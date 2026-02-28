@@ -182,6 +182,7 @@ window.initMap = async function () {
     zoom: 7,
     minZoom: 7,
     mapId: mapEl.dataset.mapId || undefined,
+    mapTypeId: "satellite",
     tilt: 0,
     heading: 0,
     rotateControl: true,
