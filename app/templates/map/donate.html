@@ -1,6 +1,6 @@
 {% extends "shared/base.html" %}
 {% block title %} | Donaciones{% endblock %}
-{% block meta_description %}Apoya el proyecto #SOSCuba Map. Dona en Bitcoin para mantener el mapa colaborativo y la infraestructura de verificacion y visualizacion.{% endblock %}
+{% block meta_description %}Apoya el proyecto #SOSCuba Map. Dona en Bitcoin para mantener el mapa colaborativo y la infraestructura de verificación y visualización.{% endblock %}
 {% block content %}
 <section class="panel donate">
   <h1>Apoya el proyecto</h1>
@@ -10,13 +10,13 @@
     <div class="donate-qr">
       <img
         src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=bitcoin:bc1qsvypsue2xvcxag7yg2fvzgv4nnjcfvapzk22rt"
-        alt="QR de donacion"
+        alt="QR de donación"
       />
     </div>
     <div class="donate-info">
-      <div class="donate-label">Direccion BTC</div>
+      <div class="donate-label">Dirección BTC</div>
       <div class="donate-address" id="btcAddress">bc1qsvypsue2xvcxag7yg2fvzgv4nnjcfvapzk22rt</div>
-      <button class="btn-secondary" id="copyBtc">Copiar direccion</button>
+      <button class="btn-secondary" id="copyBtc">Copiar dirección</button>
       <div class="donate-note">Comparte este QR para apoyar el mapa.</div>
     </div>
   </div>
@@ -30,7 +30,7 @@
     try {
       await navigator.clipboard.writeText(addr);
       copyBtn.textContent = "Copiado";
-      setTimeout(() => (copyBtn.textContent = "Copiar direccion"), 1500);
+      setTimeout(() => (copyBtn.textContent = "Copiar dirección"), 1500);
     } catch (e) {
       copyBtn.textContent = "Copia manual";
     }

@@ -4,24 +4,24 @@ let currentPolygon;
 
 const PLACEHOLDER_BY_SLUG = {
   "accion-represiva": {
-    title: "Ej: Detencion masiva en parque",
-    description: "Incluye fecha, tipo de operativo, cantidad de detenidos, fuerzas presentes, y puntos de referencia visibles.",
+    title: "Ej: Detención masiva en parque",
+    description: "Incluye fecha, tipo de operativo, cantidad de detenidos, fuerzas presentes y puntos de referencia visibles.",
   },
   "residencia-represor": {
     title: "Ej: Residencia de funcionario local",
-    description: "Describe la ubicacion exacta, referencias cercanas, horarios frecuentes y evidencias visibles.",
+    description: "Describe la ubicación exacta, referencias cercanas, horarios frecuentes y evidencias visibles.",
   },
   "centro-penitenciario": {
     title: "Ej: Centro penitenciario provincial",
     description: "Anota nombre del centro, capacidad aproximada, accesos, y cualquier dato verificable.",
   },
   "estacion-policia": {
-    title: "Ej: Estacion de policia",
-    description: "Incluye la direccion, nombre del distrito, patrullas visibles y horarios de mayor actividad.",
+    title: "Ej: Estación de policía",
+    description: "Incluye la dirección, nombre del distrito, patrullas visibles y horarios de mayor actividad.",
   },
   "escuela-pcc": {
-    title: "Ej: Escuela de formacion del PCC",
-    description: "Detalla el nombre, ubicacion, horarios, entradas, y cualquier señalizacion.",
+    title: "Ej: Escuela de formación del PCC",
+    description: "Detalla el nombre, ubicación, horarios, entradas y cualquier señalización.",
   },
   "sede-pcc": {
     title: "Ej: Sede municipal del PCC",
@@ -29,11 +29,11 @@ const PLACEHOLDER_BY_SLUG = {
   },
   "sede-seguridad-estado": {
     title: "Ej: Sede de Seguridad del Estado",
-    description: "Incluye la ubicacion precisa, accesos, presencia de vigilancia y referencias cercanas.",
+    description: "Incluye la ubicación precisa, accesos, presencia de vigilancia y referencias cercanas.",
   },
   "unidad-militar": {
     title: "Ej: Unidad militar",
-    description: "Anota el tipo de unidad, accesos, perimetro, y presencia visible.",
+    description: "Anota el tipo de unidad, accesos, perímetro y presencia visible.",
   },
   "base-espionaje": {
     title: "Ej: Base de espionaje",

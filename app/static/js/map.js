@@ -150,7 +150,7 @@ function renderRecent(posts) {
   if (!container) return;
 
   if (!posts.length) {
-    container.innerHTML = `<div class="console-empty">Sin aportaciones visibles aun.</div>`;
+    container.innerHTML = `<div class="console-empty">Sin aportaciones visibles aún.</div>`;
     return;
   }
 
@@ -260,7 +260,7 @@ window.initMap = async function () {
 
     clickInfo.setContent(`
       <div style="color:#111;max-width:240px;">
-        <div style="font-weight:600;margin-bottom:8px;">Crear reporte aqui</div>
+        <div style="font-weight:600;margin-bottom:8px;">Crear reporte aquí</div>
         <button id="createReportBtn" style="background:#6ee7b7;border:none;padding:8px 10px;border-radius:6px;cursor:pointer;">Abrir formulario</button>
       </div>
     `);
@@ -304,7 +304,7 @@ function focusSearchResult(geometry, label) {
     searchMarker = new google.maps.Marker({
       position,
       map,
-      title: label || "Busqueda",
+      title: label || "Búsqueda",
     });
   }
 }

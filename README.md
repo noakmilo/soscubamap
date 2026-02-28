@@ -6,11 +6,11 @@ Dashboard colaborativo para documentar y visualizar lugares y acciones represiva
 - Python Flask
 - PostgreSQL
 
-## Configuracion rapida
+## Configuración rápida
 1. Crear entorno virtual e instalar dependencias
 2. Copiar variables de entorno
 3. Crear base de datos y ejecutar migraciones
-4. Sembrar roles y categorias
+4. Sembrar roles y categorías
 5. Configurar admin por env
 6. Ejecutar app
 
@@ -42,5 +42,5 @@ flask --app run.py run
 - administrador: gestiona usuarios y ajustes
 
 ## Nota
-Los reportes se muestran como anonimos por defecto y pasan por moderacion.
+Los reportes se muestran como anónimos por defecto y pasan por moderación.
 Si `ADMIN_EMAIL` y `ADMIN_PASSWORD` estan en `.env`, al hacer login se crea el usuario admin automaticamente.

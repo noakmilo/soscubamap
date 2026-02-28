@@ -1,13 +1,13 @@
 {% extends "shared/base.html" %}
 {% block title %} | Nuevo reporte{% endblock %}
-{% block meta_description %}Envía un reporte anonimo sobre acciones represivas, centros penitenciarios o sedes oficiales en Cuba. Tu informacion ayuda a documentar y visibilizar.{% endblock %}
+{% block meta_description %}Envía un reporte anónimo sobre acciones represivas, centros penitenciarios o sedes oficiales en Cuba. Tu información ayuda a documentar y visibilizar.{% endblock %}
 {% block content %}
 <section class="panel">
   <h1>Nuevo reporte</h1>
-  <p>Todos los reportes se publican como anonimos. No necesitas cuenta para enviar. Los moderadores revisaran la informacion.</p>
+  <p>Todos los reportes se publican como anónimos. No necesitas cuenta para enviar. Los moderadores revisarán la información.</p>
 
   <div class="draw-wrap">
-    <div class="draw-title">Dibuja el area del reporte (opcional)</div>
+    <div class="draw-title">Dibuja el área del reporte (opcional)</div>
     <div
       id="drawMap"
       class="draw-map"
@@ -16,25 +16,25 @@
       data-lat="{{ preset_lat }}"
       data-lng="{{ preset_lng }}"
     ></div>
-    <div class="draw-help">Usa el icono de poligono para dibujar. Puedes borrar y volver a dibujar.</div>
+    <div class="draw-help">Usa el ícono de polígono para dibujar. Puedes borrar y volver a dibujar.</div>
   </div>
 
   <form class="form-grid" method="post">
     <label>
-      Titulo
-      <input type="text" name="title" id="titleInput" placeholder="Ej: Detencion arbitraria" />
+      Título
+      <input type="text" name="title" id="titleInput" placeholder="Ej: Detención arbitraria" />
     </label>
     <label>
-      Categoria
+      Categoría
       <select name="category_id" id="categorySelect" required>
-        <option value="" disabled selected>Elige categoria</option>
+        <option value="" disabled selected>Elige categoría</option>
         {% for cat in categories %}
           <option value="{{ cat.id }}" data-slug="{{ cat.slug }}">{{ cat.name }}</option>
         {% endfor %}
       </select>
     </label>
     <label>
-      Descripcion
+      Descripción
       <textarea name="description" id="descriptionInput" rows="6" required placeholder="Incluye detalles que ayuden a identificar el lugar, fechas, contexto y referencias visibles."></textarea>
     </label>
     <div class="two-col">
@@ -48,7 +48,7 @@
       </label>
     </div>
     <label>
-      Direccion
+      Dirección
       <input type="text" name="address" />
     </label>
     <label>
@@ -57,7 +57,7 @@
     </label>
     <div class="links-group">
       <div class="links-header">
-        <span>Enlaces de interes</span>
+        <span>Enlaces de interés</span>
         <button type="button" class="btn-secondary" id="addLinkBtn">+ Agregar</button>
       </div>
       <div id="linksList" class="links-list">
@@ -67,7 +67,7 @@
     <input type="hidden" name="polygon_geojson" id="polygonGeojson" />
     <button type="submit" class="btn-primary">
       {% if moderation_enabled %}
-        Enviar a moderacion
+        Enviar a moderación
       {% else %}
         Publicar reporte
       {% endif %}

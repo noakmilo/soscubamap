@@ -1,15 +1,15 @@
 {% extends "shared/base.html" %}
 {% block title %} | Mapa{% endblock %}
-{% block meta_description %}Mapa represivo de Cuba con reportes anonimos y verificados. Explora acciones represivas, sedes oficiales y centros clave en un mapa interactivo.{% endblock %}
+{% block meta_description %}Mapa represivo de Cuba con reportes anónimos y verificados. Explora acciones represivas, sedes oficiales y centros clave en un mapa interactivo.{% endblock %}
 {% block content %}
 <section class="hero">
   <div>
     <h1>Mapa Represivo de Cuba</h1>
-    <p>Documenta y visibiliza acciones y lugares de represion. Los reportes aparecen como anonimos.</p>
+    <p>Documenta y visibiliza acciones y lugares de represión. Los reportes aparecen como anónimos.</p>
   </div>
   <div class="status">
     <div class="stat">
-      <span class="label">Categorias</span>
+      <span class="label">Categorías</span>
       <span class="value">{{ categories|length }}</span>
     </div>
     <div class="stat">
@@ -23,11 +23,11 @@
   <div class="filter-title">Filtros</div>
   <div class="filter-controls">
     <label>
-      Buscar direccion (Cuba)
+      Buscar dirección (Cuba)
       <input id="mapSearch" type="text" placeholder="Ej: Vedado, La Habana" />
     </label>
     <label>
-      Categoria
+      Categoría
       <select id="categoryFilter">
         <option value="">Todas</option>
         {% for cat in categories %}
@@ -40,7 +40,7 @@
 
 {% if categories|length == 0 %}
   <section class="panel notice">
-    <strong>No hay categorias cargadas.</strong>
+    <strong>No hay categorías cargadas.</strong>
     <div>Ejecuta: <code>python -m scripts.seed_categories</code></div>
   </section>
 {% endif %}
@@ -63,7 +63,7 @@
 
 <section class="legend">
   <div class="legend-header">
-    <div class="legend-title">Leyenda de iconos</div>
+    <div class="legend-title">Leyenda de íconos</div>
   </div>
   <div class="legend-grid">
     {% for cat in categories %}
@@ -83,12 +83,12 @@
     <div class="console-status">En vivo</div>
   </div>
   <div id="recentFeed" class="console-body">
-    <div class="console-empty">Sin aportaciones visibles aun.</div>
+    <div class="console-empty">Sin aportaciones visibles aún.</div>
   </div>
 </section>
 
 <section class="categories">
-  <h2>Categorias</h2>
+  <h2>Categorías</h2>
   <div class="category-grid">
     {% for cat in categories %}
       <div class="category-card">

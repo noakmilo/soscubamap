@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{{ config.APP_NAME }}{% block title %}{% endblock %}</title>
-    <meta name="description" content="{% block meta_description %}Mapa colaborativo para documentar acciones represivas y lugares clave en Cuba. Reportes anonimos, verificacion comunitaria y visualizacion en tiempo real.{% endblock %}">
+    <meta name="description" content="{% block meta_description %}Mapa colaborativo para documentar acciones represivas y lugares clave en Cuba. Reportes anónimos, verificación comunitaria y visualización en tiempo real.{% endblock %}">
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favico.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
     <link
@@ -28,7 +28,7 @@
           <a href="{{ url_for('map.about') }}">Acerca de</a>
           <a href="{{ url_for('map.donate') }}">Donar</a>
           {% if current_user.has_role('moderador') or current_user.has_role('administrador') %}
-            <a href="{{ url_for('moderation.dashboard') }}">Moderacion</a>
+            <a href="{{ url_for('moderation.dashboard') }}">Moderación</a>
           {% endif %}
           {% if current_user.has_role('administrador') %}
             <a href="{{ url_for('admin.dashboard') }}">Admin</a>
@@ -59,7 +59,7 @@
     </main>
 
     <footer class="site-footer">
-      <div>Plataforma colaborativa y anonima.</div>
+      <div>Plataforma colaborativa y anónima.</div>
     </footer>
 
     <div id="reportModal" class="modal-overlay" aria-hidden="true">

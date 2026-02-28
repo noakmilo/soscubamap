@@ -47,7 +47,7 @@ def new_post():
             lat = Decimal(latitude)
             lng = Decimal(longitude)
         except Exception:
-            flash("Latitud/longitud invalidas.", "error")
+            flash("Latitud/longitud inválidas.", "error")
             return redirect(url_for("map.new_post"))
 
         author_id = None
@@ -86,7 +86,7 @@ def new_post():
         db.session.commit()
 
         if moderation_enabled:
-            flash("Reporte enviado a moderacion.", "success")
+            flash("Reporte enviado a moderación.", "success")
         else:
             flash("Reporte publicado.", "success")
         return redirect(url_for("map.dashboard"))

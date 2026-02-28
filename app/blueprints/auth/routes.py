@@ -23,11 +23,11 @@ def register():
         password = request.form.get("password", "")
 
         if not email or not password:
-            flash("Email y contrasena son obligatorios.", "error")
+            flash("Email y contraseña son obligatorios.", "error")
             return redirect(url_for("auth.register"))
 
         if User.query.filter_by(email=email).first():
-            flash("Ese email ya esta registrado.", "error")
+            flash("Ese email ya está registrado.", "error")
             return redirect(url_for("auth.register"))
 
         user = User(email=email)
@@ -73,7 +73,7 @@ def login():
             db.session.commit()
 
         if not user or not user.check_password(password):
-            flash("Credenciales invalidas.", "error")
+            flash("Credenciales inválidas.", "error")
             return redirect(url_for("auth.login"))
 
         login_user(user)

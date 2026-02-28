@@ -2,11 +2,11 @@
 {% block title %} | Admin{% endblock %}
 {% block content %}
 <section class="panel">
-  <h1>Administracion</h1>
-  <p>Gestion de usuarios, roles, categorias y configuracion del mapa.</p>
+  <h1>Administración</h1>
+  <p>Gestión de usuarios, roles, categorías y configuración del mapa.</p>
 
   <div class="admin-section">
-    <h2>Moderacion</h2>
+    <h2>Moderación</h2>
     <form method="post" action="{{ url_for('admin.toggle_moderation') }}">
       <label class="switch">
         <input type="checkbox" name="moderation_enabled" {% if moderation_enabled %}checked{% endif %} />
@@ -14,7 +14,7 @@
       </label>
       <span class="switch-label">
         {% if moderation_enabled %}
-          Activada (los reportes van a moderacion)
+          Activada (los reportes van a moderación)
         {% else %}
           Desactivada (los reportes se publican directo)
         {% endif %}

@@ -22,7 +22,7 @@ def dashboard():
 def toggle_moderation():
     enabled = request.form.get("moderation_enabled") == "on"
     set_setting("moderation_enabled", "true" if enabled else "false")
-    flash("Moderacion actualizada.", "success")
+    flash("Moderación actualizada.", "success")
     return redirect(url_for("admin.dashboard"))
 
 
@@ -45,7 +45,7 @@ def reports():
 def update_report_status(post_id):
     status = request.form.get("status")
     if status not in {"approved", "hidden", "deleted", "rejected", "pending"}:
-        flash("Estado invalido.", "error")
+        flash("Estado inválido.", "error")
         return redirect(url_for("admin.reports"))
 
     post = Post.query.get_or_404(post_id)
