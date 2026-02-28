@@ -118,6 +118,16 @@ async function initReportCard(card) {
     });
   }
 
+  const mapBtn = card.querySelector(".map-btn");
+  if (mapBtn) {
+    mapBtn.addEventListener("click", () => {
+      const lat = mapBtn.getAttribute("data-map-lat");
+      const lng = mapBtn.getAttribute("data-map-lng");
+      if (!lat || !lng) return;
+      window.location.href = `/?lat=${lat}&lng=${lng}`;
+    });
+  }
+
   const form = card.querySelector(".comment-form");
   if (form) {
     form.addEventListener("submit", async (e) => {

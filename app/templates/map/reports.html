@@ -49,6 +49,7 @@
           <span class="verify-count" id="verify-count-{{ post.id }}">{{ post.verify_count or 0 }}</span>
           <button class="btn-secondary" type="button" data-history-url="{{ url_for('map.post_history', post_id=post.id) }}">Historial</button>
           <button class="btn-secondary edit-btn" type="button" data-edit-url="{{ url_for('map.edit_report_public', post_id=post.id) }}">Editar</button>
+          <button class="btn-primary map-btn" type="button" data-map-lat="{{ post.latitude }}" data-map-lng="{{ post.longitude }}">Ver en el mapa</button>
         </div>
         <div class="comments" data-post-id="{{ post.id }}">
           <div class="comment-list" id="comment-list-{{ post.id }}"></div>

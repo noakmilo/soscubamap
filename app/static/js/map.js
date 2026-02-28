@@ -337,6 +337,16 @@ window.initMap = async function () {
     // Styles should be managed via Map ID when present
   });
 
+  const params = new URLSearchParams(window.location.search);
+  const latParam = parseFloat(params.get("lat"));
+  const lngParam = parseFloat(params.get("lng"));
+  if (Number.isFinite(latParam) && Number.isFinite(lngParam)) {
+    const target = { lat: latParam, lng: lngParam };
+    map.setCenter(target);
+    map.setZoom(Math.max(map.getZoom(), 14));
+    new google.maps.Marker({ position: target, map, title: "Ubicación" });
+  }
+
   const searchInput = document.getElementById("mapSearch");
   if (searchInput && google.maps.places) {
     const cubaBounds = new google.maps.LatLngBounds(

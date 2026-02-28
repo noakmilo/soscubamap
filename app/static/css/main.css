@@ -200,7 +200,7 @@ body {
 }
 
 .map-canvas {
-  height: 920px;
+  height: min(70vh, 720px);
   border: 1px solid var(--border);
   border-radius: 12px;
   background: linear-gradient(135deg, #0e1419, #101b21);
