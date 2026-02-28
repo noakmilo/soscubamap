@@ -110,3 +110,8 @@ def new_post():
 @map_bp.route("/donar")
 def donate():
     return render_template("map/donate.html")
+
+
+@map_bp.route("/acerca")
+def about():
+    return render_template("map/about.html")
