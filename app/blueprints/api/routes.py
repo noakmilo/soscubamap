@@ -1,12 +1,15 @@
-from flask import jsonify, request, make_response
+from flask import jsonify, request, make_response, session
 import json
 import secrets
+from datetime import datetime, timedelta
 from flask_login import current_user
 
 from app.extensions import db
 from app.models.comment import Comment
 from app.models.user import User
 from app.models.role import Role
+from app.models.chat_message import ChatMessage
+from app.models.chat_presence import ChatPresence
 
 from app.models.post import Post
 from app.models.category import Category
@@ -174,3 +177,77 @@ def vote_comment(comment_id):
     )
     resp.set_cookie(cookie_key, "1")
     return resp
+
+
+@api_bp.route("/chat", methods=["GET", "POST"])
+def chat_messages():
+    now = datetime.utcnow()
+    cutoff_keep = now - timedelta(hours=48)
+    cutoff_visible = now - timedelta(hours=24)
+    cutoff_online = now - timedelta(minutes=10)
+
+    ChatMessage.query.filter(ChatMessage.created_at < cutoff_keep).delete()
+    ChatPresence.query.filter(ChatPresence.last_seen < cutoff_online).delete()
+    db.session.commit()
+
+    session_id = session.get("chat_sid")
+    if not session_id:
+        session_id = secrets.token_hex(16)
+        session["chat_sid"] = session_id
+
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        body = (data.get("body") or "").strip()
+        nickname = (data.get("nickname") or "").strip()
+
+        if not body:
+            return jsonify({"ok": False, "error": "Mensaje vacío."}), 400
+
+        if not nickname:
+            nickname = session.get("chat_nick") or "Anon"
+
+        nickname = nickname[:80]
+        session["chat_nick"] = nickname
+
+        presence = ChatPresence.query.filter_by(session_id=session_id).first()
+        if not presence:
+            presence = ChatPresence(session_id=session_id, nickname=nickname, last_seen=now)
+            db.session.add(presence)
+        else:
+            presence.nickname = nickname
+            presence.last_seen = now
+
+        author_id = current_user.id if current_user.is_authenticated else None
+        msg = ChatMessage(author_id=author_id, author_label=nickname, body=body)
+        db.session.add(msg)
+        db.session.commit()
+    else:
+        nickname = session.get("chat_nick") or "Anon"
+        presence = ChatPresence.query.filter_by(session_id=session_id).first()
+        if not presence:
+            presence = ChatPresence(session_id=session_id, nickname=nickname, last_seen=now)
+            db.session.add(presence)
+        else:
+            presence.last_seen = now
+        db.session.commit()
+
+    items = (
+        ChatMessage.query.filter(ChatMessage.created_at >= cutoff_visible)
+        .order_by(ChatMessage.created_at.asc())
+        .all()
+    )
+    online_count = ChatPresence.query.count()
+    return jsonify(
+        {
+            "items": [
+                {
+                    "id": m.id,
+                    "author": m.author_label,
+                    "body": m.body,
+                    "created_at": m.created_at.isoformat(),
+                }
+                for m in items
+            ],
+            "online_count": online_count,
+        }
+    )

@@ -24,6 +24,7 @@
       </a>
       <nav class="nav-links">
         <a href="{{ url_for('map.dashboard') }}">Mapa</a>
+        <a href="{{ url_for('map.dashboard') }}#chatbox">Chat</a>
         {% if current_user.is_authenticated %}
           <button class="btn-secondary" type="button" data-open-report data-url="{{ url_for('map.new_post') }}">Nuevo reporte</button>
           <a href="{{ url_for('map.reports') }}">Reportes</a>

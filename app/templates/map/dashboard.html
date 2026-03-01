@@ -81,6 +81,30 @@
   </div>
 </section>
 
+<section id="chatbox" class="chatbox">
+  <div class="chat-header">
+    <div class="chat-title">Chat colaborativo</div>
+    <div class="chat-meta">
+      <span class="chat-online"><span id="chatOnlineCount">0</span> en línea</span>
+      <span class="chat-status">Últimas 24 horas</span>
+    </div>
+  </div>
+  <div id="chatMessages" class="chat-body">
+    <div class="chat-empty">Sin mensajes aún.</div>
+  </div>
+  <form id="chatForm" class="chat-form">
+    <label>
+      Nickname (solo chat)
+      <input type="text" id="chatNick" name="nickname" value="{{ chat_nick }}" maxlength="80" />
+    </label>
+    <label class="chat-message">
+      Mensaje
+      <input type="text" id="chatMessage" name="message" placeholder="Escribe un mensaje o enlace..." required />
+    </label>
+    <button type="submit" class="btn-primary">Enviar</button>
+  </form>
+</section>
+
 <section class="live-console">
   <div class="console-header">
     <div class="console-title">Aportaciones recientes</div>
@@ -104,6 +128,7 @@
 </section>
 
 <script src="{{ url_for('static', filename='js/map.js') }}"></script>
+<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 {% if google_maps_api_key %}
 <script async
   src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initMap&libraries=marker,places&v=beta">

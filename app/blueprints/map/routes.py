@@ -1,7 +1,7 @@
 from decimal import Decimal
 import secrets
 import json
-from flask import render_template, current_app, redirect, url_for, request, flash, abort
+from flask import render_template, current_app, redirect, url_for, request, flash, abort, session
 from flask_login import current_user
 
 from app.models.category import Category
@@ -15,6 +15,28 @@ from app.models.post_edit_request import PostEditRequest
 from app.services.geo_lookup import lookup_location, list_provinces, list_municipalities, municipalities_map
 from app.extensions import db
 from . import map_bp
+
+
+def _get_chat_nick():
+    if current_user.is_authenticated and current_user.anon_code:
+        return f"Anon-{current_user.anon_code}"
+    nick = session.get("chat_nick")
+    if nick:
+        return nick
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    code = "".join(secrets.choice(alphabet) for _ in range(6))
+    nick = f"Anon-{code}"
+    session["chat_nick"] = nick
+    return nick
+
+
+def _get_chat_session_id():
+    sid = session.get("chat_sid")
+    if sid:
+        return sid
+    sid = secrets.token_hex(16)
+    session["chat_sid"] = sid
+    return sid
 
 
 def _resolve_geo_location(lat, lng, province, municipality):
@@ -38,6 +60,8 @@ def dashboard():
         categories=categories,
         posts=posts,
         google_maps_api_key=current_app.config.get("GOOGLE_MAPS_API_KEY"),
+        chat_nick=_get_chat_nick(),
+        chat_sid=_get_chat_session_id(),
     )
 
 
