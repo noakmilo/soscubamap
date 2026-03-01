@@ -7,6 +7,7 @@ let autocomplete;
 let searchMarker;
 let geocoder;
 let isAdmin = false;
+let lockZoom = false;
 
 document.addEventListener("DOMContentLoaded", () => {
   const filters = document.querySelector(".filters");
@@ -272,7 +273,9 @@ window.handleNewReport = function (payload) {
     });
   }
   map.panTo(position);
-  map.setZoom(Math.max(map.getZoom(), 14));
+  if (!lockZoom) {
+    map.setZoom(Math.max(map.getZoom(), 14));
+  }
   markers.push(marker);
   refreshRecent();
 };
@@ -322,7 +325,9 @@ function renderRecent(posts) {
       const lng = parseFloat(btn.getAttribute("data-pan-lng"));
       if (!Number.isFinite(lat) || !Number.isFinite(lng) || !map) return;
       map.panTo({ lat, lng });
-      map.setZoom(Math.max(map.getZoom(), 14));
+      if (!lockZoom) {
+        map.setZoom(Math.max(map.getZoom(), 14));
+      }
     });
   });
 }
@@ -348,17 +353,23 @@ window.initMap = async function () {
 
   const isMobile = window.matchMedia("(max-width: 900px)").matches;
   const baseZoom = isMobile ? 6 : 7;
+  lockZoom = isMobile;
 
   map = new google.maps.Map(mapEl, {
     center: { lat: 21.521757, lng: -77.781167 },
     zoom: baseZoom,
     minZoom: baseZoom,
+    maxZoom: lockZoom ? baseZoom : undefined,
     mapId: mapEl.dataset.mapId || undefined,
     mapTypeId: "hybrid",
     tilt: 0,
     heading: 0,
     rotateControl: true,
-    gestureHandling: "greedy",
+    gestureHandling: lockZoom ? "none" : "greedy",
+    zoomControl: !lockZoom,
+    scrollwheel: !lockZoom,
+    disableDoubleClickZoom: lockZoom,
+    keyboardShortcuts: !lockZoom,
     // Styles should be managed via Map ID when present
   });
 
@@ -368,7 +379,9 @@ window.initMap = async function () {
   if (Number.isFinite(latParam) && Number.isFinite(lngParam)) {
     const target = { lat: latParam, lng: lngParam };
     map.setCenter(target);
-    map.setZoom(Math.max(map.getZoom(), 14));
+    if (!lockZoom) {
+      map.setZoom(Math.max(map.getZoom(), 14));
+    }
     new google.maps.Marker({ position: target, map, title: "Ubicación" });
   }
 
@@ -454,6 +467,13 @@ window.initMap = async function () {
 };
 
 function focusSearchResult(geometry, label) {
+  if (lockZoom) {
+    const target = geometry.location || geometry.viewport?.getCenter();
+    if (target) {
+      map.panTo(target);
+    }
+    return;
+  }
   if (geometry.viewport) {
     map.fitBounds(geometry.viewport);
   } else if (geometry.location) {

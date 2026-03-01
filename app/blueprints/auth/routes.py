@@ -22,6 +22,11 @@ def register():
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
 
+        admin_email = current_app.config.get("ADMIN_EMAIL", "").strip().lower()
+        if admin_email and email == admin_email:
+            flash("Ese email está reservado.", "error")
+            return redirect(url_for("auth.register"))
+
         if not email or not password:
             flash("Email y contraseña son obligatorios.", "error")
             return redirect(url_for("auth.register"))
@@ -55,6 +60,10 @@ def login():
         admin_email = current_app.config.get("ADMIN_EMAIL", "").strip().lower()
         admin_password = current_app.config.get("ADMIN_PASSWORD", "")
         if admin_email and admin_password and email == admin_email:
+            if password != admin_password:
+                flash("Credenciales inválidas.", "error")
+                return redirect(url_for("auth.login"))
+
             if not user:
                 user = User(email=email)
                 user.set_password(admin_password)
@@ -63,10 +72,16 @@ def login():
                 user.roles.append(admin_role)
                 db.session.add(user)
                 db.session.commit()
-            elif not user.has_role("administrador"):
-                admin_role = _get_or_create_role("administrador")
-                user.roles.append(admin_role)
+            else:
+                if not user.check_password(admin_password):
+                    user.set_password(admin_password)
+                if not user.has_role("administrador"):
+                    admin_role = _get_or_create_role("administrador")
+                    user.roles.append(admin_role)
                 db.session.commit()
+
+            login_user(user)
+            return redirect(url_for("map.dashboard"))
 
         if user and not user.anon_code:
             user.ensure_anon_code()

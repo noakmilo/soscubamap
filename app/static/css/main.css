@@ -1061,6 +1061,23 @@ textarea {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 2px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.footer-link {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: 1px;
+}
+
+.footer-link:hover {
+  color: var(--accent);
 }
 
 .history-section {

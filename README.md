@@ -43,4 +43,4 @@ flask --app run.py run
 
 ## Nota
 Los reportes se muestran como anónimos por defecto y pasan por moderación.
-Si `ADMIN_EMAIL` y `ADMIN_PASSWORD` estan en `.env`, al hacer login se crea el usuario admin automaticamente.
+Si `ADMIN_EMAIL` y `ADMIN_PASSWORD` están en `.env`, al hacer login con esas credenciales se crea el usuario admin automáticamente.
