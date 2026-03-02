@@ -29,6 +29,12 @@
             <span class="vote-score" id="post-score-{{ post.id }}">{{ post.score }}</span>
             <button class="vote-btn" data-type="post" data-id="{{ post.id }}" data-value="-1">▼</button>
             <span class="discussion-count">{{ comment_counts.get(post.id, 0) }} comentarios</span>
+            {% if current_user.is_authenticated and current_user.has_role('administrador') %}
+              <a class="btn-secondary" href="{{ url_for('admin.edit_discussion', post_id=post.id) }}">Editar</a>
+              <form method="post" action="{{ url_for('admin.delete_discussion', post_id=post.id) }}" onsubmit="return confirm('¿Eliminar esta discusión?');">
+                <button class="btn-secondary" type="submit">Eliminar</button>
+              </form>
+            {% endif %}
           </div>
         </div>
       {% endfor %}

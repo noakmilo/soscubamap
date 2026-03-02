@@ -13,6 +13,13 @@ let mapImageModalImg;
 let mapImageModalCaption;
 let pendingMarkers = [];
 
+const CUBA_BOUNDS = {
+  north: 23.6,
+  south: 19.8,
+  west: -85.2,
+  east: -73.8,
+};
+
 document.addEventListener("DOMContentLoaded", () => {
   const filters = document.querySelector(".filters");
   const toggle = document.getElementById("filtersToggle");
@@ -553,6 +560,7 @@ window.initMap = async function () {
     zoom: baseZoom,
     minZoom: baseZoom,
     maxZoom: undefined,
+    restriction: { latLngBounds: CUBA_BOUNDS, strictBounds: true },
     mapId: mapEl.dataset.mapId || undefined,
     mapTypeId: "hybrid",
     tilt: 0,

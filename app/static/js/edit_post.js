@@ -1,6 +1,12 @@
 let drawMap;
 let drawingManager;
 let currentPolygon;
+const CUBA_BOUNDS = {
+  north: 23.6,
+  south: 19.8,
+  west: -85.2,
+  east: -73.8,
+};
 
 function setupLinks() {
   const addBtn = document.getElementById("addLinkBtn");
@@ -61,6 +67,7 @@ window.initDrawMap = function () {
     center,
     zoom: 14,
     minZoom: 7,
+    restriction: { latLngBounds: CUBA_BOUNDS, strictBounds: true },
     mapId: mapEl.dataset.mapId || undefined,
     mapTypeId: "hybrid",
     disableDefaultUI: true,

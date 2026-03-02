@@ -359,10 +359,18 @@ window.initDetailMap = function () {
   const lng = parseFloat(mapEl.dataset.lng);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
+  const CUBA_BOUNDS = {
+    north: 23.6,
+    south: 19.8,
+    west: -85.2,
+    east: -73.8,
+  };
+
   const map = new google.maps.Map(mapEl, {
     center: { lat, lng },
     zoom: 14,
     minZoom: 6,
+    restriction: { latLngBounds: CUBA_BOUNDS, strictBounds: true },
     mapId: mapEl.dataset.mapId || undefined,
     mapTypeId: "hybrid",
     tilt: 0,

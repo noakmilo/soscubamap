@@ -1,6 +1,12 @@
 let drawMap;
 let drawingManager;
 let currentPolygon;
+const CUBA_BOUNDS = {
+  north: 23.6,
+  south: 19.8,
+  west: -85.2,
+  east: -73.8,
+};
 
 const PLACEHOLDER_BY_SLUG = {
   "accion-represiva": {
@@ -85,6 +91,7 @@ window.initDrawMap = function () {
     center,
     zoom: hasZoom ? zoom : hasPreset ? 14 : 7,
     minZoom: hasZoom ? Math.min(7, zoom) : 7,
+    restriction: { latLngBounds: CUBA_BOUNDS, strictBounds: true },
     mapId: mapEl.dataset.mapId || undefined,
     mapTypeId: "hybrid",
     disableDefaultUI: true,
