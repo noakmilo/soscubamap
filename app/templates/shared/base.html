@@ -2,7 +2,7 @@
 <html lang="es">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <title>{{ config.APP_NAME }}{% block title %}{% endblock %}</title>
     <meta name="description" content="{% block meta_description %}Mapa colaborativo para documentar acciones represivas y lugares clave en Cuba. Reportes anónimos, verificación comunitaria y visualización en tiempo real.{% endblock %}">
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favico.png') }}">
@@ -82,47 +82,55 @@
     <script src="{{ url_for('static', filename='js/modal.js') }}"></script>
     <script>
       (function () {
-        const allowZoomTarget = (target) => !!(target && target.closest && target.closest("[data-allow-zoom]"));
-        let allowZoom = false;
+        const viewport = document.querySelector('meta[name="viewport"]');
+        if (!viewport) return;
 
-        const isTouchInAllowedArea = (touch) => {
-          const el = document.elementFromPoint(touch.clientX, touch.clientY);
-          return allowZoomTarget(el);
+        const locked = "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no";
+        const unlocked = "width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes";
+
+        let zoomEnabled = false;
+
+        const allowZoomTarget = (target) =>
+          !!(target && target.closest && target.closest("[data-allow-zoom]"));
+
+        const enableZoom = () => {
+          if (zoomEnabled) return;
+          viewport.setAttribute("content", unlocked);
+          zoomEnabled = true;
         };
 
-        const updateAllowZoom = (event) => {
-          if (!event.touches || event.touches.length < 2) {
-            allowZoom = false;
-            return;
-          }
-          const touches = Array.from(event.touches).slice(0, 2);
-          allowZoom = touches.every(isTouchInAllowedArea);
+        const disableZoom = () => {
+          if (!zoomEnabled) return;
+          viewport.setAttribute("content", locked);
+          zoomEnabled = false;
         };
-
-        document.addEventListener("touchstart", updateAllowZoom, { passive: true });
-        document.addEventListener("touchmove", updateAllowZoom, { passive: true });
-        document.addEventListener("touchend", () => { allowZoom = false; }, { passive: true });
-        document.addEventListener("touchcancel", () => { allowZoom = false; }, { passive: true });
-
-        const blockIfNeeded = (event) => {
-          if (allowZoom) return;
-          event.preventDefault();
-        };
-
-        ["gesturestart", "gesturechange", "gestureend"].forEach((type) => {
-          document.addEventListener(type, blockIfNeeded, { passive: false });
-        });
 
         document.addEventListener(
-          "wheel",
+          "touchstart",
           (event) => {
-            if (event.ctrlKey || event.metaKey) {
-              if (!allowZoomTarget(event.target)) {
-                event.preventDefault();
-              }
+            if (allowZoomTarget(event.target)) {
+              enableZoom();
             }
           },
-          { passive: false }
+          { passive: true }
+        );
+
+        document.addEventListener(
+          "touchend",
+          () => {
+            if (zoomEnabled) {
+              setTimeout(disableZoom, 250);
+            }
+          },
+          { passive: true }
+        );
+
+        document.addEventListener(
+          "touchcancel",
+          () => {
+            disableZoom();
+          },
+          { passive: true }
         );
       })();
     </script>
