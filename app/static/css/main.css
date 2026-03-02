@@ -87,6 +87,15 @@ body {
   text-transform: uppercase;
 }
 
+.nav-links .nav-donate {
+  color: #ff4d4d;
+  font-weight: 700;
+}
+
+.nav-links .nav-donate:hover {
+  color: #ff7b7b;
+}
+
 .nav-links button {
   margin-left: 0;
 }

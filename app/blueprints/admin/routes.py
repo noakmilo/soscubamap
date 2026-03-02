@@ -6,6 +6,7 @@ from app.services.settings import get_setting, set_setting
 from app.models.post import Post
 from app.models.discussion_post import DiscussionPost
 from app.models.discussion_comment import DiscussionComment
+from app.models.discussion_tag import DiscussionTag
 from app.models.location_report import LocationReport
 from app.models.post_revision import PostRevision
 from app.models.post_edit_request import PostEditRequest
@@ -20,6 +21,7 @@ from decimal import Decimal
 from sqlalchemy import func
 from app.services.markdown_utils import render_markdown
 from app.services.media_upload import parse_media_json
+from app.services.discussion_tags import upsert_tags
 from . import admin_bp
 
 
@@ -113,6 +115,9 @@ def edit_discussion(post_id):
         body = request.form.get("body", "").strip()
         links_list = request.form.getlist("links[]")
         links_list = [link.strip() for link in links_list if link.strip()]
+        selected_tags = request.form.getlist("tags[]")
+        new_tags = request.form.get("new_tags", "")
+        new_tags = [t.strip() for t in new_tags.split(",") if t.strip()]
 
         if not title or not body:
             flash("Título y contenido son obligatorios.", "error")
@@ -122,16 +127,19 @@ def edit_discussion(post_id):
         post.body = body
         post.body_html = render_markdown(body)
         post.links_json = json.dumps(links_list) if links_list else None
+        post.tags = upsert_tags(selected_tags + new_tags)
         db.session.commit()
         flash("Discusión actualizada.", "success")
         return redirect(url_for("admin.discussions"))
 
     images = parse_media_json(post.images_json)
+    tags = DiscussionTag.query.order_by(DiscussionTag.name.asc()).all()
     return render_template(
         "admin/edit_discussion.html",
         post=post,
         links=links,
         images=images,
+        tags=tags,
     )
 
 

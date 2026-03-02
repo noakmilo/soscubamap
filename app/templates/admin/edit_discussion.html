@@ -28,6 +28,25 @@
         {% endif %}
       </div>
     </div>
+    <div class="tag-picker">
+      <div class="tag-picker-title">Etiquetas</div>
+      <div class="tag-options" id="adminTagOptions">
+        {% for tag in tags %}
+          <button
+            type="button"
+            class="tag-chip {% if tag in post.tags %}active{% endif %}"
+            data-tag="{{ tag.name }}"
+          >
+            {{ tag.name }}
+          </button>
+        {% endfor %}
+      </div>
+      <div id="adminSelectedTags"></div>
+      <label>
+        Agregar nuevas (separadas por comas)
+        <input type="text" name="new_tags" placeholder="ej: reporte, denuncia" />
+      </label>
+    </div>
     {% if images and images|length %}
       <div class="media-section">
         <div class="media-title">Imágenes</div>
@@ -60,6 +79,44 @@
       input.placeholder = "https://ejemplo.com/fuente";
       list.appendChild(input);
     });
+  }
+
+  const tagContainer = document.getElementById("adminTagOptions");
+  const selectedHolder = document.getElementById("adminSelectedTags");
+  if (tagContainer && selectedHolder) {
+    const selected = new Set();
+    tagContainer.querySelectorAll(".tag-chip.active").forEach((chip) => {
+      const tag = chip.dataset.tag;
+      if (tag) selected.add(tag);
+    });
+
+    const syncInputs = () => {
+      selectedHolder.innerHTML = "";
+      selected.forEach((tag) => {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = "tags[]";
+        input.value = tag;
+        selectedHolder.appendChild(input);
+      });
+    };
+
+    tagContainer.querySelectorAll(".tag-chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        const tag = chip.dataset.tag;
+        if (!tag) return;
+        if (selected.has(tag)) {
+          selected.delete(tag);
+          chip.classList.remove("active");
+        } else {
+          selected.add(tag);
+          chip.classList.add("active");
+        }
+        syncInputs();
+      });
+    });
+
+    syncInputs();
   }
 </script>
 {% endblock %}

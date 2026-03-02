@@ -31,7 +31,7 @@
           <button class="btn-secondary" type="button" data-open-report data-url="{{ url_for('map.new_post') }}">Nuevo reporte</button>
           <a href="{{ url_for('map.reports') }}">Reportes</a>
           <a href="{{ url_for('map.about') }}">Acerca de</a>
-          <a href="{{ url_for('map.donate') }}">Donar</a>
+          <a class="nav-donate" href="{{ url_for('map.donate') }}">Donar</a>
           {% if current_user.has_role('moderador') or current_user.has_role('administrador') %}
             <a href="{{ url_for('moderation.dashboard') }}">Moderación</a>
           {% endif %}
@@ -42,7 +42,7 @@
         {% else %}
           <a href="{{ url_for('map.reports') }}">Reportes</a>
           <a href="{{ url_for('map.about') }}">Acerca de</a>
-          <a href="{{ url_for('map.donate') }}">Donar</a>
+          <a class="nav-donate" href="{{ url_for('map.donate') }}">Donar</a>
           <a href="{{ url_for('auth.login') }}">Login</a>
           <a href="{{ url_for('auth.register') }}">Registro</a>
           <button class="btn-cta" type="button" data-open-report data-url="{{ url_for('map.new_post') }}">Hacer reporte</button>

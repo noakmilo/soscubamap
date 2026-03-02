@@ -1,6 +1,5 @@
 import json
 import secrets
-import re
 from flask import render_template, request, redirect, url_for, flash, session
 from sqlalchemy import func
 from flask_login import current_user
@@ -10,6 +9,7 @@ from app.models.discussion_post import DiscussionPost
 from app.models.discussion_comment import DiscussionComment
 from app.models.discussion_tag import DiscussionTag
 from app.services.markdown_utils import render_markdown
+from app.services.discussion_tags import upsert_tags, normalize_tag
 from app.services.media_upload import validate_files, upload_files, parse_media_json
 from . import discussions_bp
 
@@ -51,27 +51,7 @@ def _clean_captions(raw, count):
 
 
 def _normalize_tag(value: str) -> str:
-    if not value:
-        return ""
-    normalized = re.sub(r"\s+", " ", value.strip().lower())
-    return normalized
-
-
-def _upsert_tags(raw_tags):
-    tags = []
-    for raw in raw_tags:
-        slug = _normalize_tag(raw)
-        if not slug:
-            continue
-        existing = DiscussionTag.query.filter_by(slug=slug).first()
-        if existing:
-            tags.append(existing)
-            continue
-        tag = DiscussionTag(name=raw.strip()[:80], slug=slug[:80])
-        db.session.add(tag)
-        db.session.flush()
-        tags.append(tag)
-    return tags
+    return normalize_tag(value)
 
 
 @discussions_bp.route("/discusiones", methods=["GET"])
@@ -157,7 +137,7 @@ def new_discussion():
             images_json=images_json,
             author_label=nickname,
         )
-        tags = _upsert_tags(selected_tags + new_tags)
+        tags = upsert_tags(selected_tags + new_tags)
         if tags:
             post.tags = tags
         db.session.add(post)
