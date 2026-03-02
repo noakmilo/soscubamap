@@ -209,7 +209,7 @@ function syncPolygon(event) {
 function setupImageValidation() {
   const input = document.querySelector('input[name="images"]');
   const status = document.getElementById("editImageStatus");
-  const captionsList = document.getElementById("editImageCaptionList");
+  const previewList = document.getElementById("editImagePreviewList");
   if (!input) return;
 
   const maxFiles = parseInt(input.dataset.maxFiles || "3", 10);
@@ -225,21 +225,25 @@ function setupImageValidation() {
     status.textContent = message;
   };
 
-  const renderCaptions = () => {
-    if (!captionsList) return;
+  const renderPreviews = () => {
+    if (!previewList) return;
     if (!input.files || input.files.length === 0) {
-      captionsList.innerHTML = "";
+      previewList.innerHTML = "";
       return;
     }
-    captionsList.innerHTML = Array.from(input.files)
-      .map(
-        (file, idx) => `
-          <label class="image-caption">
-            Descripción corta (imagen ${idx + 1})
-            <input type="text" name="image_captions[]" maxlength="255" placeholder="${file.name}" />
-          </label>
-        `
-      )
+    previewList.innerHTML = Array.from(input.files)
+      .map((file, idx) => {
+        const url = URL.createObjectURL(file);
+        return `
+          <div class="image-preview-card">
+            <img src="${url}" alt="Vista previa ${idx + 1}" />
+            <label class="image-caption">
+              Descripción corta (imagen ${idx + 1})
+              <input type="text" name="image_captions[]" maxlength="255" placeholder="${file.name}" />
+            </label>
+          </div>
+        `;
+      })
       .join("");
   };
 
@@ -248,7 +252,7 @@ function setupImageValidation() {
     if (input.files.length > maxFiles) {
       showError(`Máximo ${maxFiles} imágenes por envío.`);
       input.value = "";
-      renderCaptions();
+      renderPreviews();
       return;
     }
 
@@ -258,19 +262,19 @@ function setupImageValidation() {
       if (!allowedExt.includes(ext)) {
         showError(`Formato no permitido: ${ext || "desconocido"}.`);
         input.value = "";
-        renderCaptions();
+        renderPreviews();
         return;
       }
       if (file.size > maxBytes) {
         showError(`Cada imagen debe ser <= ${maxMb}MB.`);
         input.value = "";
-        renderCaptions();
+        renderPreviews();
         return;
       }
     }
 
     if (status) status.textContent = "";
-    renderCaptions();
+    renderPreviews();
   });
 }
 
@@ -278,4 +282,13 @@ document.addEventListener("DOMContentLoaded", () => {
   setupLinks();
   setupProvinceMunicipality();
   setupImageValidation();
+  const form = document.querySelector(".form-grid");
+  const submit = form?.querySelector('button[type="submit"]');
+  if (form && submit) {
+    form.addEventListener("submit", () => {
+      submit.disabled = true;
+      submit.dataset.loading = "true";
+      submit.textContent = "Enviando...";
+    });
+  }
 });

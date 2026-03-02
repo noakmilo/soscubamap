@@ -135,7 +135,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const mediaInput = document.getElementById("mediaInput");
   const mediaStatus = document.getElementById("mediaStatus");
   const mediaGrid = document.getElementById("mediaGrid");
-  const captionList = document.getElementById("detailImageCaptionList");
+  const previewList = document.getElementById("detailImagePreviewList");
   const modal = document.getElementById("imageModal");
   const modalImg = document.getElementById("imageModalImg");
   const modalCaption = document.getElementById("imageModalCaption");
@@ -168,26 +168,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     btn.addEventListener("click", closeModal);
   });
 
-  const renderCaptions = () => {
-    if (!captionList || !mediaInput) return;
+  const renderPreviews = () => {
+    if (!previewList || !mediaInput) return;
     if (!mediaInput.files || mediaInput.files.length === 0) {
-      captionList.innerHTML = "";
+      previewList.innerHTML = "";
       return;
     }
-    captionList.innerHTML = Array.from(mediaInput.files)
-      .map(
-        (file, idx) => `
-          <label class="image-caption">
-            Descripción corta (imagen ${idx + 1})
-            <input type="text" name="image_captions[]" maxlength="255" placeholder="${file.name}" />
-          </label>
-        `
-      )
+    previewList.innerHTML = Array.from(mediaInput.files)
+      .map((file, idx) => {
+        const url = URL.createObjectURL(file);
+        return `
+          <div class="image-preview-card">
+            <img src="${url}" alt="Vista previa ${idx + 1}" />
+            <label class="image-caption">
+              Descripción corta (imagen ${idx + 1})
+              <input type="text" name="image_captions[]" maxlength="255" placeholder="${file.name}" />
+            </label>
+          </div>
+        `;
+      })
       .join("");
   };
 
   if (mediaInput) {
-    mediaInput.addEventListener("change", renderCaptions);
+    mediaInput.addEventListener("change", renderPreviews);
   }
 
   if (mediaForm && mediaInput) {
@@ -227,13 +231,19 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const formData = new FormData();
       Array.from(files).forEach((file) => formData.append("images", file));
-      if (captionList) {
-        captionList.querySelectorAll('input[name="image_captions[]"]').forEach((input) => {
+      if (previewList) {
+        previewList.querySelectorAll('input[name="image_captions[]"]').forEach((input) => {
           formData.append("image_captions[]", input.value || "");
         });
       }
 
       if (mediaStatus) mediaStatus.textContent = "Subiendo imágenes...";
+      const submitBtn = mediaForm.querySelector('button[type="submit"]');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.dataset.loading = "true";
+        submitBtn.textContent = "Subiendo...";
+      }
       const res = await fetch(`/api/posts/${postId}/media`, {
         method: "POST",
         body: formData,
@@ -241,6 +251,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       const data = await res.json();
       if (!res.ok || data?.ok === false) {
         if (mediaStatus) mediaStatus.textContent = data?.error || "Error al subir.";
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.dataset.loading = "false";
+          submitBtn.textContent = "Subir imágenes";
+        }
         return;
       }
 
@@ -273,10 +288,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       mediaInput.value = "";
-      renderCaptions();
+      renderPreviews();
       setTimeout(() => {
         if (mediaStatus) mediaStatus.textContent = "";
       }, 2000);
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.dataset.loading = "false";
+        submitBtn.textContent = "Subir imágenes";
+      }
     });
   }
 
