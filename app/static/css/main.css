@@ -21,6 +21,7 @@ body {
   color: var(--text);
   min-height: 100vh;
   touch-action: manipulation;
+  overflow-x: hidden;
 }
 
 .site-header {

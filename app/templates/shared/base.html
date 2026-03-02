@@ -85,27 +85,24 @@
         const allowZoomTarget = (target) => !!(target && target.closest && target.closest("[data-allow-zoom]"));
         let allowZoom = false;
 
-        document.addEventListener(
-          "touchstart",
-          (event) => {
-            allowZoom = allowZoomTarget(event.target);
-          },
-          { passive: true }
-        );
-        document.addEventListener(
-          "touchend",
-          () => {
+        const isTouchInAllowedArea = (touch) => {
+          const el = document.elementFromPoint(touch.clientX, touch.clientY);
+          return allowZoomTarget(el);
+        };
+
+        const updateAllowZoom = (event) => {
+          if (!event.touches || event.touches.length < 2) {
             allowZoom = false;
-          },
-          { passive: true }
-        );
-        document.addEventListener(
-          "touchcancel",
-          () => {
-            allowZoom = false;
-          },
-          { passive: true }
-        );
+            return;
+          }
+          const touches = Array.from(event.touches).slice(0, 2);
+          allowZoom = touches.every(isTouchInAllowedArea);
+        };
+
+        document.addEventListener("touchstart", updateAllowZoom, { passive: true });
+        document.addEventListener("touchmove", updateAllowZoom, { passive: true });
+        document.addEventListener("touchend", () => { allowZoom = false; }, { passive: true });
+        document.addEventListener("touchcancel", () => { allowZoom = false; }, { passive: true });
 
         const blockIfNeeded = (event) => {
           if (allowZoom) return;
