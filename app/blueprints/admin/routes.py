@@ -9,7 +9,7 @@ from app.models.post_revision import PostRevision
 from app.models.post_edit_request import PostEditRequest
 from app.models.category import Category
 from app.extensions import db
-from app.services.geo_lookup import lookup_location
+from app.services.geo_lookup import lookup_location, list_provinces, municipalities_map
 from flask_login import current_user
 import json
 from decimal import Decimal
@@ -194,7 +194,14 @@ def edit_report(post_id):
         flash("Reporte actualizado.", "success")
         return redirect(url_for("admin.edit_report", post_id=post.id))
 
-    return render_template("admin/edit_report.html", post=post, categories=categories, links=links)
+    return render_template(
+        "admin/edit_report.html",
+        post=post,
+        categories=categories,
+        links=links,
+        provinces=list_provinces(),
+        municipalities_map=municipalities_map(),
+    )
 
 
 @admin_bp.route("/reportes/<int:post_id>/revisiones/<int:revision_id>/restaurar", methods=["POST"])

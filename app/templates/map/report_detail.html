@@ -43,6 +43,7 @@
       data-lat="{{ post.latitude }}"
       data-lng="{{ post.longitude }}"
       data-geojson="{{ post.polygon_geojson|default('')|e }}"
+      data-allow-zoom="1"
     ></div>
 
     <div class="comments" data-post-id="{{ post.id }}">

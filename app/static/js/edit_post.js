@@ -16,6 +16,39 @@ function setupLinks() {
   });
 }
 
+function setupProvinceMunicipality() {
+  const provSelect = document.getElementById("provinceSelect");
+  const munSelect = document.getElementById("municipalitySelect");
+  const municipalities = window.CUBA_MUNICIPALITIES || {};
+  if (!provSelect || !munSelect) return;
+
+  const selectedMun = munSelect.dataset.selected || "";
+
+  const renderMunicipalities = (province, selected) => {
+    let items = [];
+    if (province && municipalities[province]) {
+      items = municipalities[province];
+    } else {
+      Object.values(municipalities).forEach((list) => {
+        items = items.concat(list);
+      });
+      items = Array.from(new Set(items)).sort();
+    }
+    munSelect.innerHTML =
+      `<option value="" disabled ${selected ? "" : "selected"}>Elige municipio</option>` +
+      items
+        .map(
+          (m) => `<option value="${m}" ${m === selected ? "selected" : ""}>${m}</option>`
+        )
+        .join("");
+  };
+
+  renderMunicipalities(provSelect.value, selectedMun);
+  provSelect.addEventListener("change", () => {
+    renderMunicipalities(provSelect.value, "");
+  });
+}
+
 window.initDrawMap = function () {
   const mapEl = document.getElementById("drawMap");
   if (!mapEl) return;
@@ -173,4 +206,7 @@ function syncPolygon(event) {
   input.value = geojson ? JSON.stringify(geojson) : "";
 }
 
-document.addEventListener("DOMContentLoaded", setupLinks);
+document.addEventListener("DOMContentLoaded", () => {
+  setupLinks();
+  setupProvinceMunicipality();
+});

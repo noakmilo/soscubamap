@@ -16,6 +16,7 @@
       data-lat="{{ post.latitude }}"
       data-lng="{{ post.longitude }}"
       data-geojson="{{ post.polygon_geojson|default('')|e }}"
+      data-allow-zoom="1"
     ></div>
     <div class="draw-help">Usa polígono, rectángulo o círculo. Puedes editar el área antes de guardar.</div>
   </div>
@@ -58,11 +59,18 @@
     <div class="two-col">
       <label>
         Provincia
-        <input type="text" name="province" value="{{ post.province or '' }}" required />
+        <select name="province" id="provinceSelect" required>
+          <option value="" disabled {% if not post.province %}selected{% endif %}>Elige provincia</option>
+          {% for prov in provinces %}
+            <option value="{{ prov }}" {% if post.province == prov %}selected{% endif %}>{{ prov }}</option>
+          {% endfor %}
+        </select>
       </label>
       <label>
         Municipio
-        <input type="text" name="municipality" value="{{ post.municipality or '' }}" required />
+        <select name="municipality" id="municipalitySelect" data-selected="{{ post.municipality or '' }}" required>
+          <option value="" disabled selected>Elige municipio</option>
+        </select>
       </label>
     </div>
     <div class="links-group">
@@ -89,6 +97,9 @@
 </section>
 
 <script src="{{ url_for('static', filename='js/edit_post.js') }}"></script>
+<script>
+  window.CUBA_MUNICIPALITIES = {{ municipalities_map|tojson }};
+</script>
 {% if config.GOOGLE_MAPS_API_KEY %}
 <script async
   src="https://maps.googleapis.com/maps/api/js?key={{ config.GOOGLE_MAPS_API_KEY }}&callback=initDrawMap&libraries=drawing&v=beta">

@@ -20,6 +20,7 @@ body {
   background: radial-gradient(circle at top left, #141a20 0%, #0b0f12 45%, #070a0c 100%);
   color: var(--text);
   min-height: 100vh;
+  touch-action: manipulation;
 }
 
 .site-header {
@@ -235,6 +236,7 @@ body {
   position: relative;
   overflow: hidden;
   box-shadow: 0 20px 40px var(--shadow);
+  touch-action: pan-x pan-y pinch-zoom;
 }
 
 .map-hint {
@@ -752,6 +754,7 @@ body {
   border-radius: 12px;
   border: 1px solid var(--border);
   overflow: hidden;
+  touch-action: pan-x pan-y pinch-zoom;
 }
 
 .draw-help {

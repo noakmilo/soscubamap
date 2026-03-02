@@ -2,7 +2,7 @@
 <html lang="es">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes" />
     <title>{{ config.APP_NAME }}{% block title %}{% endblock %}</title>
     <meta name="description" content="{% block meta_description %}Mapa colaborativo para documentar acciones represivas y lugares clave en Cuba. Reportes anónimos, verificación comunitaria y visualización en tiempo real.{% endblock %}">
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favico.png') }}">
@@ -80,5 +80,31 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/modal.js') }}"></script>
+    <script>
+      (function () {
+        const allowZoomTarget = (target) => !!(target && target.closest && target.closest("[data-allow-zoom]"));
+
+        const blockIfNeeded = (event) => {
+          if (allowZoomTarget(event.target)) return;
+          event.preventDefault();
+        };
+
+        ["gesturestart", "gesturechange", "gestureend"].forEach((type) => {
+          document.addEventListener(type, blockIfNeeded, { passive: false });
+        });
+
+        document.addEventListener(
+          "wheel",
+          (event) => {
+            if (event.ctrlKey || event.metaKey) {
+              if (!allowZoomTarget(event.target)) {
+                event.preventDefault();
+              }
+            }
+          },
+          { passive: false }
+        );
+      })();
+    </script>
   </body>
 </html>

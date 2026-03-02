@@ -327,7 +327,14 @@ def edit_report_public(post_id):
         flash("Edición aplicada.", "success")
         return redirect(url_for("map.dashboard"))
 
-    return render_template("map/edit_report.html", post=post, categories=categories, links=links)
+    return render_template(
+        "map/edit_report.html",
+        post=post,
+        categories=categories,
+        links=links,
+        provinces=list_provinces(),
+        municipalities_map=municipalities_map(),
+    )
 
 
 @map_bp.route("/reporte/<int:post_id>")
