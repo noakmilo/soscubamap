@@ -802,6 +802,89 @@ button[data-loading="true"]::after {
   margin-bottom: 20px;
 }
 
+.tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.tag-cloud-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 12px;
+  background: #0b1014;
+}
+
+.tag-cloud-item span {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.tag-cloud-item.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.tag-clear {
+  align-self: center;
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: none;
+  padding-left: 6px;
+}
+
+.tag-picker {
+  display: grid;
+  gap: 10px;
+}
+
+.tag-picker-title {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.tag-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag-chip {
+  border: 1px solid var(--border);
+  background: #0b1014;
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.tag-chip.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.tag-chip.small {
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+.discussion-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .editor-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

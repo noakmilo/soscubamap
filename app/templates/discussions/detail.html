@@ -12,6 +12,13 @@
     <h1>{{ post.title }}</h1>
     <div class="discussion-meta">{{ post.author_label }} · {{ post.created_at }}</div>
     <div class="discussion-body">{{ post.body_html|safe }}</div>
+    {% if tags and tags|length %}
+      <div class="discussion-tags">
+        {% for tag in tags %}
+          <a href="{{ url_for('discussions.index', tag=tag.slug) }}" class="tag-chip small">{{ tag.name }}</a>
+        {% endfor %}
+      </div>
+    {% endif %}
 
     {% if links and links|length %}
       <div class="muted">Fuentes</div>

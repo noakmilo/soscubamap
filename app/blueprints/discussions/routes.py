@@ -1,11 +1,13 @@
 import json
 import secrets
+import re
 from flask import render_template, request, redirect, url_for, flash, session
 from sqlalchemy import func
 
 from app.extensions import db
 from app.models.discussion_post import DiscussionPost
 from app.models.discussion_comment import DiscussionComment
+from app.models.discussion_tag import DiscussionTag
 from app.services.markdown_utils import render_markdown
 from app.services.media_upload import validate_files, upload_files, parse_media_json
 from . import discussions_bp
@@ -34,18 +36,60 @@ def _clean_captions(raw, count):
     return captions
 
 
+def _normalize_tag(value: str) -> str:
+    if not value:
+        return ""
+    normalized = re.sub(r"\s+", " ", value.strip().lower())
+    return normalized
+
+
+def _upsert_tags(raw_tags):
+    tags = []
+    for raw in raw_tags:
+        slug = _normalize_tag(raw)
+        if not slug:
+            continue
+        existing = DiscussionTag.query.filter_by(slug=slug).first()
+        if existing:
+            tags.append(existing)
+            continue
+        tag = DiscussionTag(name=raw.strip()[:80], slug=slug[:80])
+        db.session.add(tag)
+        db.session.flush()
+        tags.append(tag)
+    return tags
+
+
 @discussions_bp.route("/discusiones", methods=["GET"])
 def index():
-    posts = DiscussionPost.query.order_by(DiscussionPost.created_at.desc()).all()
+    selected_tag = request.args.get("tag", "").strip().lower()
+    if selected_tag:
+        posts = (
+            DiscussionPost.query.join(DiscussionPost.tags)
+            .filter(DiscussionTag.slug == selected_tag)
+            .order_by(DiscussionPost.created_at.desc())
+            .all()
+        )
+    else:
+        posts = DiscussionPost.query.order_by(DiscussionPost.created_at.desc()).all()
     counts = dict(
         db.session.query(DiscussionComment.post_id, func.count(DiscussionComment.id))
         .group_by(DiscussionComment.post_id)
+        .all()
+    )
+    tag_counts = (
+        db.session.query(DiscussionTag, func.count(DiscussionPost.id))
+        .join(DiscussionTag.posts)
+        .group_by(DiscussionTag.id)
+        .order_by(DiscussionTag.name.asc())
         .all()
     )
     return render_template(
         "discussions/index.html",
         posts=posts,
         comment_counts=counts,
+        tag_counts=tag_counts,
+        selected_tag=selected_tag,
         nick=_get_discussion_nick(),
     )
 
@@ -58,6 +102,9 @@ def new_discussion():
         nickname = request.form.get("nickname", "").strip()
         links_list = request.form.getlist("links[]")
         links_list = [link.strip() for link in links_list if link.strip()]
+        selected_tags = request.form.getlist("tags[]")
+        new_tags = request.form.get("new_tags", "")
+        new_tags = [t.strip() for t in new_tags.split(",") if t.strip()]
         images = [
             file
             for file in request.files.getlist("images")
@@ -99,12 +146,16 @@ def new_discussion():
             images_json=images_json,
             author_label=nickname,
         )
+        tags = _upsert_tags(selected_tags + new_tags)
+        if tags:
+            post.tags = tags
         db.session.add(post)
         db.session.commit()
         flash("Discusión publicada.", "success")
         return redirect(url_for("discussions.index"))
 
-    return render_template("discussions/new.html", nick=_get_discussion_nick())
+    tags = DiscussionTag.query.order_by(DiscussionTag.name.asc()).all()
+    return render_template("discussions/new.html", nick=_get_discussion_nick(), tags=tags)
 
 
 @discussions_bp.route("/discusiones/<int:post_id>", methods=["GET", "POST"])
@@ -167,6 +218,7 @@ def detail(post_id):
         post=post,
         links=links,
         images=images,
+        tags=post.tags,
         comments=roots,
         nick=_get_discussion_nick(),
     )

@@ -13,6 +13,7 @@ from .chat_message import ChatMessage
 from .chat_presence import ChatPresence
 from .discussion_post import DiscussionPost
 from .discussion_comment import DiscussionComment
+from .discussion_tag import DiscussionTag, discussion_post_tags
 
 __all__ = [
     "User",
@@ -30,4 +31,6 @@ __all__ = [
     "ChatPresence",
     "DiscussionPost",
     "DiscussionComment",
+    "DiscussionTag",
+    "discussion_post_tags",
 ]

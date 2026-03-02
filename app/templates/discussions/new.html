@@ -43,6 +43,20 @@
       </div>
     </div>
 
+    <div class="tag-picker">
+      <div class="tag-picker-title">Etiquetas</div>
+      <div class="tag-options" id="tagOptions">
+        {% for tag in tags %}
+          <button type="button" class="tag-chip" data-tag="{{ tag.name }}">{{ tag.name }}</button>
+        {% endfor %}
+      </div>
+      <div id="selectedTags"></div>
+      <label>
+        Agregar nuevas (separadas por comas)
+        <input type="text" name="new_tags" placeholder="ej: reporte, denuncia" />
+      </label>
+    </div>
+
     <label>
       Imágenes (máx {{ config.IMAGE_MAX_PER_SUBMIT }}, {{ config.IMAGE_MAX_MB }}MB c/u)
       <input

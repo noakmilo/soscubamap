@@ -63,6 +63,40 @@ function setupLinks() {
   });
 }
 
+function setupTagPicker() {
+  const container = document.getElementById("tagOptions");
+  const selectedHolder = document.getElementById("selectedTags");
+  if (!container || !selectedHolder) return;
+
+  const selected = new Set();
+
+  const syncInputs = () => {
+    selectedHolder.innerHTML = "";
+    selected.forEach((tag) => {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = "tags[]";
+      input.value = tag;
+      selectedHolder.appendChild(input);
+    });
+  };
+
+  container.querySelectorAll(".tag-chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const tag = chip.dataset.tag;
+      if (!tag) return;
+      if (selected.has(tag)) {
+        selected.delete(tag);
+        chip.classList.remove("active");
+      } else {
+        selected.add(tag);
+        chip.classList.add("active");
+      }
+      syncInputs();
+    });
+  });
+}
+
 function setupImageUploads() {
   const input = document.querySelector('input[name="images"]');
   const status = document.getElementById("discussionImageStatus");
@@ -207,4 +241,5 @@ document.addEventListener("DOMContentLoaded", () => {
   setupVotes();
   setupLoadingButtons();
   setupReplyToggles();
+  setupTagPicker();
 });

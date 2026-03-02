@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from app.extensions import db
+from app.models.discussion_tag import discussion_post_tags
 
 
 class DiscussionPost(db.Model):
@@ -23,6 +24,11 @@ class DiscussionPost(db.Model):
         "DiscussionComment",
         back_populates="post",
         cascade="all, delete-orphan",
+    )
+    tags = db.relationship(
+        "DiscussionTag",
+        secondary=discussion_post_tags,
+        back_populates="posts",
     )
 
     @property
