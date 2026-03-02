@@ -10,6 +10,7 @@ let isAdmin = false;
 let allPosts = [];
 let mapImageModal;
 let mapImageModalImg;
+let mapImageModalCaption;
 
 document.addEventListener("DOMContentLoaded", () => {
   const filters = document.querySelector(".filters");
@@ -26,12 +27,14 @@ document.addEventListener("DOMContentLoaded", () => {
 function setupMapImageModal() {
   mapImageModal = document.getElementById("mapImageModal");
   mapImageModalImg = document.getElementById("mapImageModalImg");
+  mapImageModalCaption = document.getElementById("mapImageModalCaption");
   if (!mapImageModal || !mapImageModalImg) return;
 
   const close = () => {
     mapImageModal.setAttribute("aria-hidden", "true");
     mapImageModal.classList.remove("open");
     mapImageModalImg.src = "";
+    if (mapImageModalCaption) mapImageModalCaption.textContent = "";
   };
 
   document.querySelectorAll("[data-close-map-image]").forEach((btn) => {
@@ -149,8 +152,15 @@ function renderMarkers(posts) {
             .map((item) => {
               const url = typeof item === "string" ? item : item?.url;
               if (!url) return "";
+              const caption = typeof item === "string" ? "" : item?.caption || "";
+              const safeCaption = caption
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll("\"", "&quot;")
+                .replaceAll("'", "&#39;");
               return `
-                <button class="info-media-thumb" type="button" data-image="${url}">
+                <button class="info-media-thumb" type="button" data-image="${url}" data-caption="${safeCaption}">
                   <img src="${url}" alt="Imagen del reporte" />
                 </button>
               `;
@@ -198,8 +208,10 @@ function renderMarkers(posts) {
       thumbs.forEach((thumb) => {
         thumb.addEventListener("click", () => {
           const url = thumb.getAttribute("data-image");
+          const caption = thumb.getAttribute("data-caption") || "";
           if (!url || !mapImageModal || !mapImageModalImg) return;
           mapImageModalImg.src = url;
+          if (mapImageModalCaption) mapImageModalCaption.textContent = caption;
           mapImageModal.setAttribute("aria-hidden", "false");
           mapImageModal.classList.add("open");
         });

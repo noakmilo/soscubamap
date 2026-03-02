@@ -34,8 +34,24 @@ def _clean_captions(raw, count):
     return captions
 
 
-@discussions_bp.route("/discusiones", methods=["GET", "POST"])
+@discussions_bp.route("/discusiones", methods=["GET"])
 def index():
+    posts = DiscussionPost.query.order_by(DiscussionPost.created_at.desc()).all()
+    counts = dict(
+        db.session.query(DiscussionComment.post_id, func.count(DiscussionComment.id))
+        .group_by(DiscussionComment.post_id)
+        .all()
+    )
+    return render_template(
+        "discussions/index.html",
+        posts=posts,
+        comment_counts=counts,
+        nick=_get_discussion_nick(),
+    )
+
+
+@discussions_bp.route("/discusiones/nueva", methods=["GET", "POST"])
+def new_discussion():
     if request.method == "POST":
         title = request.form.get("title", "").strip()
         body = request.form.get("body", "").strip()
@@ -51,7 +67,7 @@ def index():
 
         if not title or not body:
             flash("Título y contenido son obligatorios.", "error")
-            return redirect(url_for("discussions.index"))
+            return redirect(url_for("discussions.new_discussion"))
 
         if not nickname:
             nickname = _get_discussion_nick()
@@ -62,7 +78,7 @@ def index():
             ok, error = validate_files(images)
             if not ok:
                 flash(error, "error")
-                return redirect(url_for("discussions.index"))
+                return redirect(url_for("discussions.new_discussion"))
 
         body_html = render_markdown(body)
         images_json = None
@@ -86,20 +102,9 @@ def index():
         db.session.add(post)
         db.session.commit()
         flash("Discusión publicada.", "success")
-        return redirect(url_for("discussions.detail", post_id=post.id))
+        return redirect(url_for("discussions.index"))
 
-    posts = DiscussionPost.query.order_by(DiscussionPost.created_at.desc()).all()
-    counts = dict(
-        db.session.query(DiscussionComment.post_id, func.count(DiscussionComment.id))
-        .group_by(DiscussionComment.post_id)
-        .all()
-    )
-    return render_template(
-        "discussions/index.html",
-        posts=posts,
-        comment_counts=counts,
-        nick=_get_discussion_nick(),
-    )
+    return render_template("discussions/new.html", nick=_get_discussion_nick())
 
 
 @discussions_bp.route("/discusiones/<int:post_id>", methods=["GET", "POST"])

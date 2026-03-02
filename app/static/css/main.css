@@ -787,6 +787,12 @@ button[data-loading="true"]::after {
   margin-bottom: 32px;
 }
 
+.discussion-cta {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+}
+
 .editor-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1321,6 +1327,9 @@ textarea {
 .image-modal-content img {
   max-width: 90vw;
   max-height: 80vh;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
   display: block;
 }
 
