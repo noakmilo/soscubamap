@@ -574,6 +574,18 @@ window.initMap = async function () {
     // Styles should be managed via Map ID when present
   });
 
+  const bounds = new google.maps.LatLngBounds(
+    { lat: CUBA_BOUNDS.south, lng: CUBA_BOUNDS.west },
+    { lat: CUBA_BOUNDS.north, lng: CUBA_BOUNDS.east }
+  );
+  map.fitBounds(bounds);
+  google.maps.event.addListenerOnce(map, "idle", () => {
+    const currentZoom = map.getZoom();
+    if (typeof currentZoom === "number") {
+      map.setOptions({ minZoom: currentZoom });
+    }
+  });
+
   const params = new URLSearchParams(window.location.search);
   const latParam = parseFloat(params.get("lat"));
   const lngParam = parseFloat(params.get("lng"));
