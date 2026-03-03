@@ -80,5 +80,57 @@
       <div class="muted">No hay ediciones registradas aún.</div>
     {% endif %}
   </div>
+
+  <div class="history-section">
+    <h2>Intentos de edición rechazados</h2>
+    {% if rejected_edits %}
+      <div class="history-list">
+        {% for edit in rejected_edits %}
+          <div class="history-card rejected" id="rejected-{{ edit.id }}">
+            <div class="muted">{{ edit.created_at }} · {{ edit.editor_label or 'Anon' }}</div>
+            {% if edit.rejection_reason %}
+              <div class="muted"><em>Intento de edición rechazado por: {{ edit.rejection_reason }}</em></div>
+            {% else %}
+              <div class="muted"><em>Intento de edición rechazado.</em></div>
+            {% endif %}
+            {% if edit.reason %}
+              <div class="muted"><strong>Motivo del editor:</strong> {{ edit.reason }}</div>
+            {% endif %}
+            <div><strong>Título propuesto:</strong> {{ edit.title }}</div>
+            <div><strong>Descripción propuesta:</strong> {{ edit.description }}</div>
+            <div><strong>Coordenadas propuestas:</strong> {{ edit.latitude }}, {{ edit.longitude }}</div>
+            {% if edit.province or edit.municipality %}
+              <div><strong>Provincia:</strong> {{ edit.province or 'N/D' }} · <strong>Municipio:</strong> {{ edit.municipality or 'N/D' }}</div>
+            {% endif %}
+            {% if edit.address %}<div><strong>Dirección:</strong> {{ edit.address }}</div>{% endif %}
+            {% if edit.repressor_name %}
+              <div><strong>Represor:</strong> {{ edit.repressor_name }}</div>
+            {% endif %}
+            {% if edit.other_type %}
+              <div><strong>Tipo:</strong> {{ edit.other_type }}</div>
+            {% endif %}
+            {% if edit.links_json %}
+              <div><strong>Enlaces:</strong>
+                <ul class="history-links">
+                  {% for link in rejected_links[edit.id] %}<li>{{ link }}</li>{% endfor %}
+                </ul>
+              </div>
+            {% endif %}
+            {% if rejected_media[edit.id] %}
+              <div><strong>Imágenes:</strong>
+                <div class="history-media">
+                  {% for item in rejected_media[edit.id] %}
+                    <img src="{{ item.url }}" alt="Imagen del reporte" />
+                  {% endfor %}
+                </div>
+              </div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="muted">No hay intentos rechazados registrados.</div>
+    {% endif %}
+  </div>
 </section>
 {% endblock %}

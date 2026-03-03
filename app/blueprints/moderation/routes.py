@@ -1,5 +1,5 @@
 import json
-from flask import render_template, redirect, url_for, flash
+from flask import render_template, redirect, url_for, flash, request
 from flask_login import login_required
 
 from app.extensions import db
@@ -30,6 +30,8 @@ def approve(post_id):
     post.status = "approved"
     db.session.commit()
     flash("Reporte aprobado.", "success")
+    if request.args.get("modal") == "1":
+        return render_template("map/edit_success.html", payload={"status": "approved"})
     return redirect(url_for("moderation.dashboard"))
 
 
@@ -41,6 +43,8 @@ def reject(post_id):
     post.status = "rejected"
     db.session.commit()
     flash("Reporte rechazado.", "success")
+    if request.args.get("modal") == "1":
+        return render_template("map/edit_success.html", payload={"status": "rejected"})
     return redirect(url_for("moderation.dashboard"))
 
 
@@ -100,6 +104,8 @@ def approve_edit(edit_id):
     edit.status = "approved"
     db.session.commit()
     flash("Edición aprobada.", "success")
+    if request.args.get("modal") == "1":
+        return render_template("map/edit_success.html", payload={"status": "approved"})
     return redirect(url_for("moderation.dashboard"))
 
 
@@ -108,9 +114,18 @@ def approve_edit(edit_id):
 @role_required("moderador", "administrador")
 def reject_edit(edit_id):
     edit = PostEditRequest.query.get_or_404(edit_id)
+    rejection_reason = request.form.get("rejection_reason", "").strip()
+    if not rejection_reason:
+        flash("Debes indicar un motivo de rechazo.", "error")
+        if request.args.get("modal") == "1":
+            return redirect(url_for("moderation.edit_detail", edit_id=edit.id, modal=1))
+        return redirect(url_for("moderation.edit_detail", edit_id=edit.id))
+    edit.rejection_reason = rejection_reason
     edit.status = "rejected"
     db.session.commit()
     flash("Edición rechazada.", "success")
+    if request.args.get("modal") == "1":
+        return render_template("map/edit_success.html", payload={"status": "rejected"})
     return redirect(url_for("moderation.dashboard"))
 
 

@@ -33,10 +33,10 @@
 
     <div class="report-actions">
       {% if current_user.is_authenticated and (current_user.has_role('moderador') or current_user.has_role('administrador')) and post.status == 'pending' %}
-        <form method="post" action="{{ url_for('moderation.approve', post_id=post.id) }}">
+        <form method="post" action="{{ url_for('moderation.approve', post_id=post.id, modal=1 if request.args.get('modal') else None) }}">
           <button class="btn-primary" type="submit">Aprobar</button>
         </form>
-        <form method="post" action="{{ url_for('moderation.reject', post_id=post.id) }}">
+        <form method="post" action="{{ url_for('moderation.reject', post_id=post.id, modal=1 if request.args.get('modal') else None) }}">
           <button class="btn-secondary" type="submit">Rechazar</button>
         </form>
       {% endif %}

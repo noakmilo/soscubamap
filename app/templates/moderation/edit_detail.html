@@ -40,10 +40,14 @@
     </div>
 
     <div class="report-actions">
-      <form method="post" action="{{ url_for('moderation.approve_edit', edit_id=edit.id) }}">
+      <form method="post" action="{{ url_for('moderation.approve_edit', edit_id=edit.id, modal=1 if request.args.get('modal') else None) }}">
         <button class="btn-primary" type="submit">Aprobar edición</button>
       </form>
-      <form method="post" action="{{ url_for('moderation.reject_edit', edit_id=edit.id) }}">
+      <form method="post" action="{{ url_for('moderation.reject_edit', edit_id=edit.id, modal=1 if request.args.get('modal') else None) }}">
+        <label>
+          Motivo de rechazo
+          <textarea name="rejection_reason" rows="3" required placeholder="Explica por qué se rechaza esta edición."></textarea>
+        </label>
         <button class="btn-secondary" type="submit">Rechazar edición</button>
       </form>
       <a class="btn-secondary" href="{{ url_for('map.report_detail', post_id=post.id) }}">Ver reporte original</a>

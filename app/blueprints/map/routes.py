@@ -727,6 +727,11 @@ def report_detail(post_id):
 def post_history(post_id):
     post = Post.query.get_or_404(post_id)
     revisions = PostRevision.query.filter_by(post_id=post.id).order_by(PostRevision.created_at.desc()).all()
+    rejected_edits = (
+        PostEditRequest.query.filter_by(post_id=post.id, status="rejected")
+        .order_by(PostEditRequest.created_at.desc())
+        .all()
+    )
     latest_reason = None
     if revisions:
         latest_reason = revisions[0].reason
@@ -751,6 +756,21 @@ def post_history(post_id):
         else:
             rev_media[rev.id] = []
 
+    rejected_links = {}
+    rejected_media = {}
+    for edit in rejected_edits:
+        if edit.links_json:
+            try:
+                rejected_links[edit.id] = json.loads(edit.links_json)
+            except Exception:
+                rejected_links[edit.id] = []
+        else:
+            rejected_links[edit.id] = []
+        if edit.media_json:
+            rejected_media[edit.id] = parse_media_json(edit.media_json)
+        else:
+            rejected_media[edit.id] = []
+
     return render_template(
         "map/post_history.html",
         post=post,
@@ -760,6 +780,9 @@ def post_history(post_id):
         latest_reason=latest_reason,
         media_items=get_media_payload(post),
         rev_media=rev_media,
+        rejected_edits=rejected_edits,
+        rejected_links=rejected_links,
+        rejected_media=rejected_media,
     )
 
 

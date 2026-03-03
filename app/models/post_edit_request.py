@@ -26,6 +26,7 @@ class PostEditRequest(db.Model):
     polygon_geojson = db.Column(db.Text)
     links_json = db.Column(db.Text)
     media_json = db.Column(db.Text)
+    rejection_reason = db.Column(db.Text)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 

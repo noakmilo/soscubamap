@@ -1735,6 +1735,12 @@ textarea {
 .pending-link {
   color: var(--text);
   text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
 }
 
 .pending-link:hover {
@@ -1897,6 +1903,11 @@ textarea {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 14px;
+}
+
+.history-card.rejected {
+  opacity: 0.65;
+  font-style: italic;
 }
 
 .history-links {

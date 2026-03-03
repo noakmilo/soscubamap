@@ -11,7 +11,16 @@
       {% for post in pending %}
         <div class="pending-card">
           <div>
-            <h3><a class="pending-link" href="{{ url_for('map.report_detail', post_id=post.id) }}">{{ post.title }}</a></h3>
+            <h3>
+              <button
+                type="button"
+                class="pending-link"
+                data-open-report
+                data-url="{{ url_for('map.report_detail', post_id=post.id) }}"
+              >
+                {{ post.title }}
+              </button>
+            </h3>
             <div class="muted">{{ post.category.name }}</div>
             <p>{{ post.description }}</p>
             <div class="muted">{{ post.latitude }}, {{ post.longitude }}</div>
@@ -39,7 +48,16 @@
       {% for edit in pending_edits %}
         <div class="pending-card">
           <div>
-            <h3><a class="pending-link" href="{{ url_for('moderation.edit_detail', edit_id=edit.id) }}">{{ edit.title }}</a></h3>
+            <h3>
+              <button
+                type="button"
+                class="pending-link"
+                data-open-report
+                data-url="{{ url_for('moderation.edit_detail', edit_id=edit.id) }}"
+              >
+                {{ edit.title }}
+              </button>
+            </h3>
             <div class="muted">Reporte #{{ edit.post_id }}</div>
             <div class="muted">{{ edit.editor_label or 'Anon' }} · {{ edit.created_at }}</div>
             <div class="muted"><strong>Motivo:</strong> {{ edit.reason }}</div>
@@ -48,9 +66,6 @@
           <div class="actions">
             <form method="post" action="{{ url_for('moderation.approve_edit', edit_id=edit.id) }}">
               <button class="btn-primary" type="submit">Aprobar edición</button>
-            </form>
-            <form method="post" action="{{ url_for('moderation.reject_edit', edit_id=edit.id) }}">
-              <button class="btn-secondary" type="submit">Rechazar edición</button>
             </form>
           </div>
         </div>
