@@ -121,6 +121,11 @@
       <div class="image-previews" id="editImagePreviewList"></div>
     </div>
     <input type="hidden" name="polygon_geojson" id="polygonGeojson" value="{{ post.polygon_geojson or '' }}" />
+    {% if recaptcha_site_key %}
+      <div class="recaptcha-wrap">
+        <div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div>
+      </div>
+    {% endif %}
     <button type="submit" class="btn-primary">Enviar edición</button>
   </form>
 
@@ -133,6 +138,9 @@
 <script>
   window.CUBA_MUNICIPALITIES = {{ municipalities_map|tojson }};
 </script>
+{% if recaptcha_site_key %}
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+{% endif %}
 {% if config.GOOGLE_MAPS_API_KEY %}
 <script async
   src="https://maps.googleapis.com/maps/api/js?key={{ config.GOOGLE_MAPS_API_KEY }}&callback=initDrawMap&libraries=drawing&v=beta">

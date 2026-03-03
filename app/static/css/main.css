@@ -1385,6 +1385,11 @@ button[data-loading="true"]::after {
   font-size: 14px;
 }
 
+.recaptcha-wrap {
+  display: flex;
+  justify-content: flex-start;
+}
+
 input,
 select,
 textarea {

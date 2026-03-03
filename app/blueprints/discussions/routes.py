@@ -1,6 +1,6 @@
 import json
 import secrets
-from flask import render_template, request, redirect, url_for, flash, session
+from flask import render_template, request, redirect, url_for, flash, session, current_app
 from sqlalchemy import func
 from flask_login import current_user
 
@@ -11,6 +11,7 @@ from app.models.discussion_tag import DiscussionTag
 from app.services.markdown_utils import render_markdown
 from app.services.discussion_tags import upsert_tags, normalize_tag
 from app.services.media_upload import validate_files, upload_files, parse_media_json
+from app.services.recaptcha import verify_recaptcha, recaptcha_enabled
 from . import discussions_bp
 
 
@@ -96,6 +97,11 @@ def index():
 @limiter.limit("3/minute; 30/day", methods=["POST"])
 def new_discussion():
     if request.method == "POST":
+        if recaptcha_enabled():
+            token = request.form.get("g-recaptcha-response", "")
+            if not verify_recaptcha(token, request.remote_addr):
+                flash("Verificación reCAPTCHA falló. Intenta nuevamente.", "error")
+                return redirect(url_for("discussions.new_discussion"))
         title = request.form.get("title", "").strip()
         body = request.form.get("body", "").strip()
         nickname = request.form.get("nickname", "").strip()
@@ -151,7 +157,12 @@ def new_discussion():
         return redirect(url_for("discussions.index"))
 
     tags = DiscussionTag.query.order_by(DiscussionTag.name.asc()).all()
-    return render_template("discussions/new.html", nick=_get_discussion_nick(), tags=tags)
+    return render_template(
+        "discussions/new.html",
+        nick=_get_discussion_nick(),
+        tags=tags,
+        recaptcha_site_key=current_app.config.get("RECAPTCHA_V2_SITE_KEY"),
+    )
 
 
 @discussions_bp.route("/discusiones/<int:post_id>", methods=["GET", "POST"])

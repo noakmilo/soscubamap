@@ -72,11 +72,20 @@
     </label>
     <div class="image-previews" id="discussionImagePreviewList"></div>
 
+    {% if recaptcha_site_key %}
+      <div class="recaptcha-wrap">
+        <div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div>
+      </div>
+    {% endif %}
+
     <button type="submit" class="btn-primary">Publicar discusión</button>
   </form>
 </section>
 
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+{% if recaptcha_site_key %}
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+{% endif %}
 <script src="{{ url_for('static', filename='js/discussions.js') }}"></script>
 {% endblock %}

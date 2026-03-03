@@ -21,6 +21,7 @@ from app.services.media_upload import (
     validate_files,
     upload_files,
 )
+from app.services.recaptcha import verify_recaptcha, recaptcha_enabled
 from app.extensions import db, limiter
 from . import map_bp
 
@@ -93,6 +94,11 @@ def dashboard():
 def new_post():
     categories = Category.query.order_by(Category.id.asc()).all()
     if request.method == "POST":
+        if recaptcha_enabled():
+            token = request.form.get("g-recaptcha-response", "")
+            if not verify_recaptcha(token, request.remote_addr):
+                flash("Verificación reCAPTCHA falló. Intenta nuevamente.", "error")
+                return redirect(url_for("map.new_post"))
         title = request.form.get("title", "").strip()
         description = request.form.get("description", "").strip()
         category_id = request.form.get("category_id")
@@ -217,6 +223,7 @@ def new_post():
         moderation_enabled=moderation_enabled,
         provinces=list_provinces(),
         municipalities_map=municipalities_map(),
+        recaptcha_site_key=current_app.config.get("RECAPTCHA_V2_SITE_KEY"),
     )
 
 
@@ -290,6 +297,11 @@ def edit_report_public(post_id):
             links = []
 
     if request.method == "POST":
+        if recaptcha_enabled():
+            token = request.form.get("g-recaptcha-response", "")
+            if not verify_recaptcha(token, request.remote_addr):
+                flash("Verificación reCAPTCHA falló. Intenta nuevamente.", "error")
+                return redirect(url_for("map.edit_report_public", post_id=post.id))
         title = request.form.get("title", "").strip()
         description = request.form.get("description", "").strip()
         edit_reason = request.form.get("edit_reason", "").strip()
@@ -443,6 +455,7 @@ def edit_report_public(post_id):
         moderation_enabled=moderation_enabled,
         provinces=list_provinces(),
         municipalities_map=municipalities_map(),
+        recaptcha_site_key=current_app.config.get("RECAPTCHA_V2_SITE_KEY"),
     )
 
 
