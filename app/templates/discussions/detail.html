@@ -42,7 +42,7 @@
 
     <div class="discussion-actions">
       <button class="vote-btn" data-type="post" data-id="{{ post.id }}" data-value="1">▲</button>
-      <span class="vote-score" id="post-score-{{ post.id }}">{{ post.score }}</span>
+      <span class="vote-score {% if post.score < 0 %}score-negative{% endif %}" id="post-score-{{ post.id }}">{{ post.score }}</span>
       <button class="vote-btn" data-type="post" data-id="{{ post.id }}" data-value="-1">▼</button>
     </div>
   </div>
@@ -53,7 +53,7 @@
       <div class="discussion-body">{{ comment.rendered_body_html|safe }}</div>
       <div class="discussion-actions">
         <button class="vote-btn" data-type="comment" data-id="{{ comment.id }}" data-value="1">▲</button>
-        <span class="vote-score" id="comment-score-{{ comment.id }}">{{ comment.score }}</span>
+        <span class="vote-score {% if comment.score < 0 %}score-negative{% endif %}" id="comment-score-{{ comment.id }}">{{ comment.score }}</span>
         <button class="vote-btn" data-type="comment" data-id="{{ comment.id }}" data-value="-1">▼</button>
         <button class="btn-secondary reply-toggle" type="button" data-reply-toggle="{{ comment.id }}">Responder</button>
         {% if current_user.is_authenticated and current_user.has_role('administrador') %}

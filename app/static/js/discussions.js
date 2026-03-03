@@ -190,6 +190,7 @@ function setupVotes() {
           : document.getElementById(`comment-score-${id}`);
       if (scoreEl && typeof data.score !== "undefined") {
         scoreEl.textContent = data.score;
+        scoreEl.classList.toggle("score-negative", data.score < 0);
       }
     });
   });

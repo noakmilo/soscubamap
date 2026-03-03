@@ -47,7 +47,7 @@
           <div class="discussion-snippet">{{ post.rendered_body_html|safe }}</div>
           <div class="discussion-actions">
             <button class="vote-btn" data-type="post" data-id="{{ post.id }}" data-value="1">▲</button>
-            <span class="vote-score" id="post-score-{{ post.id }}">{{ post.score }}</span>
+            <span class="vote-score {% if post.score < 0 %}score-negative{% endif %}" id="post-score-{{ post.id }}">{{ post.score }}</span>
             <button class="vote-btn" data-type="post" data-id="{{ post.id }}" data-value="-1">▼</button>
             <span class="discussion-count">{{ comment_counts.get(post.id, 0) }} comentarios</span>
             {% if current_user.is_authenticated and current_user.has_role('administrador') %}

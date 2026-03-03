@@ -62,7 +62,7 @@ function renderComments(postId, items) {
           <div class="comment-body">${escapeHtml(c.body)}</div>
           <div class="comment-actions">
             <button class="comment-vote" data-vote="1">▲</button>
-            <span class="comment-score" id="comment-score-${c.id}">${c.score}</span>
+            <span class="comment-score ${c.score < 0 ? "score-negative" : ""}" id="comment-score-${c.id}">${c.score}</span>
             <button class="comment-vote" data-vote="-1">▼</button>
             ${isAdmin ? `<button class="comment-delete" data-delete="${c.id}">Eliminar</button>` : ""}
           </div>
@@ -80,7 +80,10 @@ function renderComments(postId, items) {
       const result = await voteComment(commentId, value);
       if (result && typeof result.score !== "undefined") {
         const scoreEl = document.getElementById(`comment-score-${commentId}`);
-        if (scoreEl) scoreEl.textContent = result.score;
+        if (scoreEl) {
+          scoreEl.textContent = result.score;
+          scoreEl.classList.toggle("score-negative", result.score < 0);
+        }
       }
     });
   });

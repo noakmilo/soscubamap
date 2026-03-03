@@ -1910,6 +1910,10 @@ textarea {
   font-style: italic;
 }
 
+.score-negative {
+  color: var(--danger);
+}
+
 .history-links {
   margin: 8px 0 0;
   padding-left: 18px;
