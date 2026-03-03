@@ -1406,6 +1406,10 @@ button[data-loading="true"]::after {
   gap: 12px;
 }
 
+.category-fields.is-hidden {
+  display: none;
+}
+
 .category-alert {
   border: 1px solid var(--danger);
   background: rgba(239, 68, 68, 0.12);
