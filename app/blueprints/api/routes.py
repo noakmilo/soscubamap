@@ -1,4 +1,5 @@
 from flask import jsonify, request, make_response, session, current_app
+import math
 import json
 import secrets
 from datetime import datetime, timedelta
@@ -116,6 +117,120 @@ def posts():
             for p in items
         ]
     )
+
+
+def _serialize_post(post: Post):
+    return {
+        "id": post.id,
+        "title": post.title,
+        "description": post.description,
+        "latitude": float(post.latitude),
+        "longitude": float(post.longitude),
+        "address": post.address,
+        "province": post.province,
+        "municipality": post.municipality,
+        "repressor_name": post.repressor_name,
+        "other_type": post.other_type,
+        "status": post.status,
+        "polygon_geojson": post.polygon_geojson,
+        "links": json.loads(post.links_json) if post.links_json else [],
+        "media": get_media_payload(post),
+        "verify_count": post.verify_count or 0,
+        "created_at": post.created_at.isoformat() if post.created_at else None,
+        "updated_at": post.updated_at.isoformat() if post.updated_at else None,
+        "anon": f"Anon-{post.author.anon_code}" if post.author and post.author.anon_code else "Anon",
+        "category": {
+            "id": post.category.id,
+            "name": post.category.name,
+            "slug": post.category.slug,
+        }
+        if post.category
+        else None,
+    }
+
+
+@api_bp.route("/v1/reports")
+@limiter.limit("120/minute")
+def reports_v1():
+    category_id = request.args.get("category_id")
+    province = (request.args.get("province") or "").strip()
+    municipality = (request.args.get("municipality") or "").strip()
+    status = (request.args.get("status") or "approved").strip().lower()
+
+    allowed_statuses = {"pending", "approved", "rejected", "hidden", "deleted"}
+    if status not in allowed_statuses:
+        status = "approved"
+
+    if status != "approved" and not _is_admin_user():
+        status = "approved"
+
+    query = Post.query.options(
+        selectinload(Post.media),
+        selectinload(Post.category),
+        selectinload(Post.author),
+    )
+    query = query.filter(Post.status == status)
+
+    if category_id:
+        try:
+            query = query.filter(Post.category_id == int(category_id))
+        except ValueError:
+            pass
+
+    if province:
+        query = query.filter(Post.province.ilike(province))
+    if municipality:
+        query = query.filter(Post.municipality.ilike(municipality))
+
+    try:
+        page = max(int(request.args.get("page", 1)), 1)
+    except ValueError:
+        page = 1
+    try:
+        per_page = max(int(request.args.get("per_page", 50)), 1)
+    except ValueError:
+        per_page = 50
+    per_page = min(per_page, 100)
+
+    total = query.count()
+    pages = max(math.ceil(total / per_page), 1) if per_page else 1
+    items = (
+        query.order_by(Post.created_at.desc())
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
+
+    return jsonify(
+        {
+            "page": page,
+            "per_page": per_page,
+            "total": total,
+            "pages": pages,
+            "has_next": page < pages,
+            "has_prev": page > 1,
+            "items": [_serialize_post(p) for p in items],
+        }
+    )
+
+
+@api_bp.route("/v1/reports/<int:post_id>")
+@limiter.limit("120/minute")
+def report_detail_v1(post_id):
+    query = Post.query.options(
+        selectinload(Post.media),
+        selectinload(Post.category),
+        selectinload(Post.author),
+    )
+    post = query.get_or_404(post_id)
+    if post.status != "approved" and not _is_admin_user():
+        return jsonify({"error": "No autorizado."}), 403
+    return jsonify(_serialize_post(post))
+
+
+@api_bp.route("/v1/categories")
+def categories_v1():
+    return categories()
 
 
 def _get_or_create_anon_user():

@@ -93,6 +93,12 @@ def dashboard():
     )
 
 
+@map_bp.route("/api-docs")
+def api_docs():
+    base_url = request.host_url.rstrip("/")
+    return render_template("map/api_docs.html", base_url=base_url)
+
+
 @map_bp.route("/nuevo", methods=["GET", "POST"])
 @limiter.limit("3/minute; 30/day", methods=["POST"])
 def new_post():

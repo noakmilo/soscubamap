@@ -68,6 +68,7 @@
     {% if not request.args.get('modal') %}
     <footer class="site-footer">
       <div>Plataforma colaborativa y anónima.</div>
+      <a class="footer-link" href="{{ url_for('map.api_docs') }}">API</a>
       <a class="footer-link" href="https://github.com/noakmilo/soscubamap" target="_blank" rel="noopener">
         <i class="fa-brands fa-github"></i> Repo
       </a>
