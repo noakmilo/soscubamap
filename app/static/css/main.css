@@ -347,39 +347,52 @@ h3 {
   background: rgba(20, 8, 8, 0.9);
   border: none;
   border-radius: 12px;
-  padding: 14px 16px;
-  margin: 18px 0 24px;
+  padding: 10px 12px;
+  margin: 14px 0 20px;
   box-shadow: 0 18px 30px rgba(0, 0, 0, 0.55);
 }
 
 .alert-console .console-title {
   color: #ffb199;
+  font-size: 11px;
 }
 
 .alert-console .console-status {
   color: var(--danger);
+  font-size: 10px;
 }
 
 .alert-console .console-header {
   align-items: flex-start;
-  gap: 16px;
+  gap: 10px;
+  margin-bottom: 8px;
 }
 
 .alert-console .console-actions {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 6px;
+  gap: 4px;
   text-align: right;
 }
 
 .alert-console .console-actions .btn-secondary {
-  padding: 8px 12px;
-  font-size: 11px;
+  padding: 6px 10px;
+  font-size: 10px;
+  border-radius: 6px;
+  background: rgba(38, 12, 12, 0.8);
+  border: 1px solid rgba(255, 107, 107, 0.45);
+  color: #ffd1c3;
+  letter-spacing: 1px;
+}
+
+.alert-console .console-actions .btn-secondary:hover {
+  border-color: rgba(255, 107, 107, 0.9);
+  color: #fff1ea;
 }
 
 .alert-console .console-note {
-  font-size: 11px;
+  font-size: 10px;
   color: #ffb199;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -390,18 +403,26 @@ h3 {
 }
 
 .alert-console .console-body {
-  max-height: 180px;
+  max-height: 140px;
   overflow-y: auto;
   padding-right: 4px;
+}
+
+.alert-console .console-empty {
+  color: #ffb199;
+  font-size: 12px;
 }
 
 .alert-console .console-item {
   border: none;
   background: rgba(18, 8, 8, 0.85);
+  padding: 8px 10px;
+  gap: 8px;
 }
 
 .alert-console .console-link {
   color: #ffd1c3;
+  font-size: 12px;
 }
 
 .alert-console .console-link:hover {
@@ -411,6 +432,7 @@ h3 {
 .alert-console .console-meta,
 .alert-console .console-time {
   color: #ffb199;
+  font-size: 11px;
 }
 
 @media (max-width: 720px) {
