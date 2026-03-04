@@ -224,7 +224,7 @@
   </form>
 </section>
 
-<script src="{{ url_for('static', filename='js/new_post.js') }}"></script>
+<script src="{{ url_for('static', filename='js/new_post.js') }}?v={{ config.ASSET_VERSION }}"></script>
 <script>
   window.CUBA_MUNICIPALITIES = {{ municipalities_map|tojson }};
 </script>

@@ -38,6 +38,7 @@ class Config:
     RECAPTCHA_V2_SITE_KEY = os.getenv("RECAPTCHA_V2_SITE_KEY", "")
     RECAPTCHA_V2_SECRET_KEY = os.getenv("RECAPTCHA_V2_SECRET_KEY", "")
     CHAT_DISABLED = os.getenv("CHAT_DISABLED", "0") == "1"
+    ASSET_VERSION = os.getenv("ASSET_VERSION", "1")
     VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "")
     VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
     VAPID_SUBJECT = os.getenv("VAPID_SUBJECT", "mailto:soscubamap@proton.me")
