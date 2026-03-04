@@ -2,6 +2,26 @@ const state = {
   charts: {},
 };
 
+const THEME = {
+  accent: "#6ee7b7",
+  accentSoft: "rgba(110, 231, 183, 0.2)",
+  accent2: "#9bd1ff",
+  accent2Soft: "rgba(155, 209, 255, 0.2)",
+  grid: "rgba(110, 231, 183, 0.15)",
+  text: "#c9f7db",
+  muted: "#7fe7c0",
+  warning: "#fcd34d",
+  danger: "#f97316",
+  neutral: "#94a3b8",
+};
+
+if (window.Chart) {
+  Chart.defaults.color = THEME.text;
+  Chart.defaults.font.family =
+    "\"IBM Plex Mono\", \"Space Mono\", \"SFMono-Regular\", Menlo, Consolas, \"Liberation Mono\", monospace";
+  Chart.defaults.font.size = 12;
+}
+
 const formatDateInput = (date) => date.toISOString().slice(0, 10);
 
 const getDateRange = () => {
@@ -45,10 +65,12 @@ const buildLine = (ctx, label, labels, data, extra = {}) =>
         {
           label,
           data,
-          borderColor: "#6ee7b7",
-          backgroundColor: "rgba(110, 231, 183, 0.2)",
+          borderColor: THEME.accent,
+          backgroundColor: THEME.accentSoft,
           tension: 0.25,
           fill: true,
+          pointRadius: 2,
+          pointHoverRadius: 4,
         },
       ],
     },
@@ -59,7 +81,15 @@ const buildLine = (ctx, label, labels, data, extra = {}) =>
         legend: { display: false },
       },
       scales: {
-        y: { beginAtZero: true },
+        x: {
+          grid: { color: THEME.grid },
+          ticks: { color: THEME.muted },
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: THEME.grid },
+          ticks: { color: THEME.muted },
+        },
       },
       ...extra,
     },
@@ -72,7 +102,15 @@ const buildMultiLine = (ctx, labels, datasets) =>
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      scales: { y: { beginAtZero: true } },
+      scales: {
+        x: { grid: { color: THEME.grid }, ticks: { color: THEME.muted } },
+        y: { beginAtZero: true, grid: { color: THEME.grid }, ticks: { color: THEME.muted } },
+      },
+      plugins: {
+        legend: {
+          labels: { color: THEME.text },
+        },
+      },
     },
   });
 
@@ -84,8 +122,8 @@ const buildBar = (ctx, labels, data, horizontal = false) =>
       datasets: [
         {
           data,
-          backgroundColor: "rgba(155, 209, 255, 0.75)",
-          borderColor: "#9bd1ff",
+          backgroundColor: THEME.accent2Soft,
+          borderColor: THEME.accent2,
           borderWidth: 1,
         },
       ],
@@ -96,8 +134,8 @@ const buildBar = (ctx, labels, data, horizontal = false) =>
       indexAxis: horizontal ? "y" : "x",
       plugins: { legend: { display: false } },
       scales: {
-        x: { beginAtZero: true },
-        y: { beginAtZero: true },
+        x: { beginAtZero: true, grid: { color: THEME.grid }, ticks: { color: THEME.muted } },
+        y: { beginAtZero: true, grid: { color: THEME.grid }, ticks: { color: THEME.muted } },
       },
     },
   });
@@ -110,14 +148,19 @@ const buildDonut = (ctx, labels, data) =>
       datasets: [
         {
           data,
-          backgroundColor: ["#6ee7b7", "#fcd34d", "#f97316", "#94a3b8"],
+          backgroundColor: [THEME.accent, THEME.warning, THEME.danger, THEME.neutral],
         },
       ],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { position: "bottom" } },
+      plugins: {
+        legend: {
+          position: "bottom",
+          labels: { color: THEME.text },
+        },
+      },
     },
   });
 
@@ -212,16 +255,18 @@ const renderCharts = (payload) => {
       {
         label: "Comentarios en reportes",
         data: payload.comments_over_time.report_counts,
-        borderColor: "#6ee7b7",
-        backgroundColor: "rgba(110, 231, 183, 0.2)",
+        borderColor: THEME.accent,
+        backgroundColor: THEME.accentSoft,
         tension: 0.25,
+        pointRadius: 2,
       },
       {
         label: "Comentarios en discusiones",
         data: payload.comments_over_time.discussion_counts,
-        borderColor: "#9bd1ff",
-        backgroundColor: "rgba(155, 209, 255, 0.2)",
+        borderColor: THEME.accent2,
+        backgroundColor: THEME.accent2Soft,
         tension: 0.25,
+        pointRadius: 2,
       },
     ]
   );
