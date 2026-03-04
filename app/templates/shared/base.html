@@ -5,7 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <title>{{ config.APP_NAME }}{% block title %}{% endblock %}</title>
     <meta name="description" content="{% block meta_description %}Mapa colaborativo para documentar acciones represivas y lugares clave en Cuba. Reportes anónimos, verificación comunitaria y visualización en tiempo real.{% endblock %}">
+    <meta name="theme-color" content="#0b0f12" />
+    <meta name="application-name" content="{{ config.APP_NAME }}" />
+    <meta name="apple-mobile-web-app-title" content="{{ config.APP_NAME }}" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favico.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/logo.png') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
     {% block head_extra %}{% endblock %}
     <link
@@ -87,6 +95,13 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/modal.js') }}"></script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("/push-sw.js").catch(() => undefined);
+        });
+      }
+    </script>
     <script>
       (function () {
         const viewport = document.querySelector('meta[name="viewport"]');
