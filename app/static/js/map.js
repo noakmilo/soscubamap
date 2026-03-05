@@ -2,6 +2,7 @@ let map;
 let markers = [];
 let markerIndex = new Map();
 let clickInfo;
+let activeInfoWindow;
 let recentTimer;
 let searchBox;
 let autocomplete;
@@ -126,6 +127,13 @@ function clearMarkers() {
   pendingMarkers.forEach((marker) => marker.setMap(null));
   pendingMarkers = [];
   markerIndex = new Map();
+}
+
+function closeActiveInfoWindow() {
+  if (activeInfoWindow) {
+    activeInfoWindow.close();
+    activeInfoWindow = null;
+  }
 }
 
 function getSelectedCategoryIds() {
@@ -387,7 +395,14 @@ function renderMarkers(posts) {
       }
     });
 
-    marker.addListener("click", () => info.open({ anchor: marker, map }));
+    marker.addListener("click", () => {
+      closeActiveInfoWindow();
+      if (clickInfo) {
+        clickInfo.close();
+      }
+      info.open({ anchor: marker, map });
+      activeInfoWindow = info;
+    });
     markers.push(marker);
     markerIndex.set(post.id, { marker, info, post });
 
@@ -431,7 +446,12 @@ function openPostOnMap(post) {
   map.setZoom(Math.max(map.getZoom(), 14));
   const entry = markerIndex.get(post.id);
   if (entry && entry.info) {
+    closeActiveInfoWindow();
+    if (clickInfo) {
+      clickInfo.close();
+    }
     entry.info.open({ anchor: entry.marker, map });
+    activeInfoWindow = entry.info;
   }
 }
 
@@ -489,7 +509,12 @@ window.handleNewReport = function (payload) {
         </div>
       `,
     });
+    closeActiveInfoWindow();
+    if (clickInfo) {
+      clickInfo.close();
+    }
     info.open({ anchor: marker, map });
+    activeInfoWindow = info;
     refreshRecent();
     refreshAlerts();
     return;
@@ -821,6 +846,7 @@ window.initMap = async function () {
 
   clickInfo = new google.maps.InfoWindow();
   map.addListener("click", (event) => {
+    closeActiveInfoWindow();
     const lat = event.latLng.lat().toFixed(6);
     const lng = event.latLng.lng().toFixed(6);
     const newUrl = mapEl.dataset.newUrl;
