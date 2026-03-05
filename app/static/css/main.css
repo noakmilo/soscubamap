@@ -189,6 +189,7 @@ h3 {
 
 .map-wrap {
   margin: 32px 0;
+  overflow: visible;
 }
 
 .filters {
@@ -265,7 +266,7 @@ h3 {
   border-radius: 12px;
   background: linear-gradient(135deg, #0e1419, #101b21);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 20px 40px var(--shadow);
   touch-action: pan-x pan-y pinch-zoom;
 }
@@ -1352,9 +1353,9 @@ button[data-loading="true"]::after {
 }
 
 .info-btn.is-verified {
-  background: rgba(110, 231, 183, 0.2);
-  border: 1px solid rgba(110, 231, 183, 0.5);
-  color: #9ef5cc;
+  background: #2a333b;
+  border: 1px solid #3a4652;
+  color: #e6f3ef;
 }
 
 button:disabled,
@@ -1363,6 +1364,13 @@ button:disabled,
 .info-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.btn-primary.is-verified {
+  background: #2a333b;
+  border: 1px solid #3a4652;
+  color: #e6f3ef;
+  box-shadow: none;
 }
 
 .info-badge {

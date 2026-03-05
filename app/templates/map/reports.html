@@ -45,7 +45,7 @@
           {% endif %}
         </div>
         <div class="report-actions">
-          <button class="btn-primary verify-btn" data-post-id="{{ post.id }}" data-verified="{{ 1 if post.id in verified_ids else 0 }}" {% if post.id in verified_ids %}disabled{% endif %}>
+          <button class="btn-primary verify-btn{% if post.id in verified_ids %} is-verified{% endif %}" data-post-id="{{ post.id }}" data-verified="{{ 1 if post.id in verified_ids else 0 }}" {% if post.id in verified_ids %}disabled{% endif %}>
             {% if post.id in verified_ids %}Verificado{% else %}Verificar{% endif %}
           </button>
           <span class="verify-count" id="verify-count-{{ post.id }}">{{ post.verify_count or 0 }}</span>

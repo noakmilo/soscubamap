@@ -43,7 +43,7 @@
           <button class="btn-secondary" type="submit">Rechazar</button>
         </form>
       {% endif %}
-      <button class="btn-primary" id="verifyBtn" data-verified="{{ 1 if verified_by_me else 0 }}" {% if verified_by_me %}disabled{% endif %}>
+      <button class="btn-primary{% if verified_by_me %} is-verified{% endif %}" id="verifyBtn" data-verified="{{ 1 if verified_by_me else 0 }}" {% if verified_by_me %}disabled{% endif %}>
         {% if verified_by_me %}Verificado{% else %}Verificar{% endif %}
       </button>
       <span class="verify-count" id="verifyCount">{{ post.verify_count or 0 }}</span>

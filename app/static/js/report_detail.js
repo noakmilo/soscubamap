@@ -130,6 +130,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (verifyBtn.getAttribute("data-verified") === "1") {
       verifyBtn.disabled = true;
       verifyBtn.textContent = "Verificado";
+      verifyBtn.classList.add("is-verified");
     }
     verifyBtn.addEventListener("click", async () => {
       if (verifyBtn.disabled) return;
@@ -141,6 +142,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         verifyBtn.disabled = true;
         verifyBtn.textContent = "Verificado";
         verifyBtn.setAttribute("data-verified", "1");
+        verifyBtn.classList.add("is-verified");
       }
     });
   }
