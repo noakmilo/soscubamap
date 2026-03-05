@@ -166,6 +166,22 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
+document.addEventListener("DOMContentLoaded", () => {
+  const floatWrap = document.getElementById("mapSearchFloat");
+  const hideBtn = document.getElementById("mapSearchHide");
+  const showBtn = document.getElementById("mapSearchShow");
+  if (!floatWrap || !hideBtn || !showBtn) return;
+
+  const setVisible = (visible) => {
+    floatWrap.classList.toggle("is-hidden", !visible);
+    showBtn.classList.toggle("is-visible", !visible);
+  };
+
+  hideBtn.addEventListener("click", () => setVisible(false));
+  showBtn.addEventListener("click", () => setVisible(true));
+  setVisible(true);
+});
+
 function setupMapImageModal() {
   mapImageModal = document.getElementById("mapImageModal");
   mapImageModalImg = document.getElementById("mapImageModalImg");
@@ -1042,17 +1058,24 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function focusSearchResult(geometry, label) {
+  const location = geometry.location || geometry.viewport?.getCenter();
   if (geometry.viewport) {
     map.fitBounds(geometry.viewport);
-  } else if (geometry.location) {
-    map.panTo(geometry.location);
+    if (location) {
+      google.maps.event.addListenerOnce(map, "idle", () => {
+        map.panTo(location);
+        map.setZoom(Math.max(map.getZoom(), 16));
+      });
+    }
+  } else if (location) {
+    map.panTo(location);
     map.setZoom(Math.max(map.getZoom(), 16));
   }
 
   if (searchMarker) {
     searchMarker.setMap(null);
   }
-  const position = geometry.location || geometry.viewport?.getCenter();
+  const position = location;
   if (position) {
     searchMarker = new google.maps.Marker({
       position,
