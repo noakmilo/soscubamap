@@ -7,6 +7,7 @@ from .blueprints.admin import admin_bp
 from .blueprints.moderation import moderation_bp
 from .blueprints.api import api_bp
 from .blueprints.discussions import discussions_bp
+from .blueprints.panic import panic_bp
 
 
 def create_app(config_object="config.settings.Config"):
@@ -27,5 +28,6 @@ def create_app(config_object="config.settings.Config"):
     app.register_blueprint(moderation_bp, url_prefix="/moderacion")
     app.register_blueprint(api_bp, url_prefix="/api")
     app.register_blueprint(discussions_bp)
+    app.register_blueprint(panic_bp)
 
     return app

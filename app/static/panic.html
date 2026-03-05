@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="es">
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+        />
+        <title>SOS Cuba · Alerta</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            *,
+            *::before,
+            *::after {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            :root {
+                --red: #ff1c1c;
+                --red-dark: #a80000;
+                --red-glow: rgba(255, 28, 28, 0.45);
+                --bg: #080808;
+                --surface: #0f0f0f;
+                --border: #1e1e1e;
+                --text: #e8e8e8;
+                --muted: #555;
+                --green: #00e676;
+            }
+
+            html,
+            body {
+                height: 100%;
+                background: var(--bg);
+                color: var(--text);
+                font-family: "Space Mono", monospace;
+                overflow: hidden;
+                user-select: none;
+                -webkit-tap-highlight-color: transparent;
+            }
+
+            /* ── Noise overlay ── */
+            body::before {
+                content: "";
+                position: fixed;
+                inset: 0;
+                background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+                pointer-events: none;
+                z-index: 999;
+                opacity: 0.6;
+            }
+
+            .screen {
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: space-between;
+                padding: 32px 24px 40px;
+            }
+
+            /* ── Header ── */
+            .header {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 4px;
+            }
+
+            .logo {
+                font-family: "Bebas Neue", sans-serif;
+                font-size: clamp(22px, 6vw, 28px);
+                letter-spacing: 4px;
+                color: var(--red);
+            }
+
+            .tagline {
+                font-size: 10px;
+                letter-spacing: 2px;
+                color: var(--muted);
+                text-transform: uppercase;
+            }
+
+            /* ── Center zone ── */
+            .center {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 28px;
+                flex: 1;
+                justify-content: center;
+            }
+
+            /* ── Panic button ── */
+            .btn-wrap {
+                position: relative;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            /* Pulse rings */
+            .ring {
+                position: absolute;
+                border-radius: 50%;
+                border: 1.5px solid var(--red);
+                opacity: 0;
+                animation: pulse-ring 2.4s ease-out infinite;
+            }
+            .ring:nth-child(1) {
+                width: 210px;
+                height: 210px;
+                animation-delay: 0s;
+            }
+            .ring:nth-child(2) {
+                width: 270px;
+                height: 270px;
+                animation-delay: 0.6s;
+            }
+            .ring:nth-child(3) {
+                width: 330px;
+                height: 330px;
+                animation-delay: 1.2s;
+            }
+
+            @keyframes pulse-ring {
+                0% {
+                    opacity: 0.6;
+                    transform: scale(0.85);
+                }
+                100% {
+                    opacity: 0;
+                    transform: scale(1.1);
+                }
+            }
+
+            .btn-panic {
+                position: relative;
+                z-index: 2;
+                width: 170px;
+                height: 170px;
+                border-radius: 50%;
+                border: none;
+                background: radial-gradient(
+                    circle at 35% 35%,
+                    #ff3d3d,
+                    var(--red-dark)
+                );
+                box-shadow:
+                    0 0 0 6px rgba(255, 28, 28, 0.12),
+                    0 0 40px var(--red-glow),
+                    0 0 80px rgba(255, 28, 28, 0.15),
+                    inset 0 2px 6px rgba(255, 255, 255, 0.15),
+                    inset 0 -4px 10px rgba(0, 0, 0, 0.4);
+                cursor: pointer;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 6px;
+                transition:
+                    transform 0.12s ease,
+                    box-shadow 0.12s ease;
+                -webkit-tap-highlight-color: transparent;
+                outline: none;
+            }
+
+            .btn-panic:active,
+            .btn-panic.pressing {
+                transform: scale(0.93);
+                box-shadow:
+                    0 0 0 6px rgba(255, 28, 28, 0.2),
+                    0 0 20px var(--red-glow),
+                    inset 0 4px 12px rgba(0, 0, 0, 0.5);
+            }
+
+            .btn-panic .sos-text {
+                font-family: "Bebas Neue", sans-serif;
+                font-size: 52px;
+                letter-spacing: 6px;
+                color: #fff;
+                line-height: 1;
+                text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+            }
+
+            .btn-panic .btn-sub {
+                font-family: "Space Mono", monospace;
+                font-size: 9px;
+                letter-spacing: 2.5px;
+                color: rgba(255, 255, 255, 0.65);
+                text-transform: uppercase;
+            }
+
+            /* ── Status bar ── */
+            .status-bar {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 11px;
+                letter-spacing: 1.5px;
+                color: var(--muted);
+                text-transform: uppercase;
+            }
+
+            .status-dot {
+                width: 7px;
+                height: 7px;
+                border-radius: 50%;
+                background: var(--muted);
+                flex-shrink: 0;
+            }
+            .status-dot.ready {
+                background: var(--green);
+                box-shadow: 0 0 6px var(--green);
+                animation: blink 2s ease-in-out infinite;
+            }
+            .status-dot.loading {
+                background: #ffd600;
+                box-shadow: 0 0 6px #ffd600;
+                animation: blink 0.6s ease-in-out infinite;
+            }
+            .status-dot.error {
+                background: var(--red);
+                box-shadow: 0 0 6px var(--red);
+            }
+            .status-dot.sent {
+                background: var(--green);
+                box-shadow: 0 0 8px var(--green);
+            }
+
+            @keyframes blink {
+                0%,
+                100% {
+                    opacity: 1;
+                }
+                50% {
+                    opacity: 0.3;
+                }
+            }
+
+            /* ── Coords display ── */
+            .coords {
+                font-size: 10px;
+                letter-spacing: 1px;
+                color: var(--muted);
+                text-align: center;
+                min-height: 14px;
+                transition: color 0.3s;
+            }
+            .coords.active {
+                color: #888;
+            }
+
+            /* ── Footer info ── */
+            .footer {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+                width: 100%;
+            }
+
+            .info-box {
+                width: 100%;
+                max-width: 320px;
+                background: var(--surface);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 12px 16px;
+                font-size: 10px;
+                line-height: 1.7;
+                color: var(--muted);
+                letter-spacing: 0.5px;
+            }
+
+            .info-box strong {
+                color: var(--text);
+                display: block;
+                margin-bottom: 4px;
+                font-size: 11px;
+                letter-spacing: 1px;
+            }
+
+            .link-full {
+                margin-top: 8px;
+                font-size: 10px;
+                color: var(--muted);
+                letter-spacing: 1px;
+            }
+
+            .link-full a {
+                color: var(--red);
+                text-decoration: none;
+            }
+
+            /* ── Success overlay ── */
+            .overlay {
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.92);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 20px;
+                z-index: 100;
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 0.35s ease;
+            }
+
+            .overlay.visible {
+                opacity: 1;
+                pointer-events: all;
+            }
+
+            .overlay-icon {
+                font-size: 64px;
+                animation: pop 0.4s cubic-bezier(0.17, 0.89, 0.32, 1.28);
+            }
+
+            @keyframes pop {
+                0% {
+                    transform: scale(0);
+                }
+                100% {
+                    transform: scale(1);
+                }
+            }
+
+            .overlay-title {
+                font-family: "Bebas Neue", sans-serif;
+                font-size: 32px;
+                letter-spacing: 4px;
+                color: var(--green);
+            }
+
+            .overlay-msg {
+                font-size: 11px;
+                letter-spacing: 1.5px;
+                color: var(--muted);
+                text-align: center;
+                max-width: 260px;
+                line-height: 1.8;
+                text-transform: uppercase;
+            }
+
+            .overlay-id {
+                font-size: 10px;
+                color: #333;
+                letter-spacing: 1px;
+                margin-top: 4px;
+            }
+
+            .btn-close-overlay {
+                margin-top: 16px;
+                background: transparent;
+                border: 1px solid var(--border);
+                color: var(--muted);
+                font-family: "Space Mono", monospace;
+                font-size: 10px;
+                letter-spacing: 2px;
+                padding: 10px 28px;
+                border-radius: 4px;
+                cursor: pointer;
+                text-transform: uppercase;
+                transition:
+                    border-color 0.2s,
+                    color 0.2s;
+            }
+
+            .btn-close-overlay:hover {
+                border-color: #444;
+                color: var(--text);
+            }
+
+            /* ── Not in Cuba warning ── */
+            .warn-cuba {
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.95);
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 16px;
+                z-index: 101;
+                text-align: center;
+                padding: 32px;
+            }
+
+            .warn-cuba.visible {
+                display: flex;
+            }
+
+            .warn-cuba .warn-icon {
+                font-size: 48px;
+            }
+            .warn-cuba .warn-title {
+                font-family: "Bebas Neue", sans-serif;
+                font-size: 28px;
+                letter-spacing: 3px;
+                color: #ffd600;
+            }
+            .warn-cuba .warn-msg {
+                font-size: 11px;
+                letter-spacing: 1px;
+                color: var(--muted);
+                line-height: 1.8;
+                max-width: 280px;
+            }
+            .warn-cuba .btn-override {
+                background: transparent;
+                border: 1px solid #333;
+                color: #444;
+                font-family: "Space Mono", monospace;
+                font-size: 9px;
+                letter-spacing: 2px;
+                padding: 8px 20px;
+                border-radius: 4px;
+                cursor: pointer;
+                text-transform: uppercase;
+                margin-top: 8px;
+                transition:
+                    color 0.2s,
+                    border-color 0.2s;
+            }
+            .warn-cuba .btn-override:hover {
+                color: #666;
+                border-color: #444;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="screen">
+            <div class="header">
+                <div class="logo">#SOSCuba</div>
+                <div class="tagline">
+                    Botón de emergencia · Alerta inmediata
+                </div>
+            </div>
+
+            <div class="center">
+                <div class="btn-wrap">
+                    <div class="ring"></div>
+                    <div class="ring"></div>
+                    <div class="ring"></div>
+                    <button
+                        class="btn-panic"
+                        id="panicBtn"
+                        aria-label="Enviar alerta de emergencia"
+                    >
+                        <span class="sos-text">SOS</span>
+                        <span class="btn-sub">Toca para alertar</span>
+                    </button>
+                </div>
+
+                <div class="status-bar">
+                    <div class="status-dot" id="statusDot"></div>
+                    <span id="statusText">Iniciando...</span>
+                </div>
+
+                <div class="coords" id="coordsDisplay"></div>
+            </div>
+
+            <div class="footer">
+                <div class="info-box">
+                    <strong>¿Cómo funciona?</strong>
+                    Al pulsar el botón, se captura tu ubicación GPS y se
+                    registra automáticamente una alerta de acción represiva en
+                    el mapa. No necesitas cuenta ni rellenar nada. Solo pulsa —
+                    el resto es automático.
+                </div>
+                <div class="link-full">
+                    Reporte detallado → <a href="/nuevo">mapa completo</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Success overlay -->
+        <div class="overlay" id="successOverlay">
+            <div class="overlay-icon">✓</div>
+            <div class="overlay-title">Alerta enviada</div>
+            <div class="overlay-msg">
+                Tu reporte ha sido registrado.<br />
+                La comunidad ha sido notificada.
+            </div>
+            <div class="overlay-id" id="overlayId"></div>
+            <button class="btn-close-overlay" id="btnCloseOverlay">
+                Cerrar
+            </button>
+        </div>
+
+        <!-- Not in Cuba warning -->
+        <div class="warn-cuba" id="warnCuba">
+            <div class="warn-icon">⚠️</div>
+            <div class="warn-title">Fuera de Cuba</div>
+            <div class="warn-msg">
+                Tu ubicación está fuera del territorio cubano.<br />
+                Esta herramienta es para reportar desde Cuba.
+            </div>
+            <button class="btn-override" id="btnOverride">
+                Enviar de todas formas
+            </button>
+        </div>
+
+        <script>
+            /* ──────────────────────────────────────────────
+   CONFIG — ajusta la URL base según tu entorno
+   ────────────────────────────────────────────── */
+            const API_BASE = ""; // vacío = mismo origen
+
+            /* Cuba bounding box (holgado) */
+            const CUBA_BOUNDS = {
+                latMin: 19.6,
+                latMax: 23.3,
+                lngMin: -85.1,
+                lngMax: -73.9,
+            };
+
+            function isInCuba(lat, lng) {
+                return (
+                    lat >= CUBA_BOUNDS.latMin &&
+                    lat <= CUBA_BOUNDS.latMax &&
+                    lng >= CUBA_BOUNDS.lngMin &&
+                    lng <= CUBA_BOUNDS.lngMax
+                );
+            }
+
+            /* ── Estado ── */
+            let currentCoords = null;
+            let locationReady = false;
+            let bypassed = false;
+
+            const panicBtn = document.getElementById("panicBtn");
+            const statusDot = document.getElementById("statusDot");
+            const statusText = document.getElementById("statusText");
+            const coordsDisplay = document.getElementById("coordsDisplay");
+            const successOverlay = document.getElementById("successOverlay");
+            const overlayId = document.getElementById("overlayId");
+            const btnCloseOverlay = document.getElementById("btnCloseOverlay");
+            const warnCuba = document.getElementById("warnCuba");
+            const btnOverride = document.getElementById("btnOverride");
+
+            /* ── Helpers UI ── */
+            function setStatus(state, msg) {
+                statusDot.className = `status-dot ${state}`;
+                statusText.textContent = msg;
+            }
+
+            function fmt(n, d = 5) {
+                return n.toFixed(d);
+            }
+
+            /* ── Geolocation ── */
+            function initGeo() {
+                if (!navigator.geolocation) {
+                    setStatus("error", "GPS no disponible");
+                    return;
+                }
+                setStatus("loading", "Obteniendo ubicación...");
+                navigator.geolocation.watchPosition(
+                    (pos) => {
+                        currentCoords = {
+                            lat: pos.coords.latitude,
+                            lng: pos.coords.longitude,
+                            acc: pos.coords.accuracy,
+                        };
+                        locationReady = true;
+                        setStatus("ready", "Listo · GPS activo");
+                        coordsDisplay.className = "coords active";
+                        coordsDisplay.textContent = `${fmt(currentCoords.lat)}, ${fmt(currentCoords.lng)}  ±${Math.round(currentCoords.acc)}m`;
+                    },
+                    (err) => {
+                        if (err.code === 1) {
+                            setStatus("error", "Permiso GPS denegado");
+                            coordsDisplay.textContent =
+                                "Activa la ubicación para usar el botón";
+                        } else {
+                            setStatus("error", "Error de GPS");
+                        }
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 12000,
+                        maximumAge: 5000,
+                    },
+                );
+            }
+
+            /* ── Envío ── */
+            async function sendAlert() {
+                if (!locationReady || !currentCoords) {
+                    setStatus("loading", "Esperando GPS...");
+                    return;
+                }
+
+                if (
+                    !isInCuba(currentCoords.lat, currentCoords.lng) &&
+                    !bypassed
+                ) {
+                    warnCuba.classList.add("visible");
+                    return;
+                }
+
+                panicBtn.disabled = true;
+                setStatus("loading", "Enviando alerta...");
+
+                const payload = {
+                    title: "Alerta SOS — Acción represiva",
+                    description: `Alerta enviada desde botón de pánico. Coordenadas: ${fmt(currentCoords.lat)}, ${fmt(currentCoords.lng)}. Precisión GPS: ±${Math.round(currentCoords.acc)}m. Verificar y ampliar descripción si es posible.`,
+                    latitude: currentCoords.lat,
+                    longitude: currentCoords.lng,
+                    category_slug: "accion-represiva",
+                };
+
+                try {
+                    const res = await fetch(`${API_BASE}/api/panic`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload),
+                    });
+
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const data = await res.json();
+
+                    setStatus("sent", "Alerta enviada");
+                    coordsDisplay.textContent = "";
+                    overlayId.textContent = data.id ? `#${data.id}` : "";
+                    successOverlay.classList.add("visible");
+
+                    // Vibración en móvil
+                    if (navigator.vibrate)
+                        navigator.vibrate([100, 50, 100, 50, 200]);
+                } catch (err) {
+                    console.error(err);
+                    setStatus("error", "Error al enviar — reintenta");
+                    panicBtn.disabled = false;
+                }
+            }
+
+            /* ── Eventos ── */
+            panicBtn.addEventListener("click", sendAlert);
+
+            panicBtn.addEventListener("pointerdown", () =>
+                panicBtn.classList.add("pressing"),
+            );
+            panicBtn.addEventListener("pointerup", () =>
+                panicBtn.classList.remove("pressing"),
+            );
+            panicBtn.addEventListener("pointerleave", () =>
+                panicBtn.classList.remove("pressing"),
+            );
+
+            btnCloseOverlay.addEventListener("click", () => {
+                successOverlay.classList.remove("visible");
+                panicBtn.disabled = false;
+                bypassed = false;
+                setStatus("ready", "Listo · GPS activo");
+            });
+
+            btnOverride.addEventListener("click", () => {
+                warnCuba.classList.remove("visible");
+                bypassed = true;
+                sendAlert();
+            });
+
+            /* ── Init ── */
+            initGeo();
+        </script>
+    </body>
+</html>
