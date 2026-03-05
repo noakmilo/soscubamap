@@ -261,7 +261,7 @@ h3 {
 }
 
 .map-canvas {
-  height: min(70vh, 720px);
+  height: min(91vh, 936px);
   border: 1px solid var(--border);
   border-radius: 12px;
   background: linear-gradient(135deg, #0e1419, #101b21);
@@ -2511,7 +2511,7 @@ textarea {
   }
 
   .map-canvas {
-    height: 460px;
+    height: 598px;
   }
 }
 
