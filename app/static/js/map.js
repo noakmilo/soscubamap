@@ -900,14 +900,14 @@ window.initMap = async function () {
     geocoder = new google.maps.Geocoder();
     autocomplete = new google.maps.places.Autocomplete(searchInput, {
       bounds: cubaBounds,
-      componentRestrictions: { country: "cu" },
-      fields: ["geometry", "name"],
+      strictBounds: false,
+      fields: ["geometry", "name", "formatted_address"],
       types: ["geocode"],
     });
     autocomplete.addListener("place_changed", () => {
       const place = autocomplete.getPlace();
       if (!place.geometry || !place.geometry.location) return;
-      focusSearchResult(place.geometry, place.name);
+      focusSearchResult(place.geometry, place.formatted_address || place.name);
     });
 
     searchInput.addEventListener("keydown", (e) => {
@@ -920,11 +920,22 @@ window.initMap = async function () {
           address: query,
           bounds: cubaBounds,
           componentRestrictions: { country: "cu" },
+          region: "cu",
         },
         (results, status) => {
-          if (status !== "OK" || !results?.length) return;
-          const result = results[0];
-          focusSearchResult(result.geometry, result.formatted_address);
+          if (status === "OK" && results?.length) {
+            const result = results[0];
+            focusSearchResult(result.geometry, result.formatted_address);
+            return;
+          }
+          geocoder.geocode(
+            { address: query, region: "cu" },
+            (fallbackResults, fallbackStatus) => {
+              if (fallbackStatus !== "OK" || !fallbackResults?.length) return;
+              const result = fallbackResults[0];
+              focusSearchResult(result.geometry, result.formatted_address);
+            }
+          );
         }
       );
     });
