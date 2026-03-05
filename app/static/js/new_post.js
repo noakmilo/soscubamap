@@ -335,6 +335,23 @@ function setupProvinceMunicipality() {
   const municipalities = window.CUBA_MUNICIPALITIES || {};
   if (!provSelect || !munSelect) return;
 
+  const normalize = (value) =>
+    String(value || "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
+  const provinceLookup = new Map(
+    Object.keys(municipalities).map((prov) => [normalize(prov), prov])
+  );
+  const municipalityLookup = new Map();
+  Object.entries(municipalities).forEach(([prov, muns]) => {
+    (muns || []).forEach((mun) => {
+      municipalityLookup.set(normalize(mun), { name: mun, province: prov });
+    });
+  });
+
   const selectedProv = provSelect.dataset.selected || provSelect.value;
   if (selectedProv) {
     provSelect.value = selectedProv;
@@ -364,6 +381,64 @@ function setupProvinceMunicipality() {
   provSelect.addEventListener("change", () => {
     renderMunicipalities(provSelect.value, "");
   });
+
+  const applySelection = (province, municipality) => {
+    if (province) {
+      provSelect.value = province;
+    }
+    renderMunicipalities(provSelect.value, municipality || "");
+    if (municipality) {
+      munSelect.value = municipality;
+    }
+  };
+
+  const autoFillFromLatLng = () => {
+    if (provSelect.value || provSelect.dataset.selected || munSelect.value || munSelect.dataset.selected) {
+      return;
+    }
+    const latInput = document.querySelector('input[name="latitude"]');
+    const lngInput = document.querySelector('input[name="longitude"]');
+    const lat = parseFloat(latInput?.value || "");
+    const lng = parseFloat(lngInput?.value || "");
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    if (!(window.google && google.maps && google.maps.Geocoder)) return;
+
+    const geocoder = new google.maps.Geocoder();
+    geocoder.geocode({ location: { lat, lng }, region: "cu" }, (results, status) => {
+      if (status !== "OK" || !results?.length) return;
+      const components = results[0].address_components || [];
+      const findComponent = (type) =>
+        components.find((comp) => (comp.types || []).includes(type))?.long_name || "";
+
+      const rawProvince = findComponent("administrative_area_level_1");
+      const rawMunicipality =
+        findComponent("administrative_area_level_2") ||
+        findComponent("locality") ||
+        findComponent("sublocality") ||
+        findComponent("sublocality_level_1");
+
+      let province = provinceLookup.get(normalize(rawProvince)) || "";
+      const municipalityData = municipalityLookup.get(normalize(rawMunicipality));
+      let municipality = municipalityData ? municipalityData.name : "";
+
+      if (!province && municipalityData) {
+        province = municipalityData.province;
+      }
+      if (province && municipalityData && municipalityData.province !== province) {
+        municipality = "";
+      }
+
+      if (province || municipality) {
+        applySelection(province, municipality);
+      }
+    });
+  };
+
+  autoFillFromLatLng();
+  const latInput = document.querySelector('input[name="latitude"]');
+  const lngInput = document.querySelector('input[name="longitude"]');
+  if (latInput) latInput.addEventListener("change", autoFillFromLatLng);
+  if (lngInput) lngInput.addEventListener("change", autoFillFromLatLng);
 }
 
 function setupImageValidation() {

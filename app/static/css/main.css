@@ -271,6 +271,41 @@ h3 {
   touch-action: pan-x pan-y pinch-zoom;
 }
 
+.map-search-bar {
+  margin: 0 0 12px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(110, 231, 183, 0.35);
+  background: rgba(9, 14, 18, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: grid;
+  gap: 8px;
+  width: 60%;
+}
+
+.map-search-label {
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.map-search-bar input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  outline: none;
+}
+
+.map-search-bar input::placeholder {
+  color: rgba(214, 251, 231, 0.8);
+  font-weight: 600;
+}
+
 .map-canvas .gm-style .gm-style-iw,
 .map-canvas .gm-style .gm-style-iw-c,
 .map-canvas .gm-style .gm-style-iw-d,

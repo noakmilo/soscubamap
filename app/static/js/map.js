@@ -157,13 +157,28 @@ function adjustInfoWindowOffset(info, position) {
 document.addEventListener("DOMContentLoaded", () => {
   const filters = document.querySelector(".filters");
   const toggle = document.getElementById("filtersToggle");
-  if (!filters || !toggle) return;
+  if (filters && toggle) {
+    toggle.addEventListener("click", () => {
+      const isCollapsed = filters.classList.toggle("collapsed");
+      toggle.textContent = isCollapsed ? "Mostrar filtros" : "Ocultar filtros";
+      toggle.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
+    });
+  }
 
-  toggle.addEventListener("click", () => {
-    const isCollapsed = filters.classList.toggle("collapsed");
-    toggle.textContent = isCollapsed ? "Mostrar filtros" : "Ocultar filtros";
-    toggle.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
-  });
+  const searchInput = document.getElementById("mapSearch");
+  if (searchInput) {
+    const placeholders = [
+      "Ej: Sector PNR",
+      "Ej: Prisión",
+      "Ej: Unidad Militar",
+      "Ej: Tropas",
+      "Ej: Estación de policía",
+      "Ej: Centro de detención",
+      "Ej: Brigada Especial",
+    ];
+    const pick = placeholders[Math.floor(Math.random() * placeholders.length)];
+    searchInput.setAttribute("placeholder", pick);
+  }
 });
 
 function setupMapImageModal() {
@@ -1042,17 +1057,24 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function focusSearchResult(geometry, label) {
+  const location = geometry.location || geometry.viewport?.getCenter();
   if (geometry.viewport) {
     map.fitBounds(geometry.viewport);
-  } else if (geometry.location) {
-    map.panTo(geometry.location);
+    if (location) {
+      google.maps.event.addListenerOnce(map, "idle", () => {
+        map.panTo(location);
+        map.setZoom(Math.max(map.getZoom(), 16));
+      });
+    }
+  } else if (location) {
+    map.panTo(location);
     map.setZoom(Math.max(map.getZoom(), 16));
   }
 
   if (searchMarker) {
     searchMarker.setMap(null);
   }
-  const position = geometry.location || geometry.viewport?.getCenter();
+  const position = location;
   if (position) {
     searchMarker = new google.maps.Marker({
       position,
