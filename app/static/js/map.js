@@ -38,6 +38,14 @@ function safeUrl(value) {
   return url.replaceAll("\"", "%22").replaceAll("'", "%27");
 }
 
+function isWithinCubaBounds(location) {
+  if (!location) return false;
+  const lat = typeof location.lat === "function" ? location.lat() : location.lat;
+  const lng = typeof location.lng === "function" ? location.lng() : location.lng;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+  return lat <= CUBA_BOUNDS.north && lat >= CUBA_BOUNDS.south && lng >= CUBA_BOUNDS.west && lng <= CUBA_BOUNDS.east;
+}
+
 function fadeInInfoWindow(info) {
   const container = document.querySelector(".gm-style-iw-c");
   if (!container) return;
@@ -901,12 +909,13 @@ window.initMap = async function () {
     autocomplete = new google.maps.places.Autocomplete(searchInput, {
       bounds: cubaBounds,
       strictBounds: false,
+      componentRestrictions: { country: "cu" },
       fields: ["geometry", "name", "formatted_address"],
-      types: ["geocode"],
     });
     autocomplete.addListener("place_changed", () => {
       const place = autocomplete.getPlace();
       if (!place.geometry || !place.geometry.location) return;
+      if (!isWithinCubaBounds(place.geometry.location)) return;
       focusSearchResult(place.geometry, place.formatted_address || place.name);
     });
 
@@ -923,19 +932,10 @@ window.initMap = async function () {
           region: "cu",
         },
         (results, status) => {
-          if (status === "OK" && results?.length) {
-            const result = results[0];
-            focusSearchResult(result.geometry, result.formatted_address);
-            return;
-          }
-          geocoder.geocode(
-            { address: query, region: "cu" },
-            (fallbackResults, fallbackStatus) => {
-              if (fallbackStatus !== "OK" || !fallbackResults?.length) return;
-              const result = fallbackResults[0];
-              focusSearchResult(result.geometry, result.formatted_address);
-            }
-          );
+          if (status !== "OK" || !results?.length) return;
+          const result = results.find((item) => isWithinCubaBounds(item.geometry?.location));
+          if (!result) return;
+          focusSearchResult(result.geometry, result.formatted_address);
         }
       );
     });
