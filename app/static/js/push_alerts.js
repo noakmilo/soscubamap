@@ -37,7 +37,7 @@
     if (state === "subscribed") {
       toggle.dataset.state = "on";
       toggle.textContent = "Desactivar alertas";
-      statusEl.textContent = "Alertas activas para movimiento y acción represiva.";
+      statusEl.textContent = "Alertas activas para movimiento, desconexiones y acción represiva.";
       return;
     }
     if (state === "blocked") {
@@ -49,7 +49,7 @@
     }
     toggle.dataset.state = "off";
     toggle.textContent = "Activar alertas";
-    statusEl.textContent = "Solo para movimiento y acción represiva.";
+    statusEl.textContent = "Solo para movimiento, desconexiones y acción represiva.";
   };
 
   const urlBase64ToUint8Array = (base64String) => {

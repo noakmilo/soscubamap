@@ -20,7 +20,7 @@
     {% set ns.selected_name = post.category.name %}
   {% endif %}
   {% set selected_name = (ns.selected_name or '')|lower %}
-  {% set is_urgent = ns.selected_slug in ['accion-represiva','movimiento-tropas'] or ('accion represiva' in selected_name) or ('movimiento' in selected_name) %}
+{% set is_urgent = ns.selected_slug in ['accion-represiva','movimiento-tropas','desconexion-internet'] or ('accion represiva' in selected_name) or ('movimiento' in selected_name) or ('desconexion' in selected_name) or ('desconexión' in selected_name) %}
   {% set is_residencia = ns.selected_slug == 'residencia-represor' or ('residencia' in selected_name) %}
   {% set is_otros = ns.selected_slug == 'otros' or ('otros' in selected_name) %}
   <h1>Editar reporte</h1>
@@ -94,12 +94,12 @@
     </div>
     <div id="movimientoFields" class="category-fields {% if not is_urgent and not errors.get('movement_date') and not errors.get('movement_time') %}is-hidden{% endif %}">
       <div class="category-alert">
-        Para “Acción represiva del gobierno” y “Movimiento de tropas” debes indicar fecha y hora del movimiento y aportar
+        Para “Acción represiva del gobierno”, “Movimiento de tropas” y “Reporte de Desconexión de Internet” debes indicar fecha y hora del evento y aportar
         detalles precisos (tipo de tropas, armamento observado o motivo de la movilización).
       </div>
       <div class="two-col">
         <label>
-          Fecha del movimiento
+          Fecha del evento
           <input
             type="date"
             name="movement_date"
@@ -113,7 +113,7 @@
           {% endif %}
         </label>
         <label>
-          Hora del movimiento
+          Hora del evento
           <input
             type="time"
             name="movement_time"

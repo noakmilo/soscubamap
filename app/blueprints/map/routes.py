@@ -44,6 +44,7 @@ URGENT_CATEGORY_SLUGS = {
     "accion-represiva-del-gobierno",
     "movimiento-tropas",
     "movimiento-militar",
+    "desconexion-internet",
 }
 
 
@@ -403,9 +404,9 @@ def new_post():
                 errors["images"] = "Debes subir al menos una imagen del represor."
         if slug in URGENT_CATEGORY_SLUGS:
             if not form_data["movement_date"]:
-                errors["movement_date"] = "Debes indicar la fecha del movimiento."
+                errors["movement_date"] = "Debes indicar la fecha del evento."
             if not form_data["movement_time"]:
-                errors["movement_time"] = "Debes indicar la hora del movimiento."
+                errors["movement_time"] = "Debes indicar la hora del evento."
             if not errors.get("movement_date") and not errors.get("movement_time"):
                 try:
                     movement_at = datetime.fromisoformat(
@@ -756,9 +757,9 @@ def edit_report_public(post_id):
                 errors["images"] = "Debes subir al menos una imagen del represor."
         if slug in URGENT_CATEGORY_SLUGS:
             if not form_data["movement_date"]:
-                errors["movement_date"] = "Debes indicar la fecha del movimiento."
+                errors["movement_date"] = "Debes indicar la fecha del evento."
             if not form_data["movement_time"]:
-                errors["movement_time"] = "Debes indicar la hora del movimiento."
+                errors["movement_time"] = "Debes indicar la hora del evento."
             if not errors.get("movement_date") and not errors.get("movement_time"):
                 try:
                     movement_at = datetime.fromisoformat(

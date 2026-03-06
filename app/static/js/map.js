@@ -202,6 +202,7 @@ function setupMapImageModal() {
 const CATEGORY_ICONS = {
   "accion-represiva": "fa-hand-fist",
   "movimiento-tropas": "fa-bolt",
+  "desconexion-internet": "fa-wifi",
   "residencia-represor": "fa-house-chimney-user",
   "centro-penitenciario": "fa-landmark-dome",
   "estacion-policia": "fa-building-shield",
@@ -217,7 +218,7 @@ const CATEGORY_IMAGES = {
   "sede-pcc": "/static/img/Communist_Party_of_Cuba_logo.svg.png",
 };
 
-const ALERT_SLUGS = new Set(["accion-represiva", "movimiento-tropas"]);
+const ALERT_SLUGS = new Set(["accion-represiva", "movimiento-tropas", "desconexion-internet"]);
 
 function isAlertCategory(slug) {
   return ALERT_SLUGS.has(slug);
@@ -790,7 +791,7 @@ function renderAlerts(posts) {
 
   const alerts = (posts || []).filter((post) => isAlertCategory(post.category?.slug));
   if (!alerts.length) {
-    container.innerHTML = `<div class="console-empty">Sin movimientos o acciones recientes.</div>`;
+    container.innerHTML = `<div class="console-empty">Sin movimientos, desconexiones o acciones recientes.</div>`;
     return;
   }
 

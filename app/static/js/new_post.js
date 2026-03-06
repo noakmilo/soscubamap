@@ -53,6 +53,10 @@ const PLACEHOLDER_BY_SLUG = {
     title: "Ej: Movimiento de tropas en carretera",
     description: "Indica fecha y hora del movimiento. Describe tipo de tropas, armamento observado y motivo si se conoce.",
   },
+  "desconexion-internet": {
+    title: "Ej: Desconexión total en municipio",
+    description: "Indica fecha y hora de la desconexión. Añade duración aproximada y zonas afectadas.",
+  },
   "base-espionaje": {
     title: "Ej: Base de espionaje",
     description: "Describe infraestructura, antenas, instalaciones cercanas y evidencia observable.",
@@ -86,6 +90,7 @@ const isUrgentCategory = (key) => {
   if (key.includes("movimiento") && (key.includes("tropa") || key.includes("militar"))) {
     return true;
   }
+  if (key.includes("desconexion")) return true;
   return false;
 };
 
@@ -97,6 +102,7 @@ const getPlaceholderSample = (key) => {
   if (PLACEHOLDER_BY_SLUG[key]) return PLACEHOLDER_BY_SLUG[key];
   if (key.includes("accion-represiva")) return PLACEHOLDER_BY_SLUG["accion-represiva"];
   if (key.includes("movimiento")) return PLACEHOLDER_BY_SLUG["movimiento-tropas"];
+  if (key.includes("desconexion")) return PLACEHOLDER_BY_SLUG["desconexion-internet"];
   return null;
 };
 
@@ -174,7 +180,7 @@ function setupCategoryRequirements() {
         if (!hasDate || !hasTime) {
           e.preventDefault();
           if (status) {
-            status.textContent = "Debes indicar fecha y hora del movimiento.";
+            status.textContent = "Debes indicar fecha y hora del evento.";
           }
         }
       }

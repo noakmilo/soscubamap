@@ -31,6 +31,7 @@ const isUrgentCategory = (key) => {
   if (key.includes("movimiento") && (key.includes("tropa") || key.includes("militar"))) {
     return true;
   }
+  if (key.includes("desconexion")) return true;
   return false;
 };
 
@@ -153,9 +154,9 @@ function setupCategoryRequirements() {
         if (!hasDate || !hasTime) {
           e.preventDefault();
           if (status) {
-            status.textContent = "Debes indicar fecha y hora del movimiento.";
+            status.textContent = "Debes indicar fecha y hora del evento.";
           } else {
-            alert("Debes indicar fecha y hora del movimiento.");
+            alert("Debes indicar fecha y hora del evento.");
           }
         }
       }

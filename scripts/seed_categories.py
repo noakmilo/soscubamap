@@ -10,6 +10,11 @@ DEFAULT_CATEGORIES = [
         "movimiento-tropas",
         "Movimientos policiales, brigada especial o tropas. Indica fecha y hora del movimiento y describe tipo de tropas, armamento o motivo.",
     ),
+    (
+        "Reporte de Desconexion de Internet",
+        "desconexion-internet",
+        "Desconexiones de internet en vivo. Indica fecha, hora, duración y zonas afectadas.",
+    ),
     ("Residencia de represor", "residencia-represor", "Direcciones o zonas asociadas a represores."),
     ("Centro Penitenciario", "centro-penitenciario", "Carceles y centros de detencion."),
     ("Estacion de Policia", "estacion-policia", "Unidades policiales y puestos."),
