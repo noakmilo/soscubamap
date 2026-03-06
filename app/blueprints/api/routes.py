@@ -429,7 +429,6 @@ def analytics_v1():
         )
         .group_by(Post.province)
         .order_by(func.count(Post.id).desc())
-        .limit(10)
     )
     if category_id:
         try:
@@ -440,7 +439,7 @@ def analytics_v1():
         province_distribution = province_distribution.filter(Post.province == province)
 
     province_items = [
-        {"name": row[0], "count": row[1]} for row in province_distribution.all()
+        {"name": row[0], "count": row[1]} for row in province_distribution.limit(10).all()
     ]
 
     municipality_distribution = (
@@ -454,7 +453,6 @@ def analytics_v1():
         )
         .group_by(Post.municipality)
         .order_by(func.count(Post.id).desc())
-        .limit(10)
     )
     if category_id:
         try:
@@ -465,7 +463,7 @@ def analytics_v1():
         municipality_distribution = municipality_distribution.filter(Post.province == province)
 
     municipality_items = [
-        {"name": row[0], "count": row[1]} for row in municipality_distribution.all()
+        {"name": row[0], "count": row[1]} for row in municipality_distribution.limit(10).all()
     ]
 
     moderation_status = (
