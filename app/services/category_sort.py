@@ -5,5 +5,6 @@ def sort_categories_for_forms(categories):
         "movimiento-tropas": 1,
         "movimiento-militar": 1,
         "desconexion-internet": 2,
+        "otros": 999,
     }
     return sorted(categories, key=lambda c: (priority.get(c.slug, 99), c.name))
