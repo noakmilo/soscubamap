@@ -42,6 +42,7 @@
           <a href="{{ url_for('map.analytics') }}">Analíticas</a>
           <a href="{{ url_for('map.about') }}">Acerca de</a>
           <a class="nav-donate" href="{{ url_for('map.donate') }}">Donar</a>
+          <a class="nav-sos" href="{{ url_for('panic.panic_page') }}">🚨 SOS</a>
           {% if current_user.has_role('moderador') or current_user.has_role('administrador') %}
             <a href="{{ url_for('moderation.dashboard') }}">Moderación</a>
           {% endif %}
@@ -57,6 +58,7 @@
           <a class="nav-donate" href="{{ url_for('map.donate') }}">Donar</a>
           <a href="{{ url_for('auth.login') }}">Login</a>
           <a href="{{ url_for('auth.register') }}">Registro</a>
+          <a class="nav-sos" href="{{ url_for('panic.panic_page') }}">🚨 SOS</a>
           <button class="btn-cta" type="button" data-open-report data-url="{{ url_for('map.new_post') }}">Hacer reporte</button>
         {% endif %}
       </nav>
