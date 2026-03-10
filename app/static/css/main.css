@@ -605,11 +605,13 @@ h3 {
   margin-top: 18px;
   display: grid;
   gap: 12px;
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
+  background: linear-gradient(145deg, #f6fff9 0%, #ebfff5 58%, #dcf7ea 100%);
+  border: 1px solid rgba(12, 58, 41, 0.28);
   border-radius: 12px;
   padding: 16px;
   font-family: "IBM Plex Mono", "Courier New", monospace;
+  color: #10231a;
+  box-shadow: 0 14px 24px rgba(0, 0, 0, 0.24);
 }
 
 .chat-header {
@@ -626,7 +628,7 @@ h3 {
 }
 
 .chat-online {
-  color: var(--accent);
+  color: #0f7a56;
   font-weight: 700;
 }
 
@@ -635,17 +637,17 @@ h3 {
   text-transform: uppercase;
   letter-spacing: 1px;
   font-size: 12px;
-  color: var(--muted);
+  color: #123a2c;
 }
 
 .chat-status {
   font-size: 12px;
-  color: var(--accent-2);
+  color: #24576f;
 }
 
 .chat-body {
-  background: #0b1014;
-  border: 1px solid var(--border);
+  background: #ffffff;
+  border: 1px solid rgba(12, 58, 41, 0.18);
   border-radius: 10px;
   padding: 12px;
   max-height: 280px;
@@ -655,10 +657,10 @@ h3 {
 }
 
 .chat-embed {
-  border: 1px solid var(--border);
+  border: 1px solid rgba(12, 58, 41, 0.18);
   border-radius: 10px;
   overflow: hidden;
-  background: #0b1014;
+  background: #ffffff;
 }
 
 .chat-embed iframe {
@@ -669,34 +671,38 @@ h3 {
 }
 
 .chat-empty {
-  color: var(--muted);
+  color: #56786a;
   font-size: 13px;
 }
 
 .chat-item {
   display: grid;
   gap: 6px;
+  background: rgba(16, 52, 39, 0.06);
+  border: 1px solid rgba(16, 52, 39, 0.08);
+  border-radius: 8px;
+  padding: 8px 10px;
 }
 
-.chat-meta {
+.chat-item .chat-meta {
   display: flex;
   justify-content: space-between;
   font-size: 12px;
-  color: var(--muted);
+  color: #406355;
 }
 
 .chat-author {
-  color: #9bd1ff;
+  color: #0b5f8f;
 }
 
 .chat-body-line {
   font-size: 13px;
-  color: var(--text);
+  color: #0e2018;
   word-break: break-word;
 }
 
 .chat-body-line a {
-  color: #ffffff;
+  color: #0b3f8a;
   font-weight: 700;
 }
 
@@ -708,16 +714,23 @@ h3 {
 .chat-form label {
   display: grid;
   gap: 8px;
-  color: var(--muted);
+  color: #325447;
   font-size: 12px;
 }
 
 .chatbox input {
   font-family: "IBM Plex Mono", "Courier New", monospace;
+  background: #ffffff;
+  border: 1px solid rgba(12, 58, 41, 0.25);
+  color: #10231a;
 }
 
 .chat-message input {
   font-family: "IBM Plex Mono", "Courier New", monospace;
+}
+
+.chatbox input::placeholder {
+  color: #537466;
 }
 
 .chat-send {
@@ -725,6 +738,14 @@ h3 {
   justify-self: center;
   font-size: 12px;
   letter-spacing: 0.5px;
+  background: linear-gradient(135deg, #0f5a41 0%, #0a4632 100%);
+  border: 1px solid rgba(9, 55, 40, 0.6);
+  color: #effff6;
+  box-shadow: 0 8px 16px rgba(7, 38, 28, 0.3);
+}
+
+.chat-send:hover {
+  background: linear-gradient(135deg, #14704f 0%, #0d593f 100%);
 }
 
 .chat-widget {
@@ -743,10 +764,10 @@ h3 {
 }
 
 .chat-widget-toggle {
-  border: 1px solid var(--border);
+  border: 1px solid rgba(12, 58, 41, 0.24);
   border-radius: 10px;
-  background: linear-gradient(145deg, #0b1114 0%, #0c1b17 60%, #0a0f12 100%);
-  color: var(--text);
+  background: linear-gradient(145deg, #f6fff9 0%, #ebfff5 58%, #dcf7ea 100%);
+  color: #0f2a1f;
   padding: 10px 12px;
   font-family: "IBM Plex Mono", "Courier New", monospace;
   font-size: 12px;
@@ -757,12 +778,12 @@ h3 {
   justify-content: space-between;
   gap: 10px;
   cursor: pointer;
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.3);
   position: relative;
 }
 
 .chat-widget-toggle-icon {
-  color: var(--accent);
+  color: #0f6a4b;
   font-size: 14px;
 }
 
@@ -813,9 +834,9 @@ h3 {
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  border: 1px solid var(--border);
-  background: rgba(9, 14, 18, 0.9);
-  color: var(--text);
+  border: 1px solid rgba(12, 58, 41, 0.25);
+  background: #ffffff;
+  color: #1a3c2f;
   cursor: pointer;
   font-size: 18px;
   line-height: 1;
@@ -899,7 +920,7 @@ body.chat-widget-mobile-open {
     gap: 10px;
   }
 
-  .chat-widget .chat-meta {
+  .chat-widget .chat-header .chat-meta {
     margin-left: auto;
     flex-wrap: wrap;
     justify-content: flex-end;
@@ -2592,7 +2613,6 @@ textarea {
 }
 
 .legend,
-.chatbox,
 .console-header,
 .console-body,
 .report-card,
