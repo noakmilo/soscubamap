@@ -7,32 +7,32 @@
     aria-controls="chatbox"
   >
     <span class="chat-widget-toggle-icon"><i class="fa-solid fa-comments"></i></span>
-    <span class="chat-widget-toggle-label">Chat en vivo</span>
+    <span class="chat-widget-toggle-label">{{ _("Chat en vivo") }}</span>
     <span id="chatUnreadCount" class="chat-widget-unread is-hidden">0</span>
   </button>
   <div id="chatWidgetBackdrop" class="chat-widget-backdrop" data-close-chat-widget hidden></div>
   <section id="chatbox" class="chatbox chat-widget-panel">
     <div class="chat-header">
-      <div class="chat-title">Chat colaborativo</div>
+      <div class="chat-title">{{ _("Chat colaborativo") }}</div>
       <div class="chat-meta">
-        <span class="chat-online"><span id="chatOnlineCount">0</span> en línea</span>
-        <span class="chat-status">Últimas 24 horas</span>
+        <span class="chat-online"><span id="chatOnlineCount">0</span> {{ _("en línea") }}</span>
+        <span class="chat-status">{{ _("Últimas 24 horas") }}</span>
       </div>
       <button
         type="button"
         id="chatWidgetClose"
         class="chat-widget-close"
-        aria-label="Cerrar chat"
+        aria-label="{{ _('Cerrar chat') }}"
       >
         &times;
       </button>
     </div>
     <div id="chatMessages" class="chat-body">
-      <div class="chat-empty">Sin mensajes aún.</div>
+      <div class="chat-empty">{{ _("Sin mensajes aún.") }}</div>
     </div>
     <form id="chatForm" class="chat-form">
       <label>
-        Nickname (solo chat)
+        {{ _("Nickname (solo chat)") }}
         <input
           type="text"
           id="chatNick"
@@ -42,16 +42,16 @@
         />
       </label>
       <label class="chat-message">
-        Mensaje
+        {{ _("Mensaje") }}
         <input
           type="text"
           id="chatMessage"
           name="message"
-          placeholder="Escribe un mensaje o enlace..."
+          placeholder="{{ _('Escribe un mensaje o enlace...') }}"
           required
         />
       </label>
-      <button type="submit" class="btn-primary chat-send">Enviar</button>
+      <button type="submit" class="btn-primary chat-send">{{ _("Enviar") }}</button>
     </form>
   </section>
 </section>

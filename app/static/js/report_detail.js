@@ -1,3 +1,5 @@
+var t = window.t;
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -47,7 +49,7 @@ function renderComments(postId, items) {
   const list = document.getElementById(`comment-list-${postId}`);
   if (!list) return;
   if (!items.length) {
-    list.innerHTML = `<div class="muted">No hay comentarios todavía.</div>`;
+    list.innerHTML = `<div class="muted">${t("empty_comments")}</div>`;
     return;
   }
 
@@ -64,7 +66,7 @@ function renderComments(postId, items) {
             <button class="comment-vote" data-vote="1">▲</button>
             <span class="comment-score ${c.score < 0 ? "score-negative" : ""}" id="comment-score-${c.id}">${c.score}</span>
             <button class="comment-vote" data-vote="-1">▼</button>
-            ${isAdmin ? `<button class="comment-delete" data-delete="${c.id}">Eliminar</button>` : ""}
+            ${isAdmin ? `<button class="comment-delete" data-delete="${c.id}">${t("button_delete")}</button>` : ""}
           </div>
         </div>
       `
@@ -93,7 +95,7 @@ function renderComments(postId, items) {
       btn.addEventListener("click", async () => {
         const commentId = btn.getAttribute("data-delete");
         if (!commentId) return;
-        if (!confirm("¿Eliminar comentario?")) return;
+        if (!confirm(t("confirmation_delete_comment"))) return;
         await fetch(`/api/comments/${commentId}`, { method: "DELETE" });
         const updated = await loadComments(postId);
         renderComments(postId, updated);
@@ -108,10 +110,10 @@ function setupCopyLink() {
   copyBtn.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
-      copyBtn.textContent = "Enlace copiado";
-      setTimeout(() => (copyBtn.textContent = "Copiar enlace"), 1500);
+      copyBtn.textContent = t("toast_link_copied");
+      setTimeout(() => (copyBtn.textContent = t("button_copy_link")), 1500);
     } catch (e) {
-      copyBtn.textContent = "Copia manual";
+      copyBtn.textContent = t("fallback_copy_manual");
     }
   });
 }
@@ -129,7 +131,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (verifyBtn) {
     if (verifyBtn.getAttribute("data-verified") === "1") {
       verifyBtn.disabled = true;
-      verifyBtn.textContent = "Verificado";
+      verifyBtn.textContent = t("button_verified");
       verifyBtn.classList.add("is-verified");
     }
     verifyBtn.addEventListener("click", async () => {
@@ -140,7 +142,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       if (result && result.ok) {
         verifyBtn.disabled = true;
-        verifyBtn.textContent = "Verificado";
+        verifyBtn.textContent = t("button_verified");
         verifyBtn.setAttribute("data-verified", "1");
         verifyBtn.classList.add("is-verified");
       }
@@ -158,7 +160,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (hideBtn) {
     hideBtn.addEventListener("click", async () => {
-      if (!confirm("¿Ocultar este reporte?")) return;
+      if (!confirm(t("confirmation_hide_report"))) return;
       const result = await updateStatus("hidden");
       if (result && result.ok) {
         window.location.href = "/admin/reportes?status=hidden";
@@ -168,7 +170,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (deleteBtn) {
     deleteBtn.addEventListener("click", async () => {
-      if (!confirm("¿Eliminar este reporte?")) return;
+      if (!confirm(t("confirmation_delete_report"))) return;
       const result = await updateStatus("deleted");
       if (result && result.ok) {
         window.location.href = "/admin/reportes?status=deleted";
@@ -189,7 +191,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const recaptchaEl = document.getElementById("reportCommentRecaptcha");
       if (recaptchaEl && !window.grecaptcha) {
         if (commentStatus) {
-          commentStatus.textContent = "reCAPTCHA aún está cargando. Intenta de nuevo.";
+          commentStatus.textContent = t("error_recaptcha_loading");
         }
         return;
       }
@@ -198,14 +200,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       if (window.grecaptcha && !token) {
         if (commentStatus) {
-          commentStatus.textContent = "Completa el reCAPTCHA antes de enviar.";
+          commentStatus.textContent = t("error_recaptcha_required");
         }
         return;
       }
       const result = await addComment(postId, body, token);
       if (result && result.ok === false) {
         if (commentStatus) {
-          commentStatus.textContent = result.error || "No se pudo enviar el comentario.";
+          commentStatus.textContent = result.error || t("error_comment_send_failed");
         }
         return;
       }
@@ -270,9 +272,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         const url = URL.createObjectURL(file);
         return `
           <div class="image-preview-card">
-            <img src="${url}" alt="Vista previa ${idx + 1}" />
+            <img src="${url}" alt="${t("alt_image_preview", { idx: idx + 1 })}" />
             <label class="image-caption">
-              Descripción corta (imagen ${idx + 1})
+              ${t("label_image_caption_numbered", { idx: idx + 1 })}
               <input type="text" name="image_captions[]" maxlength="255" placeholder="${file.name}" />
             </label>
           </div>
@@ -300,7 +302,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const maxBytes = maxMb * 1024 * 1024;
 
       if (files.length > maxFiles) {
-        if (mediaStatus) mediaStatus.textContent = `Máximo ${maxFiles} imágenes por envío.`;
+        if (mediaStatus) mediaStatus.textContent = t("error_max_images_exceeded", { maxFiles });
         mediaInput.value = "";
         return;
       }
@@ -309,12 +311,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         const name = file.name || "";
         const ext = name.includes(".") ? name.split(".").pop().toLowerCase() : "";
         if (!allowedExt.includes(ext)) {
-          if (mediaStatus) mediaStatus.textContent = `Formato no permitido: ${ext || "desconocido"}.`;
+          if (mediaStatus) mediaStatus.textContent = t("error_invalid_file_format", { ext: ext || "desconocido" });
           mediaInput.value = "";
           return;
         }
         if (file.size > maxBytes) {
-          if (mediaStatus) mediaStatus.textContent = `Cada imagen debe ser <= ${maxMb}MB.`;
+          if (mediaStatus) mediaStatus.textContent = t("error_image_too_large", { maxMb });
           mediaInput.value = "";
           return;
         }
@@ -328,12 +330,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
       }
 
-      if (mediaStatus) mediaStatus.textContent = "Subiendo imágenes...";
+      if (mediaStatus) mediaStatus.textContent = t("status_uploading_images");
       const submitBtn = mediaForm.querySelector('button[type="submit"]');
       if (submitBtn) {
         submitBtn.disabled = true;
         submitBtn.dataset.loading = "true";
-        submitBtn.textContent = "Subiendo...";
+        submitBtn.textContent = t("button_uploading");
       }
       const res = await fetch(`/api/posts/${postId}/media`, {
         method: "POST",
@@ -341,19 +343,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
       const data = await res.json();
       if (!res.ok || data?.ok === false) {
-        if (mediaStatus) mediaStatus.textContent = data?.error || "Error al subir.";
+        if (mediaStatus) mediaStatus.textContent = data?.error || t("error_upload_failed");
         if (submitBtn) {
           submitBtn.disabled = false;
           submitBtn.dataset.loading = "false";
-          submitBtn.textContent = "Subir imágenes";
+          submitBtn.textContent = t("button_upload_images");
         }
         return;
       }
 
       if (data.status === "pending") {
-        if (mediaStatus) mediaStatus.textContent = "Enviado a moderación.";
+        if (mediaStatus) mediaStatus.textContent = t("status_sent_to_moderation");
       } else {
-        if (mediaStatus) mediaStatus.textContent = "Imágenes agregadas.";
+        if (mediaStatus) mediaStatus.textContent = t("status_images_added");
       }
 
       if (Array.isArray(data.media) && mediaGrid) {
@@ -362,7 +364,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (typeof item === "string") {
               return `
                 <button class="media-thumb" type="button" data-image="${item}" data-caption="">
-                  <img src="${item}" alt="Imagen del reporte" />
+                  <img src="${item}" alt="${t("alt_report_image")}" />
                 </button>
               `;
             }
@@ -370,7 +372,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             const caption = item?.caption || "";
             return `
               <button class="media-thumb" type="button" data-image="${url}" data-caption="${escapeHtml(caption)}">
-                <img src="${url}" alt="Imagen del reporte" />
+                <img src="${url}" alt="${t("alt_report_image")}" />
               </button>
             `;
           })
@@ -386,7 +388,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (submitBtn) {
         submitBtn.disabled = false;
         submitBtn.dataset.loading = "false";
-        submitBtn.textContent = "Subir imágenes";
+        submitBtn.textContent = t("button_upload_images");
       }
     });
   }

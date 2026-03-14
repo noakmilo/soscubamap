@@ -1,4 +1,12 @@
 (function () {
+  const t = (key, vars = {}) => {
+    let str = (window.TRANSLATIONS || {})[key] || key;
+    Object.entries(vars).forEach(([k, v]) => {
+      str = str.replaceAll(`{${k}}`, String(v));
+    });
+    return str;
+  };
+
   const toggle = document.getElementById("alertPushToggle");
   const statusEl = document.getElementById("alertPushStatus");
   if (!toggle || !statusEl) return;
@@ -14,20 +22,19 @@
 
   if (!enabled || !vapidKey) {
     toggle.disabled = true;
-    toggle.textContent = "Alertas no disponibles";
-    statusEl.textContent = "Notificaciones deshabilitadas en el servidor.";
+    toggle.textContent = t("status_alerts_unavailable");
+    statusEl.textContent = t("status_notifications_disabled");
     statusEl.classList.add("is-muted");
     return;
   }
 
   if (!hasPushSupport) {
     toggle.disabled = true;
-    toggle.textContent = "Instala la PWA";
+    toggle.textContent = t("button_install_pwa");
     if (isMobile) {
-      statusEl.textContent =
-        "Para activar alertas debes instalar la PWA. iOS: Compartir → Añadir a pantalla de inicio → abre desde el icono. Android: Menú ⋮ → Instalar app / Añadir a pantalla de inicio.";
+      statusEl.textContent = t("status_install_pwa_instructions");
     } else {
-      statusEl.textContent = "Tu navegador no soporta notificaciones push.";
+      statusEl.textContent = t("status_push_not_supported");
     }
     statusEl.classList.add("is-muted");
     return;
@@ -36,20 +43,20 @@
   const setState = (state) => {
     if (state === "subscribed") {
       toggle.dataset.state = "on";
-      toggle.textContent = "Desactivar alertas";
-      statusEl.textContent = "Alertas activas para movimiento, desconexiones y acción represiva.";
+      toggle.textContent = t("button_disable_alerts");
+      statusEl.textContent = t("status_alerts_active");
       return;
     }
     if (state === "blocked") {
       toggle.dataset.state = "blocked";
       toggle.disabled = true;
-      toggle.textContent = "Alertas bloqueadas";
-      statusEl.textContent = "Activa las notificaciones en tu navegador para continuar.";
+      toggle.textContent = t("button_alerts_blocked");
+      statusEl.textContent = t("status_enable_browser_notifications");
       return;
     }
     toggle.dataset.state = "off";
-    toggle.textContent = "Activar alertas";
-    statusEl.textContent = "Solo para movimiento, desconexiones y acción represiva.";
+    toggle.textContent = t("button_enable_alerts");
+    statusEl.textContent = t("status_alert_categories");
   };
 
   const urlBase64ToUint8Array = (base64String) => {
@@ -80,8 +87,8 @@
       }
     } catch (err) {
       toggle.disabled = true;
-      toggle.textContent = "Alertas no disponibles";
-      statusEl.textContent = "No se pudo inicializar el servicio de notificaciones.";
+      toggle.textContent = t("status_alerts_unavailable");
+      statusEl.textContent = t("error_notification_service_init");
       statusEl.classList.add("is-muted");
     }
   };
@@ -114,7 +121,7 @@
       });
       setState("subscribed");
     } catch (err) {
-      statusEl.textContent = "No se pudo registrar la suscripción.";
+      statusEl.textContent = t("error_subscription_failed");
       statusEl.classList.add("is-muted");
     }
   };
@@ -131,7 +138,7 @@
           body: JSON.stringify({ endpoint: subscription.endpoint }),
         });
       } catch (err) {
-        statusEl.textContent = "No se pudo desactivar la suscripción.";
+        statusEl.textContent = t("error_unsubscribe_failed");
         statusEl.classList.add("is-muted");
       }
       await subscription.unsubscribe();

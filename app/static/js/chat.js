@@ -1,3 +1,5 @@
+var t = window.t;
+
 function escapeHtml(value) {
   return String(value)
     .replace(/&/g, "&amp;")
@@ -47,7 +49,7 @@ function renderChat(payload) {
     container.scrollHeight - container.scrollTop - container.clientHeight < 40;
 
   if (!items.length) {
-    container.innerHTML = `<div class="chat-empty">Sin mensajes aún.</div>`;
+    container.innerHTML = `<div class="chat-empty">${t("empty_chat_message")}</div>`;
     latestRenderedMessageId = 0;
     return [];
   }
@@ -58,7 +60,7 @@ function renderChat(payload) {
       return `
         <div class="chat-item">
           <div class="chat-meta">
-            <span class="chat-author">${escapeHtml(msg.author || "Anon")}</span>
+            <span class="chat-author">${escapeHtml(msg.author || t("anonymous_user_default"))}</span>
             <span class="chat-time">${time}</span>
           </div>
           <div class="chat-body-line">${linkify(msg.body || "")}</div>
@@ -231,7 +233,7 @@ document.addEventListener("DOMContentLoaded", () => {
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const nicknameRaw = nickInput && nickInput.value ? nickInput.value.trim() : "";
-      const nickname = nicknameRaw || "Anon";
+      const nickname = nicknameRaw || t("anonymous_user_default");
       const body = messageInput && messageInput.value ? messageInput.value.trim() : "";
       if (!body) return;
       await sendChatMessage(nickname, body);

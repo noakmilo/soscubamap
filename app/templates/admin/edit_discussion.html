@@ -1,23 +1,23 @@
 {% extends "shared/base.html" %}
-{% block title %} | Editar discusión{% endblock %}
+{% block title %} | {{ _("Editar discusión") }}{% endblock %}
 {% block content %}
 <section class="panel">
-  <h1>Editar discusión</h1>
-  <p class="muted">Autor: {{ post.author_label }} · {{ post.created_at }}</p>
+  <h1>{{ _("Editar discusión") }}</h1>
+  <p class="muted">{{ _("Autor:") }} {{ post.author_label }} · {{ post.created_at }}</p>
 
   <form class="form-grid" method="post">
     <label>
-      Título
+      {{ _("Título") }}
       <input type="text" name="title" value="{{ post.title }}" required />
     </label>
     <label>
-      Contenido (Markdown)
+      {{ _("Contenido (Markdown)") }}
       <textarea name="body" rows="10" required>{{ post.body }}</textarea>
     </label>
     <div class="links-group">
       <div class="links-header">
-        <span>Enlaces de interés</span>
-        <button type="button" class="btn-secondary" id="addAdminDiscussionLink">+ Agregar</button>
+        <span>{{ _("Enlaces de interés") }}</span>
+        <button type="button" class="btn-secondary" id="addAdminDiscussionLink">{{ _("+ Agregar") }}</button>
       </div>
       <div id="adminDiscussionLinks" class="links-list">
         {% for link in links %}
@@ -29,7 +29,7 @@
       </div>
     </div>
     <div class="tag-picker">
-      <div class="tag-picker-title">Etiquetas</div>
+      <div class="tag-picker-title">{{ _("Etiquetas") }}</div>
       <div class="tag-options" id="adminTagOptions">
         {% for tag in tags %}
           <button
@@ -43,18 +43,18 @@
       </div>
       <div id="adminSelectedTags"></div>
       <label>
-        Agregar nuevas (separadas por comas)
-        <input type="text" name="new_tags" placeholder="ej: reporte, denuncia" />
+        {{ _("Agregar nuevas (separadas por comas)") }}
+        <input type="text" name="new_tags" placeholder="{{ _('ej: reporte, denuncia') }}" />
       </label>
     </div>
     {% if images and images|length %}
       <div class="media-section">
-        <div class="media-title">Imágenes</div>
+        <div class="media-title">{{ _("Imágenes") }}</div>
         <div class="media-grid">
           {% for item in images %}
             <div class="discussion-media-item">
               <div class="media-thumb">
-                <img src="{{ item.url }}" alt="Imagen de discusión" />
+                <img src="{{ item.url }}" alt="{{ _('Imagen de discusión') }}" />
               </div>
               {% if item.caption %}
                 <div class="muted">{{ item.caption }}</div>
@@ -64,7 +64,7 @@
         </div>
       </div>
     {% endif %}
-    <button type="submit" class="btn-primary">Guardar cambios</button>
+    <button type="submit" class="btn-primary">{{ _("Guardar cambios") }}</button>
   </form>
 </section>
 

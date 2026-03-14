@@ -13,6 +13,7 @@ from app.services.discussion_tags import upsert_tags, normalize_tag
 from app.services.media_upload import validate_files, upload_files, parse_media_json
 from app.services.recaptcha import verify_recaptcha, recaptcha_enabled
 from app.services.input_safety import has_malicious_input
+from flask_babel import gettext as _, lazy_gettext as _l
 from . import discussions_bp
 
 
@@ -101,7 +102,7 @@ def new_discussion():
         if recaptcha_enabled():
             token = request.form.get("g-recaptcha-response", "")
             if not verify_recaptcha(token, request.remote_addr):
-                flash("Verificación reCAPTCHA falló. Intenta nuevamente.", "error")
+                flash(_("Verificación reCAPTCHA falló. Intenta nuevamente."), "error")
                 return redirect(url_for("discussions.new_discussion"))
         title = request.form.get("title", "").strip()
         body = request.form.get("body", "").strip()
@@ -119,11 +120,11 @@ def new_discussion():
         image_captions = request.form.getlist("image_captions[]")
 
         if has_malicious_input([title, body, nickname] + links_list + selected_tags + new_tags):
-            flash("Se detectó contenido sospechoso. Revisa y vuelve a intentar.", "error")
+            flash(_("Se detectó contenido sospechoso. Revisa y vuelve a intentar."), "error")
             return redirect(url_for("discussions.new_discussion"))
 
         if not title or not body:
-            flash("Título y contenido son obligatorios.", "error")
+            flash(_("Título y contenido son obligatorios."), "error")
             return redirect(url_for("discussions.new_discussion"))
 
         nickname = _resolve_discussion_nick(nickname)
@@ -158,7 +159,7 @@ def new_discussion():
             post.tags = tags
         db.session.add(post)
         db.session.commit()
-        flash("Discusión publicada.", "success")
+        flash(_("Discusión publicada."), "success")
         return redirect(url_for("discussions.index"))
 
     tags = DiscussionTag.query.order_by(DiscussionTag.name.asc()).all()
@@ -182,13 +183,13 @@ def detail(post_id):
         if recaptcha_enabled():
             token = request.form.get("g-recaptcha-response", "")
             if not verify_recaptcha(token, request.remote_addr):
-                flash("Verificación reCAPTCHA falló. Intenta nuevamente.", "error")
+                flash(_("Verificación reCAPTCHA falló. Intenta nuevamente."), "error")
                 return redirect(url_for("discussions.detail", post_id=post.id))
         if has_malicious_input([body, nickname]):
-            flash("Se detectó contenido sospechoso. Revisa y vuelve a intentar.", "error")
+            flash(_("Se detectó contenido sospechoso. Revisa y vuelve a intentar."), "error")
             return redirect(url_for("discussions.detail", post_id=post.id))
         if not body:
-            flash("El comentario no puede estar vacío.", "error")
+            flash(_("El comentario no puede estar vacío."), "error")
             return redirect(url_for("discussions.detail", post_id=post.id))
 
         nickname = _resolve_discussion_nick(nickname)
@@ -210,7 +211,7 @@ def detail(post_id):
         )
         db.session.add(comment)
         db.session.commit()
-        flash("Comentario agregado.", "success")
+        flash(_("Comentario agregado."), "success")
         return redirect(url_for("discussions.detail", post_id=post.id))
 
     links = []

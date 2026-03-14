@@ -1,3 +1,5 @@
+var t = window.t;
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -39,7 +41,7 @@ function renderComments(postId, items) {
   const list = document.getElementById(`comment-list-${postId}`);
   if (!list) return;
   if (!items.length) {
-    list.innerHTML = `<div class="muted">No hay comentarios todavía.</div>`;
+    list.innerHTML = `<div class="muted">${t("empty_comments")}</div>`;
     return;
   }
 
@@ -89,7 +91,7 @@ async function initReportCard(card) {
   if (verifyBtn) {
     if (verifyBtn.getAttribute("data-verified") === "1") {
       verifyBtn.disabled = true;
-      verifyBtn.textContent = "Verificado";
+      verifyBtn.textContent = t("button_verified");
       verifyBtn.classList.add("is-verified");
     }
     verifyBtn.addEventListener("click", async () => {
@@ -100,7 +102,7 @@ async function initReportCard(card) {
       }
       if (result && result.ok) {
         verifyBtn.disabled = true;
-        verifyBtn.textContent = "Verificado";
+        verifyBtn.textContent = t("button_verified");
         verifyBtn.setAttribute("data-verified", "1");
         verifyBtn.classList.add("is-verified");
       }
@@ -137,10 +139,10 @@ async function initReportCard(card) {
       const full = `${window.location.origin}${url}`;
       try {
         await navigator.clipboard.writeText(full);
-        copyBtn.textContent = "Enlace copiado";
-        setTimeout(() => (copyBtn.textContent = "Copiar enlace"), 1500);
+        copyBtn.textContent = t("toast_link_copied");
+        setTimeout(() => (copyBtn.textContent = t("button_copy_link")), 1500);
       } catch (e) {
-        copyBtn.textContent = "Copia manual";
+        copyBtn.textContent = t("fallback_copy_manual");
       }
     });
   }
@@ -204,7 +206,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         items = Array.from(new Set(items)).sort();
       }
-      munSelect.innerHTML = `<option value="">Todos</option>` +
+      munSelect.innerHTML = `<option value="">${t("dropdown_all_option")}</option>` +
         items.map((m) => `<option value="${m}" ${m === selected ? "selected" : ""}>${m}</option>`).join("");
     };
 

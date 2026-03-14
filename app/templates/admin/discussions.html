@@ -1,9 +1,9 @@
 {% extends "shared/base.html" %}
-{% block title %} | Discusiones{% endblock %}
+{% block title %} | {{ _("Discusiones") }}{% endblock %}
 {% block content %}
 <section class="panel">
-  <h1>Discusiones</h1>
-  <p class="muted">Editar o eliminar discusiones publicadas.</p>
+  <h1>{{ _("Discusiones") }}</h1>
+  <p class="muted">{{ _("Editar o eliminar discusiones publicadas.") }}</p>
 
   <div class="pending-list">
     {% if posts %}
@@ -12,18 +12,18 @@
           <div>
             <div class="muted">{{ post.author_label }} · {{ post.created_at }}</div>
             <h3 style="margin:6px 0;">{{ post.title }}</h3>
-            <div class="muted">{{ comment_counts.get(post.id, 0) }} comentarios · Karma {{ post.score }}</div>
+            <div class="muted">{{ comment_counts.get(post.id, 0) }} {{ _("comentarios") }} · Karma {{ post.score }}</div>
           </div>
           <div class="pending-actions">
-            <a class="btn-secondary" href="{{ url_for('admin.edit_discussion', post_id=post.id) }}">Editar</a>
-            <form method="post" action="{{ url_for('admin.delete_discussion', post_id=post.id) }}" onsubmit="return confirm('¿Eliminar esta discusión?');">
-              <button class="btn-secondary" type="submit">Eliminar</button>
+            <a class="btn-secondary" href="{{ url_for('admin.edit_discussion', post_id=post.id) }}">{{ _("Editar") }}</a>
+            <form method="post" action="{{ url_for('admin.delete_discussion', post_id=post.id) }}" onsubmit="return confirm('{{ _('¿Eliminar esta discusión?') }}');">
+              <button class="btn-secondary" type="submit">{{ _("Eliminar") }}</button>
             </form>
           </div>
         </div>
       {% endfor %}
     {% else %}
-      <div class="muted">No hay discusiones aún.</div>
+      <div class="muted">{{ _("No hay discusiones aún.") }}</div>
     {% endif %}
   </div>
 </section>

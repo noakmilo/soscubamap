@@ -117,6 +117,24 @@ h3 {
   color: var(--accent);
 }
 
+.lang-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.lang-switcher a {
+  text-decoration: none;
+  color: inherit;
+}
+
+.lang-switcher a.active {
+  font-weight: 700;
+  opacity: 1;
+}
+
 .content {
   padding: 40px 48px 80px;
 }

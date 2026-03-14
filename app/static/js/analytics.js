@@ -1,3 +1,5 @@
+var t = window.t;
+
 const state = {
   charts: {},
 };
@@ -51,7 +53,7 @@ const fetchAnalytics = async () => {
   const query = buildQuery();
   const res = await fetch(`/api/v1/analytics?${query}`);
   if (!res.ok) {
-    throw new Error("No se pudo cargar analíticas");
+    throw new Error(t("error_analytics_load_failed"));
   }
   return res.json();
 };
@@ -197,7 +199,7 @@ const renderCharts = (payload) => {
   const moderation = payload.moderation_status || {};
   state.charts.moderationStatus = buildDonut(
     document.getElementById("moderationStatus"),
-    ["Aprobados", "Pendientes", "Rechazados", "Ocultos"],
+    [t("status_approved"), t("status_pending"), t("status_rejected"), t("status_hidden")],
     [
       moderation.approved || 0,
       moderation.pending || 0,
@@ -249,7 +251,7 @@ const renderCharts = (payload) => {
     commentLabels,
     [
       {
-        label: "Comentarios en reportes",
+        label: t("chart_label_report_comments"),
         data: payload.comments_over_time.report_counts,
         borderColor: THEME.accent,
         backgroundColor: THEME.accentSoft,
@@ -257,7 +259,7 @@ const renderCharts = (payload) => {
         pointRadius: 2,
       },
       {
-        label: "Comentarios en discusiones",
+        label: t("chart_label_discussion_comments"),
         data: payload.comments_over_time.discussion_counts,
         borderColor: THEME.accent2,
         backgroundColor: THEME.accent2Soft,
@@ -270,7 +272,7 @@ const renderCharts = (payload) => {
   const editStatus = payload.edit_status || {};
   state.charts.editStatus = buildBar(
     document.getElementById("editStatus"),
-    ["Pendientes", "Aprobadas", "Rechazadas"],
+    [t("status_pending"), t("status_approved"), t("status_rejected")],
     [editStatus.pending || 0, editStatus.approved || 0, editStatus.rejected || 0]
   );
 };
@@ -288,7 +290,7 @@ const attachHandlers = () => {
   if (!refreshBtn) return;
   refreshBtn.addEventListener("click", async () => {
     refreshBtn.disabled = true;
-    refreshBtn.textContent = "Cargando...";
+    refreshBtn.textContent = t("button_loading");
     try {
       const data = await fetchAnalytics();
       renderCharts(data);
@@ -296,7 +298,7 @@ const attachHandlers = () => {
       console.error(err);
     } finally {
       refreshBtn.disabled = false;
-      refreshBtn.textContent = "Actualizar";
+      refreshBtn.textContent = t("button_refresh");
     }
   });
 };
