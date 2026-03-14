@@ -37,13 +37,19 @@ def upgrade():
         INSERT INTO categories (name, slug, description)
         SELECT :name, :slug, :description
         WHERE NOT EXISTS (
-            SELECT 1 FROM categories WHERE slug = :slug
+            SELECT 1 FROM categories WHERE slug = :slug_lookup
         )
         """
     )
 
     for category in new_categories:
-        conn.execute(stmt, category)
+        conn.execute(
+            stmt,
+            {
+                **category,
+                "slug_lookup": category["slug"],
+            },
+        )
 
 
 def downgrade():
