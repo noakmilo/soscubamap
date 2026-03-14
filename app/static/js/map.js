@@ -160,6 +160,8 @@ const CATEGORY_ICONS = {
   "estacion-policia": "fa-building-shield",
   "escuela-pcc": "fa-graduation-cap",
   "sede-pcc": "fa-people-group",
+  "sede-gobierno": "fa-building-columns",
+  "sede-ujc": "fa-flag",
   "sede-seguridad-estado": "fa-user-secret",
   "unidad-militar": "fa-person-military-pointing",
   "base-espionaje": "fa-satellite-dish",
@@ -168,6 +170,7 @@ const CATEGORY_ICONS = {
 
 const CATEGORY_IMAGES = {
   "sede-pcc": "/static/img/Communist_Party_of_Cuba_logo.svg.png",
+  "sede-ujc": "/static/img/ujc.png",
 };
 
 const ALERT_SLUGS = new Set(["accion-represiva", "movimiento-tropas", "desconexion-internet"]);

@@ -44,6 +44,14 @@ const PLACEHOLDER_BY_SLUG = {
     title: "Ej: Sede municipal del PCC",
     description: "Describe la sede, accesos, senales y eventos recurrentes.",
   },
+  "sede-gobierno": {
+    title: "Ej: Sede municipal del Gobierno",
+    description: "Describe la sede, accesos, senales y eventos recurrentes.",
+  },
+  "sede-ujc": {
+    title: "Ej: Sede municipal de la UJC",
+    description: "Describe la sede, accesos, senales y eventos recurrentes.",
+  },
   "sede-seguridad-estado": {
     title: "Ej: Sede de Seguridad del Estado",
     description:
