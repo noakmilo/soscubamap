@@ -1,31 +1,31 @@
 {% extends "shared/base.html" %}
-{% block title %} | Reportes{% endblock %}
-{% block meta_description %}Explora reportes en #SOSCuba Map filtrados por provincia y municipio. Verifica y comenta con transparencia comunitaria.{% endblock %}
+{% block title %} | {{ _("Reportes") }}{% endblock %}
+{% block meta_description %}{{ _("Explora reportes en #SOSCuba Map filtrados por provincia y municipio. Verifica y comenta con transparencia comunitaria.") }}{% endblock %}
 {% block content %}
 <section class="panel">
-  <h1>Reportes</h1>
-  <p class="muted">Filtra por provincia y municipio. Cada reporte puede ser verificado y comentado.</p>
+  <h1>{{ _("Reportes") }}</h1>
+  <p class="muted">{{ _("Filtra por provincia y municipio. Cada reporte puede ser verificado y comentado.") }}</p>
 
   <form method="get" class="filter-controls" id="reportFilters">
     <label>
-      Provincia
+      {{ _("Provincia") }}
       <select name="provincia">
-        <option value="">Todas</option>
+        <option value="">{{ _("Todas") }}</option>
         {% for prov in provinces %}
           <option value="{{ prov }}" {% if prov == selected_province %}selected{% endif %}>{{ prov }}</option>
         {% endfor %}
       </select>
     </label>
     <label>
-      Municipio
+      {{ _("Municipio") }}
       <select name="municipio">
-        <option value="">Todos</option>
+        <option value="">{{ _("Todos") }}</option>
         {% for mun in municipalities %}
           <option value="{{ mun }}" {% if mun == selected_municipality %}selected{% endif %}>{{ mun }}</option>
         {% endfor %}
       </select>
     </label>
-    <button class="btn-primary" type="submit">Aplicar</button>
+    <button class="btn-primary" type="submit">{{ _("Aplicar") }}</button>
   </form>
 </section>
 
@@ -39,37 +39,37 @@
           <div class="muted">{{ post.author.anon_code if post.author else 'Anon' }}</div>
           <div class="muted">{{ post.created_at }}</div>
           <p>{{ post.description }}</p>
-          {% if post.address %}<div class="muted">Dirección: {{ post.address }}</div>{% endif %}
+          {% if post.address %}<div class="muted">{{ _("Dirección:") }} {{ post.address }}</div>{% endif %}
           {% if post.province or post.municipality %}
-            <div class="muted">Provincia: {{ post.province or 'N/D' }} · Municipio: {{ post.municipality or 'N/D' }}</div>
+            <div class="muted">{{ _("Provincia:") }} {{ post.province or _('N/D') }} · {{ _("Municipio:") }} {{ post.municipality or _('N/D') }}</div>
           {% endif %}
         </div>
         <div class="report-actions">
           <button class="btn-primary verify-btn{% if post.id in verified_ids %} is-verified{% endif %}" data-post-id="{{ post.id }}" data-verified="{{ 1 if post.id in verified_ids else 0 }}" {% if post.id in verified_ids %}disabled{% endif %}>
-            {% if post.id in verified_ids %}Verificado{% else %}Verificar{% endif %}
+            {% if post.id in verified_ids %}{{ _("Verificado") }}{% else %}{{ _("Verificar") }}{% endif %}
           </button>
           <span class="verify-count" id="verify-count-{{ post.id }}">{{ post.verify_count or 0 }}</span>
-          <button class="btn-secondary detail-btn" type="button" data-detail-url="{{ url_for('map.report_detail', post_id=post.id) }}">Ver detalle</button>
-          <button class="btn-secondary copy-link-btn" type="button" data-copy-url="{{ url_for('map.report_detail', post_id=post.id) }}">Copiar enlace</button>
-          <button class="btn-secondary" type="button" data-history-url="{{ url_for('map.post_history', post_id=post.id) }}">Historial</button>
+          <button class="btn-secondary detail-btn" type="button" data-detail-url="{{ url_for('map.report_detail', post_id=post.id) }}">{{ _("Ver detalle") }}</button>
+          <button class="btn-secondary copy-link-btn" type="button" data-copy-url="{{ url_for('map.report_detail', post_id=post.id) }}">{{ _("Copiar enlace") }}</button>
+          <button class="btn-secondary" type="button" data-history-url="{{ url_for('map.post_history', post_id=post.id) }}">{{ _("Historial") }}</button>
           {% if not ((post.verify_count or 0) >= 10 and not (current_user.is_authenticated and current_user.has_role('administrador'))) %}
-            <button class="btn-secondary edit-btn" type="button" data-edit-url="{{ url_for('map.edit_report_public', post_id=post.id) }}">Editar</button>
+            <button class="btn-secondary edit-btn" type="button" data-edit-url="{{ url_for('map.edit_report_public', post_id=post.id) }}">{{ _("Editar") }}</button>
           {% else %}
-            <span class="muted">Edición bloqueada: 10+ verificaciones. Puedes comentar y reportar ubicación si hay datos erróneos.</span>
+            <span class="muted">{{ _("Edición bloqueada: 10+ verificaciones. Puedes comentar y reportar ubicación si hay datos erróneos.") }}</span>
           {% endif %}
-          <button class="btn-primary map-btn" type="button" data-map-lat="{{ post.latitude }}" data-map-lng="{{ post.longitude }}">Ver en el mapa</button>
+          <button class="btn-primary map-btn" type="button" data-map-lat="{{ post.latitude }}" data-map-lng="{{ post.longitude }}">{{ _("Ver en el mapa") }}</button>
         </div>
         <div class="comments" data-post-id="{{ post.id }}">
           <div class="comment-list" id="comment-list-{{ post.id }}"></div>
           <form class="comment-form" data-post-id="{{ post.id }}">
-            <textarea name="comment" rows="3" required placeholder="Escribe un comentario..."></textarea>
-            <button class="btn-secondary" type="submit">Enviar comentario</button>
+            <textarea name="comment" rows="3" required placeholder="{{ _('Escribe un comentario...') }}"></textarea>
+            <button class="btn-secondary" type="submit">{{ _("Enviar comentario") }}</button>
           </form>
         </div>
       </div>
     {% endfor %}
   {% else %}
-    <div class="panel">No hay reportes con esos filtros.</div>
+    <div class="panel">{{ _("No hay reportes con esos filtros.") }}</div>
   {% endif %}
 </section>
 

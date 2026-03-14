@@ -10,6 +10,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+RUN pybabel compile -d translations
+
 EXPOSE 8000
 
 COPY entrypoint.sh /entrypoint.sh

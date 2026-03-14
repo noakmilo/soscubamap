@@ -1,27 +1,27 @@
 {% extends "shared/base.html" %}
-{% block title %} | Donaciones{% endblock %}
-{% block meta_description %}Apoya el proyecto #SOSCuba Map. Dona en Bitcoin para mantener el mapa colaborativo y la infraestructura de verificación y visualización.{% endblock %}
+{% block title %} | {{ _("Donaciones") }}{% endblock %}
+{% block meta_description %}{{ _("Apoya el proyecto #SOSCuba Map. Dona en Bitcoin para mantener el mapa colaborativo y la infraestructura de verificación y visualización.") }}{% endblock %}
 {% block content %}
 <section class="panel donate">
-  <h1>Apoya el proyecto</h1>
-  <p>Las donaciones sostienen el dominio, servidores y el uso de la API de Google Maps. Gracias por mantener este proyecto vivo.</p>
+  <h1>{{ _("Apoya el proyecto") }}</h1>
+  <p>{{ _("Las donaciones sostienen el dominio, servidores y el uso de la API de Google Maps. Gracias por mantener este proyecto vivo.") }}</p>
 
   <div class="donate-grid">
     <div class="donate-card">
       <div class="donate-qr">
         <img
           src="https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=bitcoin:bc1qsvypsue2xvcxag7yg2fvzgv4nnjcfvapzk22rt"
-          alt="QR de donación en Bitcoin"
+          alt="{{ _('QR de donación en Bitcoin') }}"
         />
       </div>
       <div class="donate-info">
         <div class="donate-label">Bitcoin</div>
         <div class="donate-address" id="btcAddress">bc1qsvypsue2xvcxag7yg2fvzgv4nnjcfvapzk22rt</div>
         <div class="donate-actions">
-          <button class="btn-secondary" id="copyBtc">Copiar dirección</button>
-          <a class="btn-primary donate-btn" href="bitcoin:bc1qsvypsue2xvcxag7yg2fvzgv4nnjcfvapzk22rt">Abrir wallet</a>
+          <button class="btn-secondary" id="copyBtc">{{ _("Copiar dirección") }}</button>
+          <a class="btn-primary donate-btn" href="bitcoin:bc1qsvypsue2xvcxag7yg2fvzgv4nnjcfvapzk22rt">{{ _("Abrir wallet") }}</a>
         </div>
-        <div class="donate-note">Comparte este QR para apoyar el mapa.</div>
+        <div class="donate-note">{{ _("Comparte este QR para apoyar el mapa.") }}</div>
       </div>
     </div>
 
@@ -36,10 +36,10 @@
       <div class="donate-info">
         <div class="donate-label">Buy Me a Coffee</div>
         <div class="donate-note">
-          Dona de forma rápida con tarjeta o PayPal.
+          {{ _("Dona de forma rápida con tarjeta o PayPal.") }}
         </div>
         <div class="donate-actions">
-          <a class="btn-primary donate-btn" href="https://buymeacoffee.com/soscubamap" target="_blank" rel="noopener">Donar por Buy Me a Coffee</a>
+          <a class="btn-primary donate-btn" href="https://buymeacoffee.com/soscubamap" target="_blank" rel="noopener">{{ _("Donar por Buy Me a Coffee") }}</a>
         </div>
       </div>
     </div>
@@ -55,10 +55,10 @@
       <div class="donate-info">
         <div class="donate-label">QvaPay</div>
         <div class="donate-note">
-          Entra al enlace y elige el monto para apoyar #SOSCuba Map.
+          {{ _("Entra al enlace y elige el monto para apoyar #SOSCuba Map.") }}
         </div>
         <div class="donate-actions">
-          <a class="btn-primary donate-btn" href="https://soscubamap.qvpay.me/" target="_blank" rel="noopener">Donar por QvaPay</a>
+          <a class="btn-primary donate-btn" href="https://soscubamap.qvpay.me/" target="_blank" rel="noopener">{{ _("Donar por QvaPay") }}</a>
         </div>
       </div>
     </div>
@@ -66,17 +66,17 @@
 </section>
 
 <section class="panel">
-  <h2>Registro de donaciones</h2>
-  <p class="muted">Transparencia sobre los aportes recibidos y su destino.</p>
+  <h2>{{ _("Registro de donaciones") }}</h2>
+  <p class="muted">{{ _("Transparencia sobre los aportes recibidos y su destino.") }}</p>
   {% if donation_logs and donation_logs|length %}
     <div class="table-wrap">
       <table class="admin-table">
         <thead>
           <tr>
-            <th>Monto</th>
-            <th>Vía</th>
-            <th>Fecha</th>
-            <th>Destino</th>
+            <th>{{ _("Monto") }}</th>
+            <th>{{ _("Vía") }}</th>
+            <th>{{ _("Fecha") }}</th>
+            <th>{{ _("Destino") }}</th>
           </tr>
         </thead>
         <tbody>
@@ -92,7 +92,7 @@
       </table>
     </div>
   {% else %}
-    <div class="muted">No hay donaciones registradas aún.</div>
+    <div class="muted">{{ _("No hay donaciones registradas aún.") }}</div>
   {% endif %}
 </section>
 
@@ -103,10 +103,10 @@
     if (!addr) return;
     try {
       await navigator.clipboard.writeText(addr);
-      copyBtn.textContent = "Copiado";
-      setTimeout(() => (copyBtn.textContent = "Copiar dirección"), 1500);
+      copyBtn.textContent = "{{ _('Copiado') }}";
+      setTimeout(() => (copyBtn.textContent = "{{ _('Copiar dirección') }}"), 1500);
     } catch (e) {
-      copyBtn.textContent = "Copia manual";
+      copyBtn.textContent = "{{ _('Copia manual') }}";
     }
   });
 </script>

@@ -13,6 +13,8 @@ class Config:
     WTF_CSRF_ENABLED = True
     APP_NAME = "#SOSCuba Map"
     DEFAULT_LANGUAGE = "es"
+    BABEL_DEFAULT_LOCALE = "es"
+    BABEL_TRANSLATION_DIRECTORIES = "../translations"
     GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
     GOOGLE_MAPS_MAP_ID = os.getenv("GOOGLE_MAPS_MAP_ID", "")
     CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", "")

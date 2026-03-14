@@ -1,11 +1,11 @@
 {% extends "shared/base.html" %}
-{% block title %} | Moderación{% endblock %}
+{% block title %} | {{ _("Moderación") }}{% endblock %}
 {% block content %}
 <section class="panel">
-  <h1>Moderación</h1>
-  <p>Revisa reportes pendientes, aprueba o rechaza contenido.</p>
+  <h1>{{ _("Moderación") }}</h1>
+  <p>{{ _("Revisa reportes pendientes, aprueba o rechaza contenido.") }}</p>
 
-  <h2 class="section-title">Reportes pendientes</h2>
+  <h2 class="section-title">{{ _("Reportes pendientes") }}</h2>
   <div class="pending-list">
     {% if pending %}
       {% for post in pending %}
@@ -27,22 +27,22 @@
           </div>
           <div class="actions">
             <form method="post" action="{{ url_for('moderation.approve', post_id=post.id) }}">
-              <button class="btn-primary" type="submit">Aprobar</button>
+              <button class="btn-primary" type="submit">{{ _("Aprobar") }}</button>
             </form>
             <form method="post" action="{{ url_for('moderation.reject', post_id=post.id) }}">
-              <button class="btn-secondary" type="submit">Rechazar</button>
+              <button class="btn-secondary" type="submit">{{ _("Rechazar") }}</button>
             </form>
           </div>
         </div>
       {% endfor %}
     {% else %}
-      <div class="muted">No hay reportes pendientes.</div>
+      <div class="muted">{{ _("No hay reportes pendientes.") }}</div>
     {% endif %}
   </div>
 </section>
 
 <section class="panel">
-  <h2>Ediciones pendientes</h2>
+  <h2>{{ _("Ediciones pendientes") }}</h2>
   <div class="pending-list">
     {% if pending_edits %}
       {% for edit in pending_edits %}
@@ -58,20 +58,20 @@
                 {{ edit.title }}
               </button>
             </h3>
-            <div class="muted">Reporte #{{ edit.post_id }}</div>
-            <div class="muted">{{ edit.editor_label or 'Anon' }} · {{ edit.created_at }}</div>
-            <div class="muted"><strong>Motivo:</strong> {{ edit.reason }}</div>
+            <div class="muted">{{ _("Reporte #") }}{{ edit.post_id }}</div>
+            <div class="muted">{{ edit.editor_label or _('Anon') }} · {{ edit.created_at }}</div>
+            <div class="muted"><strong>{{ _("Motivo:") }}</strong> {{ edit.reason }}</div>
             <p>{{ edit.description }}</p>
           </div>
           <div class="actions">
             <form method="post" action="{{ url_for('moderation.approve_edit', edit_id=edit.id) }}">
-              <button class="btn-primary" type="submit">Aprobar edición</button>
+              <button class="btn-primary" type="submit">{{ _("Aprobar edición") }}</button>
             </form>
           </div>
         </div>
       {% endfor %}
     {% else %}
-      <div class="muted">No hay ediciones pendientes.</div>
+      <div class="muted">{{ _("No hay ediciones pendientes.") }}</div>
     {% endif %}
   </div>
 </section>

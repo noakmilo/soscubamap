@@ -9,6 +9,7 @@ from app.models.post_revision import PostRevision
 from app.models.post_edit_request import PostEditRequest
 from app.models.media import Media
 from app.services.media_upload import media_json_from_post, parse_media_json
+from flask_babel import gettext as _, lazy_gettext as _l
 from app.services.authz import role_required
 from . import moderation_bp
 
@@ -29,7 +30,7 @@ def approve(post_id):
     post = Post.query.get_or_404(post_id)
     post.status = "approved"
     db.session.commit()
-    flash("Reporte aprobado.", "success")
+    flash(_("Reporte aprobado."), "success")
     if request.args.get("modal") == "1":
         return render_template("map/edit_success.html", payload={"status": "approved"})
     return redirect(url_for("moderation.dashboard"))
@@ -42,7 +43,7 @@ def reject(post_id):
     post = Post.query.get_or_404(post_id)
     post.status = "rejected"
     db.session.commit()
-    flash("Reporte rechazado.", "success")
+    flash(_("Reporte rechazado."), "success")
     if request.args.get("modal") == "1":
         return render_template("map/edit_success.html", payload={"status": "rejected"})
     return redirect(url_for("moderation.dashboard"))
@@ -105,7 +106,7 @@ def approve_edit(edit_id):
 
     edit.status = "approved"
     db.session.commit()
-    flash("Edición aprobada.", "success")
+    flash(_("Edición aprobada."), "success")
     if request.args.get("modal") == "1":
         return render_template("map/edit_success.html", payload={"status": "approved"})
     return redirect(url_for("moderation.dashboard"))
@@ -118,14 +119,14 @@ def reject_edit(edit_id):
     edit = PostEditRequest.query.get_or_404(edit_id)
     rejection_reason = request.form.get("rejection_reason", "").strip()
     if not rejection_reason:
-        flash("Debes indicar un motivo de rechazo.", "error")
+        flash(_("Debes indicar un motivo de rechazo."), "error")
         if request.args.get("modal") == "1":
             return redirect(url_for("moderation.edit_detail", edit_id=edit.id, modal=1))
         return redirect(url_for("moderation.edit_detail", edit_id=edit.id))
     edit.rejection_reason = rejection_reason
     edit.status = "rejected"
     db.session.commit()
-    flash("Edición rechazada.", "success")
+    flash(_("Edición rechazada."), "success")
     if request.args.get("modal") == "1":
         return render_template("map/edit_success.html", payload={"status": "rejected"})
     return redirect(url_for("moderation.dashboard"))

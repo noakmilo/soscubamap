@@ -1,38 +1,38 @@
 {% extends "shared/base.html" %}
-{% block title %} | Historial{% endblock %}
-{% block meta_description %}Historial de ediciones de #SOSCuba Map para máxima transparencia.{% endblock %}
+{% block title %} | {{ _("Historial") }}{% endblock %}
+{% block meta_description %}{{ _("Historial de ediciones de #SOSCuba Map para máxima transparencia.") }}{% endblock %}
 {% block content %}
 <section class="panel">
-  <h1>Historial de ediciones</h1>
-  <p>Reporte: <strong>{{ post.title }}</strong></p>
+  <h1>{{ _("Historial de ediciones") }}</h1>
+  <p>{{ _("Reporte:") }} <strong>{{ post.title }}</strong></p>
 
   <div class="history-section">
-    <h2>Versión actual</h2>
+    <h2>{{ _("Versión actual") }}</h2>
     <div class="history-card">
-      <div class="muted">Actual</div>
-      {% if latest_reason %}<div class="muted"><strong>Motivo:</strong> {{ latest_reason }}</div>{% endif %}
-      <div><strong>Título:</strong> {{ post.title }}</div>
-      <div><strong>Descripción:</strong> {{ post.description }}</div>
-      <div><strong>Coordenadas:</strong> {{ post.latitude }}, {{ post.longitude }}</div>
+      <div class="muted">{{ _("Actual") }}</div>
+      {% if latest_reason %}<div class="muted"><strong>{{ _("Motivo:") }}</strong> {{ latest_reason }}</div>{% endif %}
+      <div><strong>{{ _("Título:") }}</strong> {{ post.title }}</div>
+      <div><strong>{{ _("Descripción:") }}</strong> {{ post.description }}</div>
+      <div><strong>{{ _("Coordenadas:") }}</strong> {{ post.latitude }}, {{ post.longitude }}</div>
       {% if post.province or post.municipality %}
-        <div><strong>Provincia:</strong> {{ post.province or 'N/D' }} · <strong>Municipio:</strong> {{ post.municipality or 'N/D' }}</div>
+        <div><strong>{{ _("Provincia:") }}</strong> {{ post.province or _('N/D') }} · <strong>{{ _("Municipio:") }}</strong> {{ post.municipality or _('N/D') }}</div>
       {% endif %}
       {% if post.movement_at %}
-        <div><strong>Movimiento:</strong> {{ post.movement_at.strftime('%Y-%m-%d %H:%M') }}</div>
+        <div><strong>{{ _("Movimiento:") }}</strong> {{ post.movement_at.strftime('%Y-%m-%d %H:%M') }}</div>
       {% endif %}
-      {% if post.address %}<div><strong>Dirección:</strong> {{ post.address }}</div>{% endif %}
+      {% if post.address %}<div><strong>{{ _("Dirección:") }}</strong> {{ post.address }}</div>{% endif %}
       {% if post.links_json %}
-        <div><strong>Enlaces:</strong>
+        <div><strong>{{ _("Enlaces:") }}</strong>
           <ul class="history-links">
             {% for link in links %}<li>{{ link }}</li>{% endfor %}
           </ul>
         </div>
       {% endif %}
       {% if media_items %}
-        <div><strong>Imágenes:</strong>
+        <div><strong>{{ _("Imágenes:") }}</strong>
           <div class="history-media">
             {% for item in media_items %}
-              <img src="{{ item.url }}" alt="Imagen del reporte" />
+              <img src="{{ item.url }}" alt="{{ _('Imagen del reporte') }}" />
             {% endfor %}
           </div>
         </div>
@@ -41,95 +41,95 @@
   </div>
 
   <div class="history-section">
-    <h2>Ediciones anteriores</h2>
+    <h2>{{ _("Ediciones anteriores") }}</h2>
     {% if revisions %}
       <div class="history-list">
         {% for rev in revisions %}
           <div class="history-card" id="rev-{{ rev.id }}">
-            <div class="muted">{{ rev.created_at }} · {{ rev.editor_label or 'Anon' }}</div>
-            {% if rev.reason %}<div class="muted"><strong>Motivo:</strong> {{ rev.reason }}</div>{% endif %}
-            <div><strong>Título:</strong> {{ rev.title }}</div>
-            <div><strong>Descripción:</strong> {{ rev.description }}</div>
-            <div><strong>Coordenadas:</strong> {{ rev.latitude }}, {{ rev.longitude }}</div>
+            <div class="muted">{{ rev.created_at }} · {{ rev.editor_label or _('Anon') }}</div>
+            {% if rev.reason %}<div class="muted"><strong>{{ _("Motivo:") }}</strong> {{ rev.reason }}</div>{% endif %}
+            <div><strong>{{ _("Título:") }}</strong> {{ rev.title }}</div>
+            <div><strong>{{ _("Descripción:") }}</strong> {{ rev.description }}</div>
+            <div><strong>{{ _("Coordenadas:") }}</strong> {{ rev.latitude }}, {{ rev.longitude }}</div>
             {% if rev.province or rev.municipality %}
-              <div><strong>Provincia:</strong> {{ rev.province or 'N/D' }} · <strong>Municipio:</strong> {{ rev.municipality or 'N/D' }}</div>
+              <div><strong>{{ _("Provincia:") }}</strong> {{ rev.province or _('N/D') }} · <strong>{{ _("Municipio:") }}</strong> {{ rev.municipality or _('N/D') }}</div>
             {% endif %}
             {% if rev.movement_at %}
-              <div><strong>Movimiento:</strong> {{ rev.movement_at.strftime('%Y-%m-%d %H:%M') }}</div>
+              <div><strong>{{ _("Movimiento:") }}</strong> {{ rev.movement_at.strftime('%Y-%m-%d %H:%M') }}</div>
             {% endif %}
-            {% if rev.address %}<div><strong>Dirección:</strong> {{ rev.address }}</div>{% endif %}
+            {% if rev.address %}<div><strong>{{ _("Dirección:") }}</strong> {{ rev.address }}</div>{% endif %}
             {% if rev.links_json %}
-              <div><strong>Enlaces:</strong>
+              <div><strong>{{ _("Enlaces:") }}</strong>
                 <ul class="history-links">
                   {% for link in rev_links[rev.id] %}<li>{{ link }}</li>{% endfor %}
                 </ul>
               </div>
             {% endif %}
             {% if rev_media[rev.id] %}
-              <div><strong>Imágenes:</strong>
+              <div><strong>{{ _("Imágenes:") }}</strong>
                 <div class="history-media">
                   {% for item in rev_media[rev.id] %}
-                    <img src="{{ item.url }}" alt="Imagen del reporte" />
+                    <img src="{{ item.url }}" alt="{{ _('Imagen del reporte') }}" />
                   {% endfor %}
                 </div>
               </div>
             {% endif %}
             {% if current_user.is_authenticated and current_user.has_role('administrador') %}
               <form method="post" action="{{ url_for('admin.restore_revision', post_id=post.id, revision_id=rev.id) }}">
-                <button class="btn-secondary" type="submit">Restaurar esta versión</button>
+                <button class="btn-secondary" type="submit">{{ _("Restaurar esta versión") }}</button>
               </form>
             {% endif %}
           </div>
         {% endfor %}
       </div>
     {% else %}
-      <div class="muted">No hay ediciones registradas aún.</div>
+      <div class="muted">{{ _("No hay ediciones registradas aún.") }}</div>
     {% endif %}
   </div>
 
   <div class="history-section">
-    <h2>Intentos de edición rechazados</h2>
+    <h2>{{ _("Intentos de edición rechazados") }}</h2>
     {% if rejected_edits %}
       <div class="history-list">
         {% for edit in rejected_edits %}
           <div class="history-card rejected" id="rejected-{{ edit.id }}">
-            <div class="muted">{{ edit.created_at }} · {{ edit.editor_label or 'Anon' }}</div>
+            <div class="muted">{{ edit.created_at }} · {{ edit.editor_label or _('Anon') }}</div>
             {% if edit.rejection_reason %}
-              <div class="muted"><em>Intento de edición rechazado por: {{ edit.rejection_reason }}</em></div>
+              <div class="muted"><em>{{ _("Intento de edición rechazado por:") }} {{ edit.rejection_reason }}</em></div>
             {% else %}
-              <div class="muted"><em>Intento de edición rechazado.</em></div>
+              <div class="muted"><em>{{ _("Intento de edición rechazado.") }}</em></div>
             {% endif %}
             {% if edit.reason %}
-              <div class="muted"><strong>Motivo del editor:</strong> {{ edit.reason }}</div>
+              <div class="muted"><strong>{{ _("Motivo del editor:") }}</strong> {{ edit.reason }}</div>
             {% endif %}
-            <div><strong>Título propuesto:</strong> {{ edit.title }}</div>
-            <div><strong>Descripción propuesta:</strong> {{ edit.description }}</div>
-            <div><strong>Coordenadas propuestas:</strong> {{ edit.latitude }}, {{ edit.longitude }}</div>
+            <div><strong>{{ _("Título propuesto:") }}</strong> {{ edit.title }}</div>
+            <div><strong>{{ _("Descripción propuesta:") }}</strong> {{ edit.description }}</div>
+            <div><strong>{{ _("Coordenadas propuestas:") }}</strong> {{ edit.latitude }}, {{ edit.longitude }}</div>
             {% if edit.province or edit.municipality %}
-              <div><strong>Provincia:</strong> {{ edit.province or 'N/D' }} · <strong>Municipio:</strong> {{ edit.municipality or 'N/D' }}</div>
+              <div><strong>{{ _("Provincia:") }}</strong> {{ edit.province or _('N/D') }} · <strong>{{ _("Municipio:") }}</strong> {{ edit.municipality or _('N/D') }}</div>
             {% endif %}
             {% if edit.movement_at %}
-              <div><strong>Movimiento:</strong> {{ edit.movement_at.strftime('%Y-%m-%d %H:%M') }}</div>
+              <div><strong>{{ _("Movimiento:") }}</strong> {{ edit.movement_at.strftime('%Y-%m-%d %H:%M') }}</div>
             {% endif %}
-            {% if edit.address %}<div><strong>Dirección:</strong> {{ edit.address }}</div>{% endif %}
+            {% if edit.address %}<div><strong>{{ _("Dirección:") }}</strong> {{ edit.address }}</div>{% endif %}
             {% if edit.repressor_name %}
-              <div><strong>Represor:</strong> {{ edit.repressor_name }}</div>
+              <div><strong>{{ _("Represor:") }}</strong> {{ edit.repressor_name }}</div>
             {% endif %}
             {% if edit.other_type %}
-              <div><strong>Tipo:</strong> {{ edit.other_type }}</div>
+              <div><strong>{{ _("Tipo:") }}</strong> {{ edit.other_type }}</div>
             {% endif %}
             {% if edit.links_json %}
-              <div><strong>Enlaces:</strong>
+              <div><strong>{{ _("Enlaces:") }}</strong>
                 <ul class="history-links">
                   {% for link in rejected_links[edit.id] %}<li>{{ link }}</li>{% endfor %}
                 </ul>
               </div>
             {% endif %}
             {% if rejected_media[edit.id] %}
-              <div><strong>Imágenes:</strong>
+              <div><strong>{{ _("Imágenes:") }}</strong>
                 <div class="history-media">
                   {% for item in rejected_media[edit.id] %}
-                    <img src="{{ item.url }}" alt="Imagen del reporte" />
+                    <img src="{{ item.url }}" alt="{{ _('Imagen del reporte') }}" />
                   {% endfor %}
                 </div>
               </div>
@@ -138,7 +138,7 @@
         {% endfor %}
       </div>
     {% else %}
-      <div class="muted">No hay intentos rechazados registrados.</div>
+      <div class="muted">{{ _("No hay intentos rechazados registrados.") }}</div>
     {% endif %}
   </div>
 </section>

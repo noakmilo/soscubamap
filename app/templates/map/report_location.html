@@ -1,21 +1,21 @@
 {% extends "shared/base.html" %}
-{% block title %} | Reportar ubicación{% endblock %}
-{% block meta_description %}Reporta una ubicación incorrecta en #SOSCuba Map para corregir la información publicada.{% endblock %}
+{% block title %} | {{ _("Reportar ubicación") }}{% endblock %}
+{% block meta_description %}{{ _("Reporta una ubicación incorrecta en #SOSCuba Map para corregir la información publicada.") }}{% endblock %}
 {% block content %}
 <section class="panel">
-  <h1>Reportar ubicación</h1>
-  <p>Estás reportando una ubicación incorrecta para: <strong>{{ post.title }}</strong></p>
+  <h1>{{ _("Reportar ubicación") }}</h1>
+  <p>{{ _("Estás reportando una ubicación incorrecta para:") }} <strong>{{ post.title }}</strong></p>
 
   {% if submitted %}
-    <div class="flash success">Gracias. Revisaremos tu reporte.</div>
-    <button class="btn-primary" type="button" onclick="if (parent && parent.closeReportModal) parent.closeReportModal();">Cerrar</button>
+    <div class="flash success">{{ _("Gracias. Revisaremos tu reporte.") }}</div>
+    <button class="btn-primary" type="button" onclick="if (parent && parent.closeReportModal) parent.closeReportModal();">{{ _("Cerrar") }}</button>
   {% else %}
     <form method="post" class="form-grid">
       <label>
-        Describe el problema
-        <textarea name="message" rows="5" required placeholder="Ej: El punto está en la calle equivocada, debería estar 2 cuadras al norte."></textarea>
+        {{ _("Describe el problema") }}
+        <textarea name="message" rows="5" required placeholder="{{ _('Ej: El punto está en la calle equivocada, debería estar 2 cuadras al norte.') }}"></textarea>
       </label>
-      <button class="btn-primary" type="submit">Enviar reporte</button>
+      <button class="btn-primary" type="submit">{{ _("Enviar reporte") }}</button>
     </form>
   {% endif %}
 </section>

@@ -1,16 +1,16 @@
 {% extends "shared/base.html" %}
-{% block title %} | Login{% endblock %}
+{% block title %} | {{ _("Login") }}{% endblock %}
 {% block content %}
 <section class="panel narrow">
-  <h1>Acceder</h1>
+  <h1>{{ _("Acceder") }}</h1>
   <form method="post" class="form-grid">
-    <label>Email
+    <label>{{ _("Email") }}
       <input type="email" name="email" required />
     </label>
-    <label>Contraseña
+    <label>{{ _("Contraseña") }}
       <input type="password" name="password" required />
     </label>
-    <button type="submit" class="btn-primary">Entrar</button>
+    <button type="submit" class="btn-primary">{{ _("Entrar") }}</button>
   </form>
 </section>
 {% endblock %}

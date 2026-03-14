@@ -2,7 +2,7 @@
 <html lang="es">
   <head>
     <meta charset="utf-8" />
-    <title>Edición bloqueada</title>
+    <title>{{ _("Edición bloqueada") }}</title>
     <style>
       body {
         margin: 0;
@@ -41,9 +41,9 @@
   </head>
   <body>
     <div class="card">
-      <h1>Edición bloqueada</h1>
+      <h1>{{ _("Edición bloqueada") }}</h1>
       <p>{{ message }}</p>
-      <a href="{{ url_for('map.report_detail', post_id=post_id) }}">Ver reporte</a>
+      <a href="{{ url_for('map.report_detail', post_id=post_id) }}">{{ _("Ver reporte") }}</a>
     </div>
   </body>
 </html>

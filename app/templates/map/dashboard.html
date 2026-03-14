@@ -1,19 +1,19 @@
 {% extends "shared/base.html" %}
-{% block title %} | Mapa{% endblock %}
-{% block meta_description %}Mapa represivo de Cuba con reportes anónimos y verificados. Explora acciones represivas, sedes oficiales y centros clave en un mapa interactivo.{% endblock %}
+{% block title %} | {{ _("Mapa") }}{% endblock %}
+{% block meta_description %}{{ _("Mapa represivo de Cuba con reportes anónimos y verificados. Explora acciones represivas, sedes oficiales y centros clave en un mapa interactivo.") }}{% endblock %}
 {% block content %}
 <section class="hero">
   <div>
-    <h1>Mapa Represivo de Cuba</h1>
-    <p>Documenta y visibiliza acciones y lugares de represión. Los reportes aparecen como anónimos.</p>
+    <h1>{{ _("Mapa Represivo de Cuba") }}</h1>
+    <p>{{ _("Documenta y visibiliza acciones y lugares de represión. Los reportes aparecen como anónimos.") }}</p>
   </div>
   <div class="status">
     <div class="stat">
-      <span class="label">Categorías</span>
+      <span class="label">{{ _("Categorías") }}</span>
       <span class="value">{{ categories|length }}</span>
     </div>
     <div class="stat">
-      <span class="label">Reportes activos</span>
+      <span class="label">{{ _("Reportes activos") }}</span>
       <span class="value">{{ posts|length }}</span>
     </div>
   </div>
@@ -21,34 +21,34 @@
 
 <section class="filters collapsed">
   <div class="filter-header">
-    <div class="filter-title">Filtros</div>
-    <button type="button" class="btn-secondary" id="filtersToggle" aria-expanded="false">Mostrar filtros</button>
+    <div class="filter-title">{{ _("Filtros") }}</div>
+    <button type="button" class="btn-secondary" id="filtersToggle" aria-expanded="false">{{ _("Mostrar filtros") }}</button>
   </div>
   <div class="filter-controls">
     <div class="filter-group">
-      <div class="filter-label">Categorías</div>
+      <div class="filter-label">{{ _("Categorías") }}</div>
       <div class="filter-checkboxes" id="categoryFilter">
         {% for cat in categories %}
           <label class="checkbox-item">
             <input type="checkbox" class="category-checkbox" value="{{ cat.id }}" checked />
-            <span>{{ cat.name }}</span>
+            <span>{{ _(cat.name) }}</span>
           </label>
         {% endfor %}
       </div>
     </div>
     <label>
-      Provincia
+      {{ _("Provincia") }}
       <select id="provinceFilter">
-        <option value="">Todas</option>
+        <option value="">{{ _("Todas") }}</option>
         {% for prov in provinces %}
           <option value="{{ prov }}">{{ prov }}</option>
         {% endfor %}
       </select>
     </label>
     <label>
-      Municipio
+      {{ _("Municipio") }}
       <select id="municipalityFilter">
-        <option value="">Todos</option>
+        <option value="">{{ _("Todos") }}</option>
       </select>
     </label>
   </div>
@@ -56,16 +56,16 @@
 
 {% if categories|length == 0 %}
   <section class="panel notice">
-    <strong>No hay categorías cargadas.</strong>
-    <div>Ejecuta: <code>python -m scripts.seed_categories</code></div>
+    <strong>{{ _("No hay categorías cargadas.") }}</strong>
+    <div>{{ _("Ejecuta:") }} <code>python -m scripts.seed_categories</code></div>
   </section>
 {% endif %}
 
 <section class="alert-console">
   <div class="console-header">
     <div>
-      <div class="console-title">Movimientos, desconexiones y acciones represivas</div>
-      <div class="console-status">En vivo</div>
+      <div class="console-title">{{ _("Movimientos, desconexiones y acciones represivas") }}</div>
+      <div class="console-status">{{ _("En vivo") }}</div>
     </div>
     <div class="console-actions">
       <button
@@ -75,20 +75,20 @@
         data-enabled="{{ 1 if push_alerts_enabled else 0 }}"
         data-vapid-key="{{ vapid_public_key }}"
       >
-        Activar alertas
+        {{ _("Activar alertas") }}
       </button>
-      <div id="alertPushStatus" class="console-note">Solo para movimiento, desconexiones y acción represiva.</div>
+      <div id="alertPushStatus" class="console-note">{{ _("Solo para movimiento, desconexiones y acción represiva.") }}</div>
     </div>
   </div>
   <div id="alertFeed" class="console-body">
-    <div class="console-empty">Sin movimientos, desconexiones o acciones recientes.</div>
+    <div class="console-empty">{{ _("Sin movimientos, desconexiones o acciones recientes.") }}</div>
   </div>
 </section>
 
 <section class="map-search-wrap">
-  <div class="map-search-label">Buscar dirección (Cuba)</div>
+  <div class="map-search-label">{{ _("Buscar dirección (Cuba)") }}</div>
   <div class="map-search-bar">
-    <input id="mapSearch" type="text" placeholder="Ej: Sector PNR" />
+    <input id="mapSearch" type="text" placeholder="{{ _('Ej: Sector PNR') }}" />
   </div>
 </section>
 
@@ -102,16 +102,16 @@
   >
     <div class="map-placeholder">
       <div class="map-title">OpenStreetMap</div>
-      <div class="map-subtitle">Cargando mapa base.</div>
+      <div class="map-subtitle">{{ _("Cargando mapa base.") }}</div>
     </div>
-    <div class="map-hint">Haz click en el mapa para crear un reporte</div>
+    <div class="map-hint">{{ _("Haz click en el mapa para crear un reporte") }}</div>
   </div>
 </section>
 
 <section class="legend">
   {% set alert_slugs = ["accion-represiva", "movimiento-tropas", "desconexion-internet"] %}
   <div class="legend-header">
-    <div class="legend-title">Leyenda de íconos</div>
+    <div class="legend-title">{{ _("Leyenda de íconos") }}</div>
   </div>
   <div class="legend-grid">
     {% for cat in categories %}
@@ -119,7 +119,7 @@
         <span class="legend-icon">
           <i class="fa-solid fa-location-dot"></i>
         </span>
-        <span class="legend-label">{{ cat.name }}</span>
+        <span class="legend-label">{{ _(cat.name) }}</span>
         <span class="legend-count" id="legend-count-{{ cat.id }}">0</span>
       </div>
     {% endfor %}
@@ -128,21 +128,21 @@
 
 <section class="live-console">
   <div class="console-header">
-    <div class="console-title">Aportaciones recientes</div>
-    <div class="console-status">En vivo</div>
+    <div class="console-title">{{ _("Aportaciones recientes") }}</div>
+    <div class="console-status">{{ _("En vivo") }}</div>
   </div>
   <div id="recentFeed" class="console-body">
-    <div class="console-empty">Sin aportaciones visibles aún.</div>
+    <div class="console-empty">{{ _("Sin aportaciones visibles aún.") }}</div>
   </div>
 </section>
 
 <section class="categories">
-  <h2>Categorías</h2>
+  <h2>{{ _("Categorías") }}</h2>
   <div class="category-grid">
     {% for cat in categories %}
       <div class="category-card">
-        <div class="category-name">{{ cat.name }}</div>
-        <div class="category-desc">{{ cat.description }}</div>
+        <div class="category-name">{{ _(cat.name) }}</div>
+        <div class="category-desc">{{ _(cat.description) }}</div>
       </div>
     {% endfor %}
   </div>
@@ -152,7 +152,7 @@
   <div class="image-modal-backdrop" data-close-map-image></div>
   <div class="image-modal-content">
     <button class="image-modal-close" type="button" data-close-map-image>&times;</button>
-    <img id="mapImageModalImg" src="" alt="Imagen ampliada" />
+    <img id="mapImageModalImg" src="" alt="{{ _('Imagen ampliada') }}" />
     <div class="image-modal-caption" id="mapImageModalCaption"></div>
   </div>
 </div>

@@ -27,6 +27,7 @@ from decimal import Decimal
 from sqlalchemy import func
 from app.services.markdown_utils import render_markdown
 from app.services.discussion_tags import upsert_tags
+from flask_babel import gettext as _, lazy_gettext as _l
 from . import admin_bp
 
 
@@ -65,7 +66,7 @@ def dashboard():
 def toggle_moderation():
     enabled = request.form.get("moderation_enabled") == "on"
     set_setting("moderation_enabled", "true" if enabled else "false")
-    flash("Moderación actualizada.", "success")
+    flash(_("Moderación actualizada."), "success")
     return redirect(url_for("admin.dashboard"))
 
 
@@ -115,13 +116,13 @@ def donations():
 
         errors = []
         if not amount:
-            errors.append("Monto obligatorio.")
+            errors.append(_("Monto obligatorio."))
         if not method:
-            errors.append("Vía obligatoria.")
+            errors.append(_("Vía obligatoria."))
         if not donated_at:
-            errors.append("Fecha obligatoria.")
+            errors.append(_("Fecha obligatoria."))
         if not destination:
-            errors.append("Destino obligatorio.")
+            errors.append(_("Destino obligatorio."))
 
         if errors:
             for msg in errors:
@@ -138,10 +139,10 @@ def donations():
                     )
                 )
                 db.session.commit()
-                flash("Donación registrada.", "success")
+                flash(_("Donación registrada."), "success")
                 return redirect(url_for("admin.donations"))
             except Exception:
-                flash("Fecha inválida. Usa formato YYYY-MM-DD.", "error")
+                flash(_("Fecha inválida. Usa formato YYYY-MM-DD."), "error")
 
     logs = DonationLog.query.order_by(DonationLog.donated_at.desc()).all()
     return render_template("admin/donations.html", donation_logs=logs)
@@ -159,7 +160,7 @@ def edit_donation(log_id):
         destination = request.form.get("destination", "").strip()
 
         if not amount or not method or not donated_at or not destination:
-            flash("Completa todos los campos.", "error")
+            flash(_("Completa todos los campos."), "error")
             return redirect(url_for("admin.edit_donation", log_id=log.id))
 
         try:
@@ -168,7 +169,7 @@ def edit_donation(log_id):
             log.donated_at = datetime.strptime(donated_at, "%Y-%m-%d").date()
             log.destination = destination
             db.session.commit()
-            flash("Donación actualizada.", "success")
+            flash(_("Donación actualizada."), "success")
             return redirect(url_for("admin.donations"))
         except Exception:
             flash("Fecha inválida. Usa formato YYYY-MM-DD.", "error")
@@ -183,7 +184,7 @@ def delete_donation(log_id):
     log = DonationLog.query.get_or_404(log_id)
     db.session.delete(log)
     db.session.commit()
-    flash("Donación eliminada.", "success")
+    flash(_("Donación eliminada."), "success")
     return redirect(url_for("admin.donations"))
 
 
@@ -209,7 +210,7 @@ def edit_discussion(post_id):
         new_tags = [t.strip() for t in new_tags.split(",") if t.strip()]
 
         if not title or not body:
-            flash("Título y contenido son obligatorios.", "error")
+            flash(_("Título y contenido son obligatorios."), "error")
             return redirect(url_for("admin.edit_discussion", post_id=post.id))
 
         post.title = title
@@ -218,7 +219,7 @@ def edit_discussion(post_id):
         post.links_json = json.dumps(links_list) if links_list else None
         post.tags = upsert_tags(selected_tags + new_tags)
         db.session.commit()
-        flash("Discusión actualizada.", "success")
+        flash(_("Discusión actualizada."), "success")
         return redirect(url_for("admin.discussions"))
 
     images = parse_media_json(post.images_json)
@@ -239,7 +240,7 @@ def delete_discussion(post_id):
     post = DiscussionPost.query.get_or_404(post_id)
     db.session.delete(post)
     db.session.commit()
-    flash("Discusión eliminada.", "success")
+    flash(_("Discusión eliminada."), "success")
     return redirect(url_for("admin.discussions"))
 
 
@@ -250,7 +251,7 @@ def delete_discussion_comment(comment_id):
     comment = DiscussionComment.query.get_or_404(comment_id)
     db.session.delete(comment)
     db.session.commit()
-    flash("Comentario eliminado.", "success")
+    flash(_("Comentario eliminado."), "success")
     return redirect(request.referrer or url_for("admin.discussions"))
 
 
@@ -260,13 +261,13 @@ def delete_discussion_comment(comment_id):
 def update_report_status(post_id):
     status = request.form.get("status")
     if status not in {"approved", "hidden", "deleted", "rejected", "pending"}:
-        flash("Estado inválido.", "error")
+        flash(_("Estado inválido."), "error")
         return redirect(url_for("admin.reports"))
 
     post = Post.query.get_or_404(post_id)
     post.status = status
     db.session.commit()
-    flash("Reporte actualizado.", "success")
+    flash(_("Reporte actualizado."), "success")
     return redirect(url_for("admin.reports", status=request.args.get("status", "approved")))
 
 
@@ -277,20 +278,20 @@ def bulk_delete_reports():
     ids = request.form.getlist("selected_ids")
     status = request.args.get("status", "approved")
     if not ids:
-        flash("Selecciona al menos un reporte.", "error")
+        flash(_("Selecciona al menos un reporte."), "error")
         return redirect(url_for("admin.reports", status=status))
 
     try:
         id_list = [int(i) for i in ids]
     except Exception:
-        flash("Selección inválida.", "error")
+        flash(_("Selección inválida."), "error")
         return redirect(url_for("admin.reports", status=status))
 
     posts = Post.query.filter(Post.id.in_(id_list)).all()
     for post in posts:
         post.status = "deleted"
     db.session.commit()
-    flash(f"Reportes eliminados: {len(posts)}.", "success")
+    flash(_("%(count)s reporte(s) eliminado(s).", count=len(posts)), "success")
     return redirect(url_for("admin.reports", status=status))
 
 
@@ -471,7 +472,7 @@ def edit_report(post_id):
             )
             db.session.add(edit_req)
             db.session.commit()
-            flash("Edición enviada a moderación.", "success")
+            flash(_("Edición enviada a moderación."), "success")
             return redirect(url_for("admin.edit_report", post_id=post.id))
 
         # Guardar revisión previa
@@ -512,7 +513,7 @@ def edit_report(post_id):
         post.links_json = json.dumps(links_list) if links_list else None
         db.session.commit()
 
-        flash("Reporte actualizado.", "success")
+        flash(_("Reporte actualizado."), "success")
         return redirect(url_for("admin.edit_report", post_id=post.id))
 
     return render_template(
@@ -536,7 +537,7 @@ def restore_revision(post_id, revision_id):
     post = Post.query.get_or_404(post_id)
     revision = PostRevision.query.get_or_404(revision_id)
     if revision.post_id != post.id:
-        flash("Revisión inválida.", "error")
+        flash(_("Revisión inválida."), "error")
         return redirect(url_for("map.post_history", post_id=post.id))
 
     # Guardar snapshot actual antes de restaurar
@@ -586,5 +587,5 @@ def restore_revision(post_id, revision_id):
             )
     db.session.commit()
 
-    flash("Reporte restaurado a una versión anterior.", "success")
+    flash(_("Reporte restaurado a una versión anterior."), "success")
     return redirect(url_for("map.post_history", post_id=post.id))

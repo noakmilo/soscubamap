@@ -1,0 +1,1817 @@
+# English translations for PROJECT.
+# Copyright (C) 2026 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-03-14 15:48-0600\n"
+"PO-Revision-Date: 2026-03-14 15:48-0600\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: en\n"
+"Language-Team: en <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: app/blueprints/admin/routes.py:69
+msgid "Moderación actualizada."
+msgstr "Moderation updated."
+
+#: app/blueprints/admin/routes.py:119
+msgid "Monto obligatorio."
+msgstr "Amount is required."
+
+#: app/blueprints/admin/routes.py:121
+msgid "Vía obligatoria."
+msgstr "Channel is required."
+
+#: app/blueprints/admin/routes.py:123
+msgid "Fecha obligatoria."
+msgstr "Date is required."
+
+#: app/blueprints/admin/routes.py:125
+msgid "Destino obligatorio."
+msgstr "Destination is required."
+
+#: app/blueprints/admin/routes.py:142
+msgid "Donación registrada."
+msgstr "Donation registered."
+
+#: app/blueprints/admin/routes.py:145
+msgid "Fecha inválida. Usa formato YYYY-MM-DD."
+msgstr "Invalid date. Use YYYY-MM-DD format."
+
+#: app/blueprints/admin/routes.py:163
+msgid "Completa todos los campos."
+msgstr "Please fill in all fields."
+
+#: app/blueprints/admin/routes.py:172
+msgid "Donación actualizada."
+msgstr "Donation updated."
+
+#: app/blueprints/admin/routes.py:187
+msgid "Donación eliminada."
+msgstr "Donation deleted."
+
+#: app/blueprints/admin/routes.py:213 app/blueprints/discussions/routes.py:127
+msgid "Título y contenido son obligatorios."
+msgstr "Title and content are required."
+
+#: app/blueprints/admin/routes.py:222
+msgid "Discusión actualizada."
+msgstr "Discussion updated."
+
+#: app/blueprints/admin/routes.py:243
+msgid "Discusión eliminada."
+msgstr "Discussion deleted."
+
+#: app/blueprints/admin/routes.py:254
+msgid "Comentario eliminado."
+msgstr "Comment deleted."
+
+#: app/blueprints/admin/routes.py:264
+msgid "Estado inválido."
+msgstr "Invalid status."
+
+#: app/blueprints/admin/routes.py:270 app/blueprints/admin/routes.py:516
+msgid "Reporte actualizado."
+msgstr "Report updated."
+
+#: app/blueprints/admin/routes.py:281
+msgid "Selecciona al menos un reporte."
+msgstr "Select at least one report."
+
+#: app/blueprints/admin/routes.py:287
+msgid "Selección inválida."
+msgstr "Invalid selection."
+
+#: app/blueprints/admin/routes.py:294
+#, python-format
+msgid "%(count)s reporte(s) eliminado(s)."
+msgstr "%(count)s report(s) deleted."
+
+#: app/blueprints/admin/routes.py:475 app/blueprints/map/routes.py:961
+msgid "Edición enviada a moderación."
+msgstr "Edit submitted for moderation."
+
+#: app/blueprints/admin/routes.py:540
+msgid "Revisión inválida."
+msgstr "Invalid revision."
+
+#: app/blueprints/admin/routes.py:590
+msgid "Reporte restaurado a una versión anterior."
+msgstr "Report restored to a previous version."
+
+#: app/blueprints/auth/routes.py:28
+msgid "Ese email está reservado."
+msgstr "That email is reserved."
+
+#: app/blueprints/auth/routes.py:32
+msgid "Email y contraseña son obligatorios."
+msgstr "Email and password are required."
+
+#: app/blueprints/auth/routes.py:36
+msgid "Ese email ya está registrado."
+msgstr "That email is already registered."
+
+#: app/blueprints/auth/routes.py:65 app/blueprints/auth/routes.py:92
+msgid "Credenciales inválidas."
+msgstr "Invalid credentials."
+
+#: app/blueprints/discussions/routes.py:105
+#: app/blueprints/discussions/routes.py:186
+msgid "Verificación reCAPTCHA falló. Intenta nuevamente."
+msgstr "reCAPTCHA verification failed. Please try again."
+
+#: app/blueprints/discussions/routes.py:123
+#: app/blueprints/discussions/routes.py:189 app/blueprints/map/routes.py:667
+msgid "Se detectó contenido sospechoso. Revisa y vuelve a intentar."
+msgstr "Suspicious content detected. Please review and try again."
+
+#: app/blueprints/discussions/routes.py:162
+msgid "Discusión publicada."
+msgstr "Discussion published."
+
+#: app/blueprints/discussions/routes.py:192
+msgid "El comentario no puede estar vacío."
+msgstr "Comment cannot be empty."
+
+#: app/blueprints/discussions/routes.py:214
+msgid "Comentario agregado."
+msgstr "Comment added."
+
+#: app/blueprints/map/routes.py:513 app/blueprints/map/routes.py:896
+msgid "Latitud/longitud inválidas."
+msgstr "Invalid latitude/longitude."
+
+#: app/blueprints/map/routes.py:517
+msgid "La ubicación debe estar dentro del territorio cubano."
+msgstr "The location must be within Cuban territory."
+
+#: app/blueprints/map/routes.py:524 app/blueprints/map/routes.py:903
+msgid "Provincia y municipio son obligatorios."
+msgstr "Province and municipality are required."
+
+#: app/blueprints/map/routes.py:604
+msgid "Reporte enviado a moderación."
+msgstr "Report submitted for moderation."
+
+#: app/blueprints/map/routes.py:606
+msgid "Reporte publicado."
+msgstr "Report published."
+
+#: app/blueprints/map/routes.py:670
+msgid "Describe por qué la ubicación es incorrecta."
+msgstr "Describe why the location is incorrect."
+
+#: app/blueprints/map/routes.py:922
+msgid "No se pudo subir la imagen."
+msgstr "Could not upload the image."
+
+#: app/blueprints/map/routes.py:1014
+msgid "Edición aplicada."
+msgstr "Edit applied."
+
+#: app/blueprints/moderation/routes.py:33
+msgid "Reporte aprobado."
+msgstr "Report approved."
+
+#: app/blueprints/moderation/routes.py:46
+msgid "Reporte rechazado."
+msgstr "Report rejected."
+
+#: app/blueprints/moderation/routes.py:109
+msgid "Edición aprobada."
+msgstr "Edit approved."
+
+#: app/blueprints/moderation/routes.py:122
+msgid "Debes indicar un motivo de rechazo."
+msgstr "You must provide a rejection reason."
+
+#: app/blueprints/moderation/routes.py:129
+msgid "Edición rechazada."
+msgstr "Edit rejected."
+
+#: app/blueprints/panic/routes.py:35
+msgid "Coordenadas inválidas."
+msgstr "Invalid coordinates."
+
+#: app/blueprints/panic/routes.py:38
+msgid "Coordenadas fuera de rango."
+msgstr "Coordinates out of range."
+
+#: app/blueprints/panic/routes.py:44
+msgid "Sin categorías configuradas."
+msgstr "No categories configured."
+
+#: app/templates/admin/dashboard.html:2 app/templates/shared/base.html:49
+msgid "Admin"
+msgstr "Admin"
+
+#: app/templates/admin/dashboard.html:5
+msgid "Administración"
+msgstr "Administration"
+
+#: app/templates/admin/dashboard.html:6
+msgid "Gestión de usuarios, roles, categorías y configuración del mapa."
+msgstr "User, role, category and map configuration management."
+
+#: app/templates/admin/dashboard.html:9
+#: app/templates/moderation/dashboard.html:2
+#: app/templates/moderation/dashboard.html:5 app/templates/shared/base.html:46
+msgid "Moderación"
+msgstr "Moderation"
+
+#: app/templates/admin/dashboard.html:17
+msgid "Activada (los reportes van a moderación)"
+msgstr "Enabled (reports go to moderation)"
+
+#: app/templates/admin/dashboard.html:19
+msgid "Desactivada (los reportes se publican directo)"
+msgstr "Disabled (reports are published directly)"
+
+#: app/templates/admin/dashboard.html:22 app/templates/admin/donations.html:27
+msgid "Guardar"
+msgstr "Save"
+
+#: app/templates/admin/dashboard.html:27 app/templates/admin/reports.html:2
+#: app/templates/admin/reports.html:5 app/templates/map/reports.html:2
+#: app/templates/map/reports.html:6 app/templates/shared/base.html:39
+#: app/templates/shared/base.html:53
+msgid "Reportes"
+msgstr "Reports"
+
+#: app/templates/admin/dashboard.html:29
+msgid "Activos"
+msgstr "Active"
+
+#: app/templates/admin/dashboard.html:30
+msgid "Ocultos"
+msgstr "Hidden"
+
+#: app/templates/admin/dashboard.html:31
+msgid "Por moderar"
+msgstr "Pending"
+
+#: app/templates/admin/dashboard.html:32
+msgid "Eliminados"
+msgstr "Deleted"
+
+#: app/templates/admin/dashboard.html:33 app/templates/map/dashboard.html:51
+#: app/templates/map/reports.html:22
+msgid "Todos"
+msgstr "All"
+
+#: app/templates/admin/dashboard.html:34 app/templates/admin/dashboard.html:41
+msgid "Ubicaciones reportadas"
+msgstr "Reported locations"
+
+#: app/templates/admin/dashboard.html:35 app/templates/admin/discussions.html:2
+#: app/templates/admin/discussions.html:5
+#: app/templates/discussions/index.html:2
+#: app/templates/discussions/index.html:11 app/templates/shared/base.html:36
+msgid "Discusiones"
+msgstr "Discussions"
+
+#: app/templates/admin/dashboard.html:36 app/templates/admin/donations.html:2
+#: app/templates/map/donate.html:2
+msgid "Donaciones"
+msgstr "Donations"
+
+#: app/templates/admin/dashboard.html:47 app/templates/map/report_detail.html:2
+msgid "Reporte"
+msgstr "Report"
+
+#: app/templates/admin/dashboard.html:48
+#: app/templates/admin/edit_report.html:53 app/templates/map/analytics.html:24
+#: app/templates/map/edit_report.html:54 app/templates/map/new_post.html:51
+msgid "Categoría"
+msgstr "Category"
+
+#: app/templates/admin/dashboard.html:49 app/templates/admin/donations.html:40
+#: app/templates/map/donate.html:78
+msgid "Fecha"
+msgstr "Date"
+
+#: app/templates/admin/dashboard.html:50
+#: app/templates/shared/chat_widget.html:45
+msgid "Mensaje"
+msgstr "Message"
+
+#: app/templates/admin/dashboard.html:51 app/templates/map/dashboard.html:2
+#: app/templates/shared/base.html:35
+msgid "Mapa"
+msgstr "Map"
+
+#: app/templates/admin/dashboard.html:66
+msgid "Ver en mapa"
+msgstr "View on map"
+
+#: app/templates/admin/dashboard.html:74
+msgid "Ver todos"
+msgstr "View all"
+
+#: app/templates/admin/dashboard.html:77
+msgid "No hay ubicaciones reportadas."
+msgstr "No reported locations."
+
+#: app/templates/admin/discussions.html:6
+msgid "Editar o eliminar discusiones publicadas."
+msgstr "Edit or delete published discussions."
+
+#: app/templates/admin/discussions.html:15
+#: app/templates/discussions/index.html:52
+msgid "comentarios"
+msgstr "comments"
+
+#: app/templates/admin/discussions.html:18
+#: app/templates/admin/donations.html:53 app/templates/admin/reports.html:47
+#: app/templates/discussions/index.html:54
+#: app/templates/map/report_detail.html:53 app/templates/map/reports.html:56
+msgid "Editar"
+msgstr "Edit"
+
+#: app/templates/admin/discussions.html:19
+#: app/templates/discussions/index.html:55
+msgid "¿Eliminar esta discusión?"
+msgstr "Delete this discussion?"
+
+#: app/templates/admin/discussions.html:20
+#: app/templates/admin/donations.html:55
+#: app/templates/discussions/detail.html:61
+#: app/templates/discussions/index.html:56
+#: app/templates/map/report_detail.html:63
+msgid "Eliminar"
+msgstr "Delete"
+
+#: app/templates/admin/discussions.html:26
+msgid "No hay discusiones aún."
+msgstr "No discussions yet."
+
+#: app/templates/admin/donations.html:5 app/templates/map/donate.html:69
+msgid "Registro de donaciones"
+msgstr "Donation log"
+
+#: app/templates/admin/donations.html:6
+msgid ""
+"Agrega y revisa aportes recibidos. Estos se muestran en la página pública"
+" de donaciones."
+msgstr "Add and review received contributions. These are shown on the public donations page."
+
+#: app/templates/admin/donations.html:9
+msgid "Nueva donación"
+msgstr "New donation"
+
+#: app/templates/admin/donations.html:12
+#: app/templates/admin/edit_donation.html:8
+msgid "Monto de la donación"
+msgstr "Donation amount"
+
+#: app/templates/admin/donations.html:13
+msgid "Ej: 25 USD / 0.001 BTC"
+msgstr "E.g.: 25 USD / 0.001 BTC"
+
+#: app/templates/admin/donations.html:16
+#: app/templates/admin/edit_donation.html:12
+msgid "Vía de la donación"
+msgstr "Donation channel"
+
+#: app/templates/admin/donations.html:17
+msgid "Ej: Bitcoin, QvaPay, BMC"
+msgstr "E.g.: Bitcoin, QvaPay, BMC"
+
+#: app/templates/admin/donations.html:20
+#: app/templates/admin/edit_donation.html:16
+msgid "Fecha de la donación"
+msgstr "Donation date"
+
+#: app/templates/admin/donations.html:24
+#: app/templates/admin/edit_donation.html:20
+msgid "Destino de la donación"
+msgstr "Donation destination"
+
+#: app/templates/admin/donations.html:25
+msgid "Ej: Servidor / API Maps / Dominio"
+msgstr "E.g.: Server / Maps API / Domain"
+
+#: app/templates/admin/donations.html:32 app/templates/map/post_history.html:2
+#: app/templates/map/report_detail.html:51 app/templates/map/reports.html:54
+msgid "Historial"
+msgstr "History"
+
+#: app/templates/admin/donations.html:38 app/templates/map/donate.html:76
+msgid "Monto"
+msgstr "Amount"
+
+#: app/templates/admin/donations.html:39 app/templates/map/donate.html:77
+msgid "Vía"
+msgstr "Channel"
+
+#: app/templates/admin/donations.html:41 app/templates/map/donate.html:79
+msgid "Destino"
+msgstr "Destination"
+
+#: app/templates/admin/donations.html:42
+msgid "Acciones"
+msgstr "Actions"
+
+#: app/templates/admin/donations.html:55
+msgid "¿Eliminar esta donación?"
+msgstr "Delete this donation?"
+
+#: app/templates/admin/donations.html:64
+msgid "No hay donaciones registradas."
+msgstr "No donations registered."
+
+#: app/templates/admin/edit_discussion.html:2
+#: app/templates/admin/edit_discussion.html:5
+msgid "Editar discusión"
+msgstr "Edit discussion"
+
+#: app/templates/admin/edit_discussion.html:6
+msgid "Autor:"
+msgstr "Author:"
+
+#: app/templates/admin/edit_discussion.html:10
+#: app/templates/admin/edit_report.html:46
+#: app/templates/discussions/new.html:20 app/templates/map/edit_report.html:47
+#: app/templates/map/new_post.html:44
+msgid "Título"
+msgstr "Title"
+
+#: app/templates/admin/edit_discussion.html:14
+msgid "Contenido (Markdown)"
+msgstr "Content (Markdown)"
+
+#: app/templates/admin/edit_discussion.html:19
+#: app/templates/admin/edit_report.html:191
+#: app/templates/discussions/new.html:38 app/templates/map/edit_report.html:189
+#: app/templates/map/new_post.html:184 app/templates/map/report_detail.html:28
+#: app/templates/moderation/edit_detail.html:36
+msgid "Enlaces de interés"
+msgstr "Relevant links"
+
+#: app/templates/admin/edit_discussion.html:20
+#: app/templates/admin/edit_report.html:192
+#: app/templates/discussions/new.html:39 app/templates/map/edit_report.html:190
+#: app/templates/map/new_post.html:185
+msgid "+ Agregar"
+msgstr "+ Add"
+
+#: app/templates/admin/edit_discussion.html:32
+#: app/templates/discussions/new.html:47
+msgid "Etiquetas"
+msgstr "Tags"
+
+#: app/templates/admin/edit_discussion.html:46
+#: app/templates/discussions/new.html:55
+msgid "Agregar nuevas (separadas por comas)"
+msgstr "Add new (comma-separated)"
+
+#: app/templates/admin/edit_discussion.html:47
+#: app/templates/discussions/new.html:56
+msgid "ej: reporte, denuncia"
+msgstr "e.g.: report, complaint"
+
+#: app/templates/admin/edit_discussion.html:52
+#: app/templates/map/edit_report.html:212
+#: app/templates/map/report_detail.html:69
+msgid "Imágenes"
+msgstr "Images"
+
+#: app/templates/admin/edit_discussion.html:57
+#: app/templates/discussions/detail.html:18
+#: app/templates/discussions/index.html:41
+msgid "Imagen de discusión"
+msgstr "Discussion image"
+
+#: app/templates/admin/edit_discussion.html:67
+#: app/templates/admin/edit_donation.html:24
+#: app/templates/admin/edit_report.html:213
+msgid "Guardar cambios"
+msgstr "Save changes"
+
+#: app/templates/admin/edit_donation.html:2
+#: app/templates/admin/edit_donation.html:5
+msgid "Editar donación"
+msgstr "Edit donation"
+
+#: app/templates/admin/edit_donation.html:25
+msgid "Volver"
+msgstr "Back"
+
+#: app/templates/admin/edit_report.html:2
+#: app/templates/admin/edit_report.html:25 app/templates/map/edit_report.html:2
+#: app/templates/map/edit_report.html:26
+msgid "Editar reporte"
+msgstr "Edit report"
+
+#: app/templates/admin/edit_report.html:26
+msgid "Los cambios se registran en el historial público."
+msgstr "Changes are recorded in the public history."
+
+#: app/templates/admin/edit_report.html:32
+#: app/templates/map/edit_report.html:33
+msgid "Dibuja o ajusta el área del reporte"
+msgstr "Draw or adjust the report area"
+
+#: app/templates/admin/edit_report.html:41
+#: app/templates/map/edit_report.html:42
+msgid ""
+"Usa polígono, rectángulo o círculo. Puedes editar el área antes de "
+"guardar."
+msgstr "Use polygon, rectangle or circle. You can edit the area before saving."
+
+#: app/templates/admin/edit_report.html:72
+#: app/templates/map/edit_report.html:70 app/templates/map/new_post.html:64
+msgid ""
+"Para \"Residencia de represor\" debes indicar el nombre o apodo del "
+"represor y subir al menos una imagen. Esto es obligatorio para evitar "
+"abuso de la app."
+msgstr "For \"Perpetrator residence\" you must provide the name or alias of the perpetrator and upload at least one image. This is required to prevent abuse."
+
+#: app/templates/admin/edit_report.html:75
+#: app/templates/map/edit_report.html:73 app/templates/map/new_post.html:67
+msgid "Nombre o apodo del represor"
+msgstr "Name or alias of the perpetrator"
+
+#: app/templates/admin/edit_report.html:84
+#: app/templates/map/edit_report.html:82 app/templates/map/new_post.html:76
+msgid "Para \"Otros\" debes especificar el tipo del reporte."
+msgstr "For \"Others\" you must specify the report type."
+
+#: app/templates/admin/edit_report.html:87
+#: app/templates/map/edit_report.html:85 app/templates/map/new_post.html:79
+msgid "Tipo (Otros)"
+msgstr "Type (Others)"
+
+#: app/templates/admin/edit_report.html:96
+#: app/templates/map/edit_report.html:94 app/templates/map/new_post.html:88
+msgid ""
+"Para \"Acción represiva del gobierno\", \"Movimiento de tropas\" y "
+"\"Reporte de Desconexión de Internet\" debes indicar fecha y hora del "
+"evento y aportar detalles precisos (tipo de tropas, armamento observado o"
+" motivo de la movilización)."
+msgstr "For \"Government repressive action\", \"Troop movement\" and \"Internet Disconnection Report\" you must provide the event date and time and precise details (type of troops, observed weaponry or reason for the mobilization)."
+
+#: app/templates/admin/edit_report.html:100
+#: app/templates/map/edit_report.html:98 app/templates/map/new_post.html:92
+msgid "Fecha del evento"
+msgstr "Event date"
+
+#: app/templates/admin/edit_report.html:114
+#: app/templates/map/edit_report.html:112 app/templates/map/new_post.html:99
+msgid "Hora del evento"
+msgstr "Event time"
+
+#: app/templates/admin/edit_report.html:130
+#: app/templates/map/edit_report.html:128 app/templates/map/new_post.html:108
+msgid "Descripción"
+msgstr "Description"
+
+#: app/templates/admin/edit_report.html:137
+#: app/templates/map/edit_report.html:135
+msgid "Motivo de edición"
+msgstr "Edit reason"
+
+#: app/templates/admin/edit_report.html:138
+#: app/templates/map/edit_report.html:136
+msgid "Explica por qué realizas este cambio."
+msgstr "Explain why you are making this change."
+
+#: app/templates/admin/edit_report.html:145
+#: app/templates/map/edit_report.html:143 app/templates/map/new_post.html:116
+msgid "Latitud"
+msgstr "Latitude"
+
+#: app/templates/admin/edit_report.html:152
+#: app/templates/map/edit_report.html:150 app/templates/map/new_post.html:123
+msgid "Longitud"
+msgstr "Longitude"
+
+#: app/templates/admin/edit_report.html:160
+#: app/templates/map/edit_report.html:158 app/templates/map/new_post.html:131
+msgid "Dirección"
+msgstr "Address"
+
+#: app/templates/admin/edit_report.html:168 app/templates/map/analytics.html:33
+#: app/templates/map/dashboard.html:40 app/templates/map/edit_report.html:166
+#: app/templates/map/new_post.html:139 app/templates/map/reports.html:11
+msgid "Provincia"
+msgstr "Province"
+
+#: app/templates/admin/edit_report.html:170
+#: app/templates/map/edit_report.html:168 app/templates/map/new_post.html:141
+msgid "Elige provincia"
+msgstr "Choose province"
+
+#: app/templates/admin/edit_report.html:180 app/templates/map/dashboard.html:49
+#: app/templates/map/edit_report.html:178 app/templates/map/new_post.html:151
+#: app/templates/map/reports.html:20
+msgid "Municipio"
+msgstr "Municipality"
+
+#: app/templates/admin/edit_report.html:182
+#: app/templates/map/edit_report.html:180 app/templates/map/new_post.html:153
+msgid "Elige municipio"
+msgstr "Choose municipality"
+
+#: app/templates/admin/edit_report.html:217
+#: app/templates/map/edit_report.html:261
+msgid "Ver historial público"
+msgstr "View public history"
+
+#: app/templates/admin/location_reports.html:2
+#: app/templates/admin/location_reports.html:5
+msgid "Reportes de ubicación"
+msgstr "Location reports"
+
+#: app/templates/admin/location_reports.html:18
+msgid "Ver reportes"
+msgstr "View reports"
+
+#: app/templates/admin/location_reports.html:23
+msgid "No hay reportes de ubicación."
+msgstr "No location reports."
+
+#: app/templates/admin/reports.html:13
+msgid "Seleccionar todo"
+msgstr "Select all"
+
+#: app/templates/admin/reports.html:15
+msgid "¿Eliminar los reportes seleccionados?"
+msgstr "Delete selected reports?"
+
+#: app/templates/admin/reports.html:16
+msgid "Eliminar seleccionados"
+msgstr "Delete selected"
+
+#: app/templates/admin/reports.html:38
+msgid "Activo"
+msgstr "Active"
+
+#: app/templates/admin/reports.html:39
+msgid "Oculto"
+msgstr "Hidden"
+
+#: app/templates/admin/reports.html:40
+msgid "Pendiente"
+msgstr "Pending"
+
+#: app/templates/admin/reports.html:41
+msgid "Rechazado"
+msgstr "Rejected"
+
+#: app/templates/admin/reports.html:42
+msgid "Eliminado"
+msgstr "Deleted"
+
+#: app/templates/admin/reports.html:44 app/templates/map/analytics.html:41
+msgid "Actualizar"
+msgstr "Update"
+
+#: app/templates/admin/reports.html:52
+msgid "No hay reportes para este estado."
+msgstr "No reports for this status."
+
+#: app/templates/auth/login.html:2 app/templates/shared/base.html:58
+msgid "Login"
+msgstr "Login"
+
+#: app/templates/auth/login.html:5
+msgid "Acceder"
+msgstr "Sign in"
+
+#: app/templates/auth/login.html:7 app/templates/auth/register.html:7
+msgid "Email"
+msgstr "Email"
+
+#: app/templates/auth/login.html:10 app/templates/auth/register.html:10
+msgid "Contraseña"
+msgstr "Password"
+
+#: app/templates/auth/login.html:13
+msgid "Entrar"
+msgstr "Log in"
+
+#: app/templates/auth/register.html:2 app/templates/shared/base.html:59
+msgid "Registro"
+msgstr "Sign up"
+
+#: app/templates/auth/register.html:5
+msgid "Crear cuenta"
+msgstr "Create account"
+
+#: app/templates/auth/register.html:13
+msgid "Registrarme"
+msgstr "Register"
+
+#: app/templates/discussions/detail.html:2
+msgid "Discusión"
+msgstr "Discussion"
+
+#: app/templates/discussions/detail.html:3
+msgid ""
+"Detalle de discusión en #SOSCuba Map. Vota, comenta y aporta fuentes "
+"verificables."
+msgstr "Discussion detail on #SOSCuba Map. Vote, comment and contribute verifiable sources."
+
+#: app/templates/discussions/detail.html:33
+msgid "Fuentes"
+msgstr "Sources"
+
+#: app/templates/discussions/detail.html:58
+msgid "Responder"
+msgstr "Reply"
+
+#: app/templates/discussions/detail.html:60
+msgid "¿Eliminar comentario?"
+msgstr "Delete comment?"
+
+#: app/templates/discussions/detail.html:68
+#: app/templates/discussions/detail.html:98
+#: app/templates/discussions/new.html:16
+msgid "Nick"
+msgstr "Nick"
+
+#: app/templates/discussions/detail.html:72
+#: app/templates/discussions/detail.html:102
+msgid "Comentario"
+msgstr "Comment"
+
+#: app/templates/discussions/detail.html:73
+#: app/templates/discussions/detail.html:103
+msgid "Responde con contexto y fuentes"
+msgstr "Reply with context and sources"
+
+#: app/templates/discussions/detail.html:75
+#: app/templates/discussions/detail.html:111
+msgid "Publicar comentario"
+msgstr "Post comment"
+
+#: app/templates/discussions/detail.html:86
+msgid "Comentarios"
+msgstr "Comments"
+
+#: app/templates/discussions/detail.html:92
+msgid "No hay comentarios aún."
+msgstr "No comments yet."
+
+#: app/templates/discussions/detail.html:119
+msgid "Imagen anterior"
+msgstr "Previous image"
+
+#: app/templates/discussions/detail.html:120
+msgid "Imagen siguiente"
+msgstr "Next image"
+
+#: app/templates/discussions/detail.html:121
+#: app/templates/map/dashboard.html:155
+#: app/templates/map/report_detail.html:139
+msgid "Imagen ampliada"
+msgstr "Enlarged image"
+
+#: app/templates/discussions/index.html:3
+msgid ""
+"Foro colaborativo de #SOSCuba Map. Crea discusiones, comparte fuentes y "
+"vota con la comunidad."
+msgstr "Collaborative forum of #SOSCuba Map. Create discussions, share sources and vote with the community."
+
+#: app/templates/discussions/index.html:12
+msgid "Comparte contexto, fuentes y debate con la comunidad."
+msgstr "Share context, sources and debate with the community."
+
+#: app/templates/discussions/index.html:15 app/templates/discussions/new.html:2
+#: app/templates/discussions/new.html:11
+msgid "Nueva discusión"
+msgstr "New discussion"
+
+#: app/templates/discussions/index.html:29
+msgid "Quitar filtro"
+msgstr "Remove filter"
+
+#: app/templates/discussions/index.html:70
+msgid "Aún no hay discusiones."
+msgstr "No discussions yet."
+
+#: app/templates/discussions/new.html:3
+msgid ""
+"Abre una nueva discusión en #SOSCuba Map y comparte ideas con la "
+"comunidad."
+msgstr "Open a new discussion on #SOSCuba Map and share ideas with the community."
+
+#: app/templates/discussions/new.html:12
+msgid "Comparte ideas, propuestas y tutoriales para la comunidad."
+msgstr "Share ideas, proposals and tutorials with the community."
+
+#: app/templates/discussions/new.html:21
+msgid "Título de la discusión"
+msgstr "Discussion title"
+
+#: app/templates/discussions/new.html:31
+msgid "Escribe en markdown..."
+msgstr "Write in markdown..."
+
+#: app/templates/discussions/new.html:61 app/templates/map/new_post.html:165
+#, python-format
+msgid "Imágenes (máx %(max)s, %(mb)sMB c/u)"
+msgstr "Images (max %(max)s, %(mb)sMB each)"
+
+#: app/templates/discussions/new.html:81
+msgid "Publicar discusión"
+msgstr "Post discussion"
+
+#: app/templates/map/about.html:2 app/templates/map/about.html:6
+#: app/templates/shared/base.html:42 app/templates/shared/base.html:56
+msgid "Acerca de"
+msgstr "About"
+
+#: app/templates/map/about.html:3
+msgid ""
+"Conoce #SOSCuba Map, un proyecto ciudadano y sin ánimo de lucro para "
+"documentar hechos y centros de represión en Cuba. Viva Cuba Libre."
+msgstr "Learn about #SOSCuba Map, a citizen non-profit project to document facts and centers of repression in Cuba. Long live a free Cuba."
+
+#: app/templates/map/about.html:8
+msgid ""
+"#SOSCuba Map es un proyecto sin ánimo de lucro creado para documentar y "
+"visibilizar la ubicación de los principales hechos y centros de represión"
+" en Cuba. Creemos que la verdad debe ser pública, verificable y "
+"accesible. Este mapa es una herramienta ciudadana para exponer la "
+"violencia del aparato estatal, proteger a quienes la denuncian y "
+"preservar la memoria de lo ocurrido."
+msgstr "#SOSCuba Map is a non-profit project created to document and make visible the location of the main facts and centers of repression in Cuba. We believe truth must be public, verifiable and accessible. This map is a citizen tool to expose state violence, protect those who denounce it and preserve the memory of what has happened."
+
+#: app/templates/map/about.html:11
+msgid ""
+"Aquí se registran acciones represivas, sedes oficiales y lugares clave "
+"con información aportada por la comunidad. Cada reporte busca aportar "
+"contexto, evidencia y referencias que ayuden a identificar con precisión "
+"los hechos y a romper el silencio impuesto por la censura."
+msgstr "Here we record repressive actions, official headquarters and key locations with information provided by the community. Each report seeks to provide context, evidence and references that help precisely identify the facts and break the silence imposed by censorship."
+
+#: app/templates/map/about.html:14
+msgid ""
+"Defendemos con firmeza la idea de una Cuba libre de dictadura, con "
+"derechos humanos plenos, justicia y dignidad para todos. Este espacio "
+"existe para denunciar con responsabilidad, con el compromiso de no "
+"olvidar y de acompañar a quienes resisten."
+msgstr "We firmly defend the idea of a Cuba free from dictatorship, with full human rights, justice and dignity for all. This space exists to denounce with responsibility, with the commitment to never forget and to stand with those who resist."
+
+#: app/templates/map/about.html:16
+msgid "¡Viva Cuba Libre!"
+msgstr "Long live a free Cuba!"
+
+#: app/templates/map/analytics.html:3 app/templates/shared/base.html:41
+#: app/templates/shared/base.html:55
+msgid "Analíticas"
+msgstr "Analytics"
+
+#: app/templates/map/analytics.html:8
+msgid "Analíticas públicas"
+msgstr "Public analytics"
+
+#: app/templates/map/analytics.html:10
+msgid ""
+"Transparencia total sobre la actividad del mapa. Puedes filtrar por "
+"fecha, categoría o provincia."
+msgstr "Full transparency on map activity. You can filter by date, category or province."
+
+#: app/templates/map/analytics.html:16
+msgid "Desde"
+msgstr "From"
+
+#: app/templates/map/analytics.html:20
+msgid "Hasta"
+msgstr "Until"
+
+#: app/templates/map/analytics.html:26 app/templates/map/analytics.html:35
+#: app/templates/map/dashboard.html:42 app/templates/map/reports.html:13
+msgid "Todas"
+msgstr "All"
+
+#: app/templates/map/analytics.html:46
+msgid "Evolución de reportes"
+msgstr "Report evolution"
+
+#: app/templates/map/analytics.html:50
+msgid "Estado de moderación"
+msgstr "Moderation status"
+
+#: app/templates/map/analytics.html:54
+msgid "Distribución por categoría"
+msgstr "Distribution by category"
+
+#: app/templates/map/analytics.html:58
+msgid "Top 10 provincias"
+msgstr "Top 10 provinces"
+
+#: app/templates/map/analytics.html:62
+msgid "Top 10 municipios"
+msgstr "Top 10 municipalities"
+
+#: app/templates/map/analytics.html:66
+msgid "Reportes más verificados"
+msgstr "Most verified reports"
+
+#: app/templates/map/analytics.html:70
+msgid "Actividad de comentarios"
+msgstr "Comment activity"
+
+#: app/templates/map/analytics.html:74
+msgid "Ediciones y revisiones"
+msgstr "Edits and revisions"
+
+#: app/templates/map/analytics.html:80
+msgid "Notas de transparencia"
+msgstr "Transparency notes"
+
+#: app/templates/map/analytics.html:82
+msgid "Los gráficos muestran datos públicos y agregados."
+msgstr "Charts show public and aggregated data."
+
+#: app/templates/map/analytics.html:83 app/templates/map/api_docs.html:97
+msgid "Si necesitas endpoints de escritura, contáctanos en"
+msgstr "If you need write endpoints, contact us at"
+
+#: app/templates/map/api_docs.html:3
+msgid "API"
+msgstr "API"
+
+#: app/templates/map/api_docs.html:8
+msgid "API · Documentación"
+msgstr "API · Documentation"
+
+#: app/templates/map/api_docs.html:10
+msgid ""
+"Esta API es de solo lectura y sirve para consumir los reportes públicos "
+"del mapa. Si necesitas acceso de escritura, escríbenos a"
+msgstr "This API is read-only and serves to consume the public reports from the map. If you need write access, contact us at"
+
+#: app/templates/map/api_docs.html:14
+msgid "Base URL:"
+msgstr "Base URL:"
+
+#: app/templates/map/api_docs.html:19
+msgid "Autenticación"
+msgstr "Authentication"
+
+#: app/templates/map/api_docs.html:20
+msgid "No se requiere autenticación para lectura pública."
+msgstr "No authentication required for public reading."
+
+#: app/templates/map/api_docs.html:24
+msgid "Endpoint principal"
+msgstr "Main endpoint"
+
+#: app/templates/map/api_docs.html:29
+msgid "Lista paginada de reportes aprobados."
+msgstr "Paginated list of approved reports."
+
+#: app/templates/map/api_docs.html:31
+msgid "(opcional) · número de página. Default: 1."
+msgstr "(optional) · page number. Default: 1."
+
+#: app/templates/map/api_docs.html:32
+msgid "(opcional) · items por página. Default: 50 (máx. 100)."
+msgstr "(optional) · items per page. Default: 50 (max. 100)."
+
+#: app/templates/map/api_docs.html:33
+msgid "(opcional) · filtra por categoría."
+msgstr "(optional) · filter by category."
+
+#: app/templates/map/api_docs.html:34
+msgid "(opcional) · filtra por provincia."
+msgstr "(optional) · filter by province."
+
+#: app/templates/map/api_docs.html:35
+msgid "(opcional) · filtra por municipio."
+msgstr "(optional) · filter by municipality."
+
+#: app/templates/map/api_docs.html:75
+msgid "Detalle de reporte"
+msgstr "Report detail"
+
+#: app/templates/map/api_docs.html:80
+msgid "Devuelve un reporte específico por su ID."
+msgstr "Returns a specific report by its ID."
+
+#: app/templates/map/api_docs.html:85 app/templates/map/dashboard.html:12
+#: app/templates/map/dashboard.html:29 app/templates/map/dashboard.html:140
+msgid "Categorías"
+msgstr "Categories"
+
+#: app/templates/map/api_docs.html:90
+msgid "Lista de categorías disponibles."
+msgstr "List of available categories."
+
+#: app/templates/map/api_docs.html:94 app/templates/map/export.html:22
+msgid "Notas"
+msgstr "Notes"
+
+#: app/templates/map/api_docs.html:96
+msgid "Solo se exponen reportes con estado"
+msgstr "Only reports with status"
+
+#: app/templates/map/dashboard.html:3
+msgid ""
+"Mapa represivo de Cuba con reportes anónimos y verificados. Explora "
+"acciones represivas, sedes oficiales y centros clave en un mapa "
+"interactivo."
+msgstr "Repressive map of Cuba with anonymous and verified reports. Explore repressive actions, official headquarters and key centers on an interactive map."
+
+#: app/templates/map/dashboard.html:7
+msgid "Mapa Represivo de Cuba"
+msgstr "Cuba Repression Map"
+
+#: app/templates/map/dashboard.html:8
+msgid ""
+"Documenta y visibiliza acciones y lugares de represión. Los reportes "
+"aparecen como anónimos."
+msgstr "Document and make visible repressive actions and locations. Reports appear as anonymous."
+
+#: app/templates/map/dashboard.html:16
+msgid "Reportes activos"
+msgstr "Active reports"
+
+#: app/templates/map/dashboard.html:24
+msgid "Filtros"
+msgstr "Filters"
+
+#: app/templates/map/dashboard.html:25
+msgid "Mostrar filtros"
+msgstr "Show filters"
+
+#: app/templates/map/dashboard.html:59
+msgid "No hay categorías cargadas."
+msgstr "No categories loaded."
+
+#: app/templates/map/dashboard.html:60
+msgid "Ejecuta:"
+msgstr "Run:"
+
+#: app/templates/map/dashboard.html:67
+msgid "Movimientos, desconexiones y acciones represivas"
+msgstr "Movements, disconnections and repressive actions"
+
+#: app/templates/map/dashboard.html:68 app/templates/map/dashboard.html:132
+msgid "En vivo"
+msgstr "Live"
+
+#: app/templates/map/dashboard.html:78
+msgid "Activar alertas"
+msgstr "Enable alerts"
+
+#: app/templates/map/dashboard.html:80
+msgid "Solo para movimiento, desconexiones y acción represiva."
+msgstr "Only for movement, disconnections and repressive action."
+
+#: app/templates/map/dashboard.html:84
+msgid "Sin movimientos, desconexiones o acciones recientes."
+msgstr "No recent movements, disconnections or actions."
+
+#: app/templates/map/dashboard.html:89
+msgid "Buscar dirección (Cuba)"
+msgstr "Search address (Cuba)"
+
+#: app/templates/map/dashboard.html:91
+msgid "Ej: Sector PNR"
+msgstr "E.g.: PNR Sector"
+
+#: app/templates/map/dashboard.html:105
+msgid "Cargando mapa base."
+msgstr "Loading base map."
+
+#: app/templates/map/dashboard.html:107
+msgid "Haz click en el mapa para crear un reporte"
+msgstr "Click on the map to create a report"
+
+#: app/templates/map/dashboard.html:114
+msgid "Leyenda de íconos"
+msgstr "Icon legend"
+
+#: app/templates/map/dashboard.html:131
+msgid "Aportaciones recientes"
+msgstr "Recent contributions"
+
+#: app/templates/map/dashboard.html:135
+msgid "Sin aportaciones visibles aún."
+msgstr "No visible contributions yet."
+
+#: app/templates/map/donate.html:3
+msgid ""
+"Apoya el proyecto #SOSCuba Map. Dona en Bitcoin para mantener el mapa "
+"colaborativo y la infraestructura de verificación y visualización."
+msgstr "Support the #SOSCuba Map project. Donate in Bitcoin to maintain the collaborative map and the verification and visualization infrastructure."
+
+#: app/templates/map/donate.html:6
+msgid "Apoya el proyecto"
+msgstr "Support the project"
+
+#: app/templates/map/donate.html:7
+msgid ""
+"Las donaciones sostienen el dominio, servidores y el uso de la API de "
+"Google Maps. Gracias por mantener este proyecto vivo."
+msgstr "Donations sustain the domain, servers and the use of the Google Maps API. Thank you for keeping this project alive."
+
+#: app/templates/map/donate.html:14
+msgid "QR de donación en Bitcoin"
+msgstr "Bitcoin donation QR"
+
+#: app/templates/map/donate.html:21 app/templates/map/donate.html:107
+msgid "Copiar dirección"
+msgstr "Copy address"
+
+#: app/templates/map/donate.html:22
+msgid "Abrir wallet"
+msgstr "Open wallet"
+
+#: app/templates/map/donate.html:24
+msgid "Comparte este QR para apoyar el mapa."
+msgstr "Share this QR to support the map."
+
+#: app/templates/map/donate.html:39
+msgid "Dona de forma rápida con tarjeta o PayPal."
+msgstr "Donate quickly with card or PayPal."
+
+#: app/templates/map/donate.html:42
+msgid "Donar por Buy Me a Coffee"
+msgstr "Donate via Buy Me a Coffee"
+
+#: app/templates/map/donate.html:58
+msgid "Entra al enlace y elige el monto para apoyar #SOSCuba Map."
+msgstr "Go to the link and choose the amount to support #SOSCuba Map."
+
+#: app/templates/map/donate.html:61
+msgid "Donar por QvaPay"
+msgstr "Donate via QvaPay"
+
+#: app/templates/map/donate.html:70
+msgid "Transparencia sobre los aportes recibidos y su destino."
+msgstr "Transparency about received contributions and their destination."
+
+#: app/templates/map/donate.html:95
+msgid "No hay donaciones registradas aún."
+msgstr "No donations registered yet."
+
+#: app/templates/map/donate.html:106
+msgid "Copiado"
+msgstr "Copied"
+
+#: app/templates/map/donate.html:109
+msgid "Copia manual"
+msgstr "Manual copy"
+
+#: app/templates/map/edit_locked.html:5 app/templates/map/edit_locked.html:44
+msgid "Edición bloqueada"
+msgstr "Edit locked"
+
+#: app/templates/map/edit_locked.html:46
+msgid "Ver reporte"
+msgstr "View report"
+
+#: app/templates/map/edit_report.html:3
+msgid "Edita y corrige reportes en #SOSCuba Map con transparencia total."
+msgstr "Edit and correct reports in #SOSCuba Map with full transparency."
+
+#: app/templates/map/edit_report.html:27
+msgid "Todas las ediciones quedan registradas en el historial público."
+msgstr "All edits are recorded in the public history."
+
+#: app/templates/map/edit_report.html:214
+#: app/templates/map/report_detail.html:71
+msgid "Las imágenes nuevas pueden requerir moderación."
+msgstr "New images may require moderation."
+
+#: app/templates/map/edit_report.html:221
+#: app/templates/map/post_history.html:35
+#: app/templates/map/post_history.html:72
+#: app/templates/map/post_history.html:132
+#: app/templates/map/report_detail.html:83
+msgid "Imagen del reporte"
+msgstr "Report image"
+
+#: app/templates/map/edit_report.html:225
+#: app/templates/map/report_detail.html:87
+msgid "Aún no hay imágenes para este reporte."
+msgstr "No images yet for this report."
+
+#: app/templates/map/edit_report.html:229
+#: app/templates/map/report_detail.html:92
+#, python-format
+msgid "Subir imágenes (máx %(max)s, %(mb)sMB c/u)"
+msgstr "Upload images (max %(max)s, %(mb)sMB each)"
+
+#: app/templates/map/edit_report.html:257
+msgid "Enviar edición"
+msgstr "Submit edit"
+
+#: app/templates/map/edit_success.html:5
+msgid "Edición enviada"
+msgstr "Edit submitted"
+
+#: app/templates/map/export.html:3 app/templates/shared/base.html:40
+#: app/templates/shared/base.html:54
+msgid "Exportar"
+msgstr "Export"
+
+#: app/templates/map/export.html:8
+msgid "Exportar reportes"
+msgstr "Export reports"
+
+#: app/templates/map/export.html:10
+msgid ""
+"Descarga los reportes públicos en distintos formatos. La exportación "
+"incluye solo reportes aprobados."
+msgstr "Download public reports in different formats. Export includes only approved reports."
+
+#: app/templates/map/export.html:15
+msgid "Descargar CSV"
+msgstr "Download CSV"
+
+#: app/templates/map/export.html:16
+msgid "Descargar XLS"
+msgstr "Download XLS"
+
+#: app/templates/map/export.html:17
+msgid "Descargar TXT"
+msgstr "Download TXT"
+
+#: app/templates/map/export.html:18
+msgid "Descargar PDF"
+msgstr "Download PDF"
+
+#: app/templates/map/export.html:24
+msgid "Los archivos se generan en tiempo real con los datos visibles."
+msgstr "Files are generated in real time with visible data."
+
+#: app/templates/map/export.html:25
+msgid "Para acceso de escritura, contáctanos en"
+msgstr "For write access, contact us at"
+
+#: app/templates/map/new_post.html:2 app/templates/map/new_post.html:23
+#: app/templates/shared/base.html:38 app/templates/shared/base.html:103
+msgid "Nuevo reporte"
+msgstr "New report"
+
+#: app/templates/map/new_post.html:3
+msgid ""
+"Envía un reporte anónimo sobre acciones represivas, centros "
+"penitenciarios o sedes oficiales en Cuba. Tu información ayuda a "
+"documentar y visibilizar."
+msgstr "Submit an anonymous report about repressive actions, detention centers or official headquarters in Cuba. Your information helps to document and make visible."
+
+#: app/templates/map/new_post.html:24
+msgid ""
+"Todos los reportes se publican como anónimos. No necesitas cuenta para "
+"enviar. Los moderadores revisarán la información."
+msgstr "All reports are published as anonymous. You do not need an account to submit. Moderators will review the information."
+
+#: app/templates/map/new_post.html:30
+msgid "Dibuja el área del reporte (opcional)"
+msgstr "Draw the report area (optional)"
+
+#: app/templates/map/new_post.html:39
+msgid "Usa el ícono de polígono para dibujar. Puedes borrar y volver a dibujar."
+msgstr "Use the polygon icon to draw. You can erase and redraw."
+
+#: app/templates/map/new_post.html:45
+msgid "Ej: Detención arbitraria"
+msgstr "E.g.: Arbitrary detention"
+
+#: app/templates/map/new_post.html:53
+msgid "Elige categoría"
+msgstr "Choose category"
+
+#: app/templates/map/new_post.html:68
+msgid "Ej: Apodo o nombre"
+msgstr "E.g.: Alias or name"
+
+#: app/templates/map/new_post.html:80
+msgid "Ej: Centro de vigilancia, evento, etc."
+msgstr "E.g.: Surveillance center, event, etc."
+
+#: app/templates/map/new_post.html:109
+msgid ""
+"Incluye detalles que ayuden a identificar el lugar, fechas, contexto y "
+"referencias visibles."
+msgstr "Include details that help identify the location, dates, context and visible references."
+
+#: app/templates/map/new_post.html:161
+msgid "Imagen (URL)"
+msgstr "Image (URL)"
+
+#: app/templates/map/new_post.html:209 app/templates/map/new_post.html:216
+msgid "Publicar reporte"
+msgstr "Publish report"
+
+#: app/templates/map/new_post.html:209 app/templates/map/new_post.html:215
+msgid "Enviar a moderación"
+msgstr "Submit for moderation"
+
+#: app/templates/map/post_history.html:3
+msgid "Historial de ediciones de #SOSCuba Map para máxima transparencia."
+msgstr "Edit history of #SOSCuba Map for maximum transparency."
+
+#: app/templates/map/post_history.html:6
+msgid "Historial de ediciones"
+msgstr "Edit history"
+
+#: app/templates/map/post_history.html:7
+msgid "Reporte:"
+msgstr "Report:"
+
+#: app/templates/map/post_history.html:10
+msgid "Versión actual"
+msgstr "Current version"
+
+#: app/templates/map/post_history.html:12
+msgid "Actual"
+msgstr "Current"
+
+#: app/templates/map/post_history.html:13
+#: app/templates/map/post_history.html:50
+#: app/templates/moderation/dashboard.html:63
+#: app/templates/moderation/edit_detail.html:13
+msgid "Motivo:"
+msgstr "Reason:"
+
+#: app/templates/map/post_history.html:14
+#: app/templates/map/post_history.html:51
+msgid "Título:"
+msgstr "Title:"
+
+#: app/templates/map/post_history.html:15
+#: app/templates/map/post_history.html:52
+msgid "Descripción:"
+msgstr "Description:"
+
+#: app/templates/map/post_history.html:16
+#: app/templates/map/post_history.html:53
+msgid "Coordenadas:"
+msgstr "Coordinates:"
+
+#: app/templates/map/post_history.html:18
+#: app/templates/map/post_history.html:55
+#: app/templates/map/post_history.html:109
+#: app/templates/map/report_detail.html:23 app/templates/map/reports.html:44
+#: app/templates/moderation/edit_detail.html:27
+msgid "Provincia:"
+msgstr "Province:"
+
+#: app/templates/map/post_history.html:18
+#: app/templates/map/post_history.html:55
+#: app/templates/map/post_history.html:109
+#: app/templates/map/report_detail.html:23 app/templates/map/reports.html:44
+#: app/templates/moderation/edit_detail.html:27
+msgid "N/D"
+msgstr "N/A"
+
+#: app/templates/map/post_history.html:18
+#: app/templates/map/post_history.html:55
+#: app/templates/map/post_history.html:109
+#: app/templates/map/report_detail.html:23 app/templates/map/reports.html:44
+#: app/templates/moderation/edit_detail.html:27
+msgid "Municipio:"
+msgstr "Municipality:"
+
+#: app/templates/map/post_history.html:21
+#: app/templates/map/post_history.html:58
+#: app/templates/map/post_history.html:112
+#: app/templates/moderation/edit_detail.html:30
+msgid "Movimiento:"
+msgstr "Movement:"
+
+#: app/templates/map/post_history.html:23
+#: app/templates/map/post_history.html:60
+#: app/templates/map/post_history.html:114
+#: app/templates/map/report_detail.html:21 app/templates/map/reports.html:42
+#: app/templates/moderation/edit_detail.html:24
+msgid "Dirección:"
+msgstr "Address:"
+
+#: app/templates/map/post_history.html:25
+#: app/templates/map/post_history.html:62
+#: app/templates/map/post_history.html:122
+msgid "Enlaces:"
+msgstr "Links:"
+
+#: app/templates/map/post_history.html:32
+#: app/templates/map/post_history.html:69
+#: app/templates/map/post_history.html:129
+msgid "Imágenes:"
+msgstr "Images:"
+
+#: app/templates/map/post_history.html:44
+msgid "Ediciones anteriores"
+msgstr "Previous edits"
+
+#: app/templates/map/post_history.html:49
+#: app/templates/map/post_history.html:96
+#: app/templates/moderation/dashboard.html:62
+#: app/templates/moderation/edit_detail.html:12
+msgid "Anon"
+msgstr "Anon"
+
+#: app/templates/map/post_history.html:79
+msgid "Restaurar esta versión"
+msgstr "Restore this version"
+
+#: app/templates/map/post_history.html:86
+msgid "No hay ediciones registradas aún."
+msgstr "No edits recorded yet."
+
+#: app/templates/map/post_history.html:91
+msgid "Intentos de edición rechazados"
+msgstr "Rejected edit attempts"
+
+#: app/templates/map/post_history.html:98
+msgid "Intento de edición rechazado por:"
+msgstr "Edit attempt rejected by:"
+
+#: app/templates/map/post_history.html:100
+msgid "Intento de edición rechazado."
+msgstr "Edit attempt rejected."
+
+#: app/templates/map/post_history.html:103
+msgid "Motivo del editor:"
+msgstr "Editor's reason:"
+
+#: app/templates/map/post_history.html:105
+msgid "Título propuesto:"
+msgstr "Proposed title:"
+
+#: app/templates/map/post_history.html:106
+msgid "Descripción propuesta:"
+msgstr "Proposed description:"
+
+#: app/templates/map/post_history.html:107
+msgid "Coordenadas propuestas:"
+msgstr "Proposed coordinates:"
+
+#: app/templates/map/post_history.html:116
+#: app/templates/map/report_detail.html:11
+#: app/templates/moderation/edit_detail.html:18
+msgid "Represor:"
+msgstr "Perpetrator:"
+
+#: app/templates/map/post_history.html:119
+#: app/templates/map/report_detail.html:14
+#: app/templates/moderation/edit_detail.html:21
+msgid "Tipo:"
+msgstr "Type:"
+
+#: app/templates/map/post_history.html:141
+msgid "No hay intentos rechazados registrados."
+msgstr "No rejected attempts recorded."
+
+#: app/templates/map/report_detail.html:3
+msgid ""
+"Detalle del reporte en #SOSCuba Map. Verifica, comenta y colabora con "
+"ediciones transparentes."
+msgstr "Report detail on #SOSCuba Map. Verify, comment and collaborate with transparent edits."
+
+#: app/templates/map/report_detail.html:17
+msgid "Movimiento reportado:"
+msgstr "Reported movement:"
+
+#: app/templates/map/report_detail.html:40
+#: app/templates/moderation/dashboard.html:30
+msgid "Aprobar"
+msgstr "Approve"
+
+#: app/templates/map/report_detail.html:43
+#: app/templates/moderation/dashboard.html:33
+msgid "Rechazar"
+msgstr "Reject"
+
+#: app/templates/map/report_detail.html:47 app/templates/map/reports.html:49
+msgid "Verificado"
+msgstr "Verified"
+
+#: app/templates/map/report_detail.html:47 app/templates/map/reports.html:49
+msgid "Verificar"
+msgstr "Verify"
+
+#: app/templates/map/report_detail.html:50 app/templates/map/reports.html:53
+msgid "Copiar enlace"
+msgstr "Copy link"
+
+#: app/templates/map/report_detail.html:56
+msgid ""
+"Edición bloqueada: el reporte tiene 10+ verificaciones. Puedes comentar "
+"notas y reportar ubicación si hay datos erróneos."
+msgstr "Edit locked: the report has 10+ verifications. You can add notes and report location if there are incorrect data."
+
+#: app/templates/map/report_detail.html:59
+#: app/templates/map/report_location.html:2
+#: app/templates/map/report_location.html:6
+msgid "Reportar ubicación"
+msgstr "Report location"
+
+#: app/templates/map/report_detail.html:60 app/templates/map/reports.html:60
+msgid "Ver en el mapa"
+msgstr "View on map"
+
+#: app/templates/map/report_detail.html:62
+msgid "Ocultar"
+msgstr "Hide"
+
+#: app/templates/map/report_detail.html:105
+msgid "Subir imágenes"
+msgstr "Upload images"
+
+#: app/templates/map/report_detail.html:122 app/templates/map/reports.html:65
+msgid "Escribe un comentario..."
+msgstr "Write a comment..."
+
+#: app/templates/map/report_detail.html:128 app/templates/map/reports.html:66
+msgid "Enviar comentario"
+msgstr "Post comment"
+
+#: app/templates/map/report_location.html:3
+msgid ""
+"Reporta una ubicación incorrecta en #SOSCuba Map para corregir la "
+"información publicada."
+msgstr "Report an incorrect location on #SOSCuba Map to correct the published information."
+
+#: app/templates/map/report_location.html:7
+msgid "Estás reportando una ubicación incorrecta para:"
+msgstr "You are reporting an incorrect location for:"
+
+#: app/templates/map/report_location.html:10
+msgid "Gracias. Revisaremos tu reporte."
+msgstr "Thank you. We will review your report."
+
+#: app/templates/map/report_location.html:11
+msgid "Cerrar"
+msgstr "Close"
+
+#: app/templates/map/report_location.html:15
+msgid "Describe el problema"
+msgstr "Describe the problem"
+
+#: app/templates/map/report_location.html:16
+msgid ""
+"Ej: El punto está en la calle equivocada, debería estar 2 cuadras al "
+"norte."
+msgstr "E.g.: The point is on the wrong street, it should be 2 blocks north."
+
+#: app/templates/map/report_location.html:18
+msgid "Enviar reporte"
+msgstr "Submit report"
+
+#: app/templates/map/report_success.html:5
+msgid "Reporte enviado"
+msgstr "Report submitted"
+
+#: app/templates/map/reports.html:3
+msgid ""
+"Explora reportes en #SOSCuba Map filtrados por provincia y municipio. "
+"Verifica y comenta con transparencia comunitaria."
+msgstr "Explore reports on #SOSCuba Map filtered by province and municipality. Verify and comment with community transparency."
+
+#: app/templates/map/reports.html:7
+msgid ""
+"Filtra por provincia y municipio. Cada reporte puede ser verificado y "
+"comentado."
+msgstr "Filter by province and municipality. Each report can be verified and commented on."
+
+#: app/templates/map/reports.html:28
+msgid "Aplicar"
+msgstr "Apply"
+
+#: app/templates/map/reports.html:52
+msgid "Ver detalle"
+msgstr "View detail"
+
+#: app/templates/map/reports.html:58
+msgid ""
+"Edición bloqueada: 10+ verificaciones. Puedes comentar y reportar "
+"ubicación si hay datos erróneos."
+msgstr "Edit locked: 10+ verifications. You can comment and report location if there are incorrect data."
+
+#: app/templates/map/reports.html:72
+msgid "No hay reportes con esos filtros."
+msgstr "No reports match those filters."
+
+#: app/templates/moderation/dashboard.html:6
+msgid "Revisa reportes pendientes, aprueba o rechaza contenido."
+msgstr "Review pending reports, approve or reject content."
+
+#: app/templates/moderation/dashboard.html:8
+msgid "Reportes pendientes"
+msgstr "Pending reports"
+
+#: app/templates/moderation/dashboard.html:39
+msgid "No hay reportes pendientes."
+msgstr "No pending reports."
+
+#: app/templates/moderation/dashboard.html:45
+msgid "Ediciones pendientes"
+msgstr "Pending edits"
+
+#: app/templates/moderation/dashboard.html:61
+#: app/templates/moderation/edit_detail.html:11
+msgid "Reporte #"
+msgstr "Report #"
+
+#: app/templates/moderation/dashboard.html:68
+#: app/templates/moderation/edit_detail.html:47
+msgid "Aprobar edición"
+msgstr "Approve edit"
+
+#: app/templates/moderation/dashboard.html:74
+msgid "No hay ediciones pendientes."
+msgstr "No pending edits."
+
+#: app/templates/moderation/edit_detail.html:2
+msgid "Revisión de edición"
+msgstr "Edit review"
+
+#: app/templates/moderation/edit_detail.html:5
+msgid "Edición pendiente"
+msgstr "Pending edit"
+
+#: app/templates/moderation/edit_detail.html:6
+msgid "Revisa la propuesta antes de aprobar o rechazar."
+msgstr "Review the proposal before approving or rejecting."
+
+#: app/templates/moderation/edit_detail.html:15
+msgid "Categoría propuesta:"
+msgstr "Proposed category:"
+
+#: app/templates/moderation/edit_detail.html:51
+msgid "Motivo de rechazo"
+msgstr "Rejection reason"
+
+#: app/templates/moderation/edit_detail.html:52
+msgid "Explica por qué se rechaza esta edición."
+msgstr "Explain why this edit is being rejected."
+
+#: app/templates/moderation/edit_detail.html:54
+msgid "Rechazar edición"
+msgstr "Reject edit"
+
+#: app/templates/moderation/edit_detail.html:56
+msgid "Ver reporte original"
+msgstr "View original report"
+
+#: app/templates/moderation/edit_detail.html:63
+msgid "Imágenes propuestas"
+msgstr "Proposed images"
+
+#: app/templates/moderation/edit_detail.html:68
+msgid "Imagen propuesta"
+msgstr "Proposed image"
+
+#: app/templates/shared/base.html:7
+msgid ""
+"Mapa colaborativo para documentar acciones represivas y lugares clave en "
+"Cuba. Reportes anónimos, verificación comunitaria y visualización en "
+"tiempo real."
+msgstr "Collaborative map to document repressive actions and key locations in Cuba. Anonymous reports, community verification, and real-time visualization."
+
+#: app/templates/shared/base.html:43 app/templates/shared/base.html:57
+msgid "Donar"
+msgstr "Donate"
+
+#: app/templates/shared/base.html:51
+msgid "Salir"
+msgstr "Log out"
+
+#: app/templates/shared/base.html:61
+msgid "Hacer reporte"
+msgstr "Submit report"
+
+#: app/templates/shared/base.html:92
+msgid "Plataforma colaborativa y anónima."
+msgstr "Collaborative and anonymous platform."
+
+#: app/templates/shared/chat_widget.html:10
+msgid "Chat en vivo"
+msgstr "Live chat"
+
+#: app/templates/shared/chat_widget.html:16
+msgid "Chat colaborativo"
+msgstr "Collaborative chat"
+
+#: app/templates/shared/chat_widget.html:18
+msgid "en línea"
+msgstr "online"
+
+#: app/templates/shared/chat_widget.html:19
+msgid "Últimas 24 horas"
+msgstr "Last 24 hours"
+
+#: app/templates/shared/chat_widget.html:25
+msgid "Cerrar chat"
+msgstr "Close chat"
+
+#: app/templates/shared/chat_widget.html:31
+msgid "Sin mensajes aún."
+msgstr "No messages yet."
+
+#: app/templates/shared/chat_widget.html:35
+msgid "Nickname (solo chat)"
+msgstr "Nickname (chat only)"
+
+#: app/templates/shared/chat_widget.html:50
+msgid "Escribe un mensaje o enlace..."
+msgstr "Write a message or link..."
+
+#: app/templates/shared/chat_widget.html:54
+msgid "Enviar"
+msgstr "Send"
+
+
+#: category names (dynamic DB values)
+msgid "Accion represiva del gobierno"
+msgstr "Government Repressive Action"
+
+msgid "Movimiento de tropas"
+msgstr "Troop Movement"
+
+msgid "Reporte de Desconexion de Internet"
+msgstr "Internet Disconnection Report"
+
+msgid "Residencia de represor"
+msgstr "Repressor Residence"
+
+msgid "Centro Penitenciario"
+msgstr "Penitentiary Center"
+
+msgid "Estacion de Policia"
+msgstr "Police Station"
+
+msgid "Escuela del Partido Comunista"
+msgstr "Communist Party School"
+
+msgid "Sede del Partido Comunista"
+msgstr "Communist Party Headquarters"
+
+msgid "Sede del Gobierno"
+msgstr "Government Headquarters"
+
+msgid "Sede de la Unión de Jóvenes Comunistas"
+msgstr "Union of Young Communists Headquarters"
+
+msgid "Sede de la Seguridad del Estado"
+msgstr "State Security Headquarters"
+
+msgid "Unidad militar"
+msgstr "Military Unit"
+
+msgid "Base de espionaje"
+msgstr "Espionage Base"
+
+msgid "Otros"
+msgstr "Others"
+
+#: category descriptions (dynamic DB values)
+msgid "Operativos, detenciones y violencia estatal."
+msgstr "Operations, arrests and state violence."
+
+msgid "Movimientos policiales, brigada especial o tropas. Indica fecha y hora del movimiento y describe tipo de tropas, armamento o motivo."
+msgstr "Police movements, special brigade or troops. Indicate date and time of movement and describe type of troops, armament or reason."
+
+msgid "Desconexiones de internet en vivo. Indica fecha, hora, duración y zonas afectadas."
+msgstr "Live internet disconnections. Indicate date, time, duration and affected areas."
+
+msgid "Direcciones o zonas asociadas a represores."
+msgstr "Addresses or areas associated with repressors."
+
+msgid "Carceles y centros de detencion."
+msgstr "Prisons and detention centers."
+
+msgid "Unidades policiales y puestos."
+msgstr "Police units and posts."
+
+msgid "Instituciones de formacion del PCC."
+msgstr "PCC training institutions."
+
+msgid "Sedes provinciales o municipales del PCC."
+msgstr "PCC provincial or municipal headquarters."
+
+msgid "Sedes provinciales o municipales del Gobierno."
+msgstr "Government provincial or municipal headquarters."
+
+msgid "Sedes provinciales o municipales de la UJC."
+msgstr "UJC provincial or municipal headquarters."
+
+msgid "Instalaciones de la Seguridad del Estado."
+msgstr "State Security facilities."
+
+msgid "Bases y unidades militares."
+msgstr "Military bases and units."
+
+msgid "Infraestructura de inteligencia o espionaje."
+msgstr "Intelligence or espionage infrastructure."
+
+msgid "Reportes generales o difíciles de clasificar."
+msgstr "General reports or hard to classify."

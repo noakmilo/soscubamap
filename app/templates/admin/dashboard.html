@@ -1,12 +1,12 @@
 {% extends "shared/base.html" %}
-{% block title %} | Admin{% endblock %}
+{% block title %} | {{ _("Admin") }}{% endblock %}
 {% block content %}
 <section class="panel">
-  <h1>Administración</h1>
-  <p>Gestión de usuarios, roles, categorías y configuración del mapa.</p>
+  <h1>{{ _("Administración") }}</h1>
+  <p>{{ _("Gestión de usuarios, roles, categorías y configuración del mapa.") }}</p>
 
   <div class="admin-section">
-    <h2>Moderación</h2>
+    <h2>{{ _("Moderación") }}</h2>
     <form method="post" action="{{ url_for('admin.toggle_moderation') }}">
       <label class="switch">
         <input type="checkbox" name="moderation_enabled" {% if moderation_enabled %}checked{% endif %} />
@@ -14,41 +14,41 @@
       </label>
       <span class="switch-label">
         {% if moderation_enabled %}
-          Activada (los reportes van a moderación)
+          {{ _("Activada (los reportes van a moderación)") }}
         {% else %}
-          Desactivada (los reportes se publican directo)
+          {{ _("Desactivada (los reportes se publican directo)") }}
         {% endif %}
       </span>
-      <button type="submit" class="btn-primary">Guardar</button>
+      <button type="submit" class="btn-primary">{{ _("Guardar") }}</button>
     </form>
   </div>
 
   <div class="admin-section">
-    <h2>Reportes</h2>
+    <h2>{{ _("Reportes") }}</h2>
     <div class="admin-links">
-      <a href="{{ url_for('admin.reports', status='approved') }}">Activos</a>
-      <a href="{{ url_for('admin.reports', status='hidden') }}">Ocultos</a>
-      <a href="{{ url_for('admin.reports', status='pending') }}">Por moderar</a>
-      <a href="{{ url_for('admin.reports', status='deleted') }}">Eliminados</a>
-      <a href="{{ url_for('admin.reports', status='all') }}">Todos</a>
-      <a href="{{ url_for('admin.location_reports') }}">Ubicaciones reportadas</a>
-      <a href="{{ url_for('admin.discussions') }}">Discusiones</a>
-      <a href="{{ url_for('admin.donations') }}">Donaciones</a>
+      <a href="{{ url_for('admin.reports', status='approved') }}">{{ _("Activos") }}</a>
+      <a href="{{ url_for('admin.reports', status='hidden') }}">{{ _("Ocultos") }}</a>
+      <a href="{{ url_for('admin.reports', status='pending') }}">{{ _("Por moderar") }}</a>
+      <a href="{{ url_for('admin.reports', status='deleted') }}">{{ _("Eliminados") }}</a>
+      <a href="{{ url_for('admin.reports', status='all') }}">{{ _("Todos") }}</a>
+      <a href="{{ url_for('admin.location_reports') }}">{{ _("Ubicaciones reportadas") }}</a>
+      <a href="{{ url_for('admin.discussions') }}">{{ _("Discusiones") }}</a>
+      <a href="{{ url_for('admin.donations') }}">{{ _("Donaciones") }}</a>
     </div>
   </div>
 
   <div class="admin-section">
-    <h2>Ubicaciones reportadas</h2>
+    <h2>{{ _("Ubicaciones reportadas") }}</h2>
     {% if location_reports and location_reports|length %}
       <div class="table-wrap">
         <table class="admin-table">
           <thead>
             <tr>
-              <th>Reporte</th>
-              <th>Categoría</th>
-              <th>Fecha</th>
-              <th>Mensaje</th>
-              <th>Mapa</th>
+              <th>{{ _("Reporte") }}</th>
+              <th>{{ _("Categoría") }}</th>
+              <th>{{ _("Fecha") }}</th>
+              <th>{{ _("Mensaje") }}</th>
+              <th>{{ _("Mapa") }}</th>
             </tr>
           </thead>
           <tbody>
@@ -63,7 +63,7 @@
                 <td>{{ report.created_at }}</td>
                 <td>{{ report.message }}</td>
                 <td>
-                  <a class="btn-secondary" href="{{ url_for('map.dashboard', lat=report.post.latitude, lng=report.post.longitude) }}">Ver en mapa</a>
+                  <a class="btn-secondary" href="{{ url_for('map.dashboard', lat=report.post.latitude, lng=report.post.longitude) }}">{{ _("Ver en mapa") }}</a>
                 </td>
               </tr>
             {% endfor %}
@@ -71,10 +71,10 @@
         </table>
       </div>
       <div style="margin-top:10px;">
-        <a class="btn-secondary" href="{{ url_for('admin.location_reports') }}">Ver todos</a>
+        <a class="btn-secondary" href="{{ url_for('admin.location_reports') }}">{{ _("Ver todos") }}</a>
       </div>
     {% else %}
-      <div class="muted">No hay ubicaciones reportadas.</div>
+      <div class="muted">{{ _("No hay ubicaciones reportadas.") }}</div>
     {% endif %}
   </div>
 </section>

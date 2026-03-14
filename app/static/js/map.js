@@ -1,3 +1,5 @@
+var t = window.t;
+
 let map;
 let markers = [];
 let markerIndex = new Map();
@@ -110,7 +112,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (filters && toggle) {
     toggle.addEventListener("click", () => {
       const isCollapsed = filters.classList.toggle("collapsed");
-      toggle.textContent = isCollapsed ? "Mostrar filtros" : "Ocultar filtros";
+      toggle.textContent = isCollapsed ? t("button_show_filters") : t("button_hide_filters");
       toggle.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
     });
   }
@@ -118,13 +120,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const searchInput = document.getElementById("mapSearch");
   if (searchInput) {
     const placeholders = [
-      "Ej: Sector PNR",
-      "Ej: Prision",
-      "Ej: Unidad Militar",
-      "Ej: Tropas",
-      "Ej: Estacion de policia",
-      "Ej: Centro de detencion",
-      "Ej: Brigada Especial",
+      t("search_placeholder_1"),
+      t("search_placeholder_2"),
+      t("search_placeholder_3"),
+      t("search_placeholder_4"),
+      t("search_placeholder_5"),
+      t("search_placeholder_6"),
+      t("search_placeholder_7"),
     ];
     const pick = placeholders[Math.floor(Math.random() * placeholders.length)];
     searchInput.setAttribute("placeholder", pick);
@@ -315,10 +317,10 @@ function attachPopupActions(post, popupElement, popupRef) {
       const full = `${window.location.origin}${url}`;
       try {
         await navigator.clipboard.writeText(full);
-        copyBtn.textContent = "Enlace copiado";
-        setTimeout(() => (copyBtn.textContent = "Copiar enlace"), 1500);
+        copyBtn.textContent = t("toast_link_copied");
+        setTimeout(() => (copyBtn.textContent = t("button_copy_link")), 1500);
       } catch (err) {
-        copyBtn.textContent = "Copia manual";
+        copyBtn.textContent = t("fallback_copy_manual");
       }
     });
   }
@@ -361,7 +363,7 @@ function attachPopupActions(post, popupElement, popupRef) {
       }
       if (data && data.ok) {
         verifyBtn.disabled = true;
-        verifyBtn.textContent = "Verificado";
+        verifyBtn.textContent = t("button_verified");
         verifyBtn.classList.add("is-verified");
         verifyBtn.setAttribute("data-verified", "1");
       }
@@ -397,7 +399,7 @@ function attachPopupActions(post, popupElement, popupRef) {
 
   if (hideBtn) {
     hideBtn.addEventListener("click", async () => {
-      if (!confirm("Ocultar este reporte?")) return;
+      if (!confirm(t("confirmation_hide_report"))) return;
       const result = await updateStatus("hidden");
       if (result && result.ok) {
         allPosts = allPosts.filter((p) => p.id !== post.id);
@@ -409,7 +411,7 @@ function attachPopupActions(post, popupElement, popupRef) {
 
   if (deleteBtn) {
     deleteBtn.addEventListener("click", async () => {
-      if (!confirm("Eliminar este reporte?")) return;
+      if (!confirm(t("confirmation_delete_report"))) return;
       const result = await updateStatus("deleted");
       if (result && result.ok) {
         allPosts = allPosts.filter((p) => p.id !== post.id);
@@ -440,7 +442,7 @@ function popupHtmlForPost(post) {
             const safeCaption = escapeHtml(caption);
             return `
               <button class="info-media-thumb" type="button" data-image="${url}" data-caption="${safeCaption}">
-                <img src="${url}" alt="Imagen del reporte" />
+                <img src="${url}" alt="${t("alt_report_image")}" />
               </button>
             `;
           })
@@ -449,7 +451,7 @@ function popupHtmlForPost(post) {
     : "";
   const editLocked = !isAdmin && (post.verify_count ?? 0) >= 10;
   const verifiedByMe = !!post.verified_by_me;
-  const verifyLabel = verifiedByMe ? "Verificado" : "Verificar";
+  const verifyLabel = verifiedByMe ? t("button_verified") : t("button_verify");
   const verifyDisabled = verifiedByMe ? "disabled data-verified=\"1\"" : "";
 
   return `
@@ -475,22 +477,22 @@ function popupHtmlForPost(post) {
           : ""
       }
       <div class="info-actions">
-        <button id="detailBtn-${post.id}" data-detail-url="/reporte/${post.id}" class="info-btn info-btn-outline">Ver detalle</button>
-        <button id="copyLinkBtn-${post.id}" data-copy-url="/reporte/${post.id}" class="info-btn info-btn-outline">Copiar enlace</button>
-        <button id="reportLocationBtn" data-report-url="/reportar-ubicacion/${post.id}" class="info-btn info-btn-outline">Reportar ubicacion</button>
-        <button id="viewHistoryBtn" data-history-url="/reporte/${post.id}/historial" class="info-btn info-btn-outline info-btn-blue">Ver historial</button>
+        <button id="detailBtn-${post.id}" data-detail-url="/reporte/${post.id}" class="info-btn info-btn-outline">${t("button_view_detail")}</button>
+        <button id="copyLinkBtn-${post.id}" data-copy-url="/reporte/${post.id}" class="info-btn info-btn-outline">${t("button_copy_link")}</button>
+        <button id="reportLocationBtn" data-report-url="/reportar-ubicacion/${post.id}" class="info-btn info-btn-outline">${t("button_report_location")}</button>
+        <button id="viewHistoryBtn" data-history-url="/reporte/${post.id}/historial" class="info-btn info-btn-outline info-btn-blue">${t("button_view_history")}</button>
         <button id="verifyBtn-${post.id}" data-verify-id="${post.id}" class="info-btn info-btn-solid ${verifiedByMe ? "is-verified" : ""}" ${verifyDisabled}>${verifyLabel}</button>
         <span id="verifyCount-${post.id}" class="info-badge">${post.verify_count ?? 0}</span>
         ${
           editLocked
-            ? `<span style="font-size:11px;color:#777;">Edicion bloqueada: 10+ verificaciones. Puedes comentar y reportar ubicacion si hay datos erroneos.</span>`
-            : `<button id="editBtn-${post.id}" data-edit-url="/reporte/${post.id}/editar" class="info-btn info-btn-outline">Editar</button>`
+            ? `<span style="font-size:11px;color:#777;">${t("message_edit_locked")}</span>`
+            : `<button id="editBtn-${post.id}" data-edit-url="/reporte/${post.id}/editar" class="info-btn info-btn-outline">${t("button_edit")}</button>`
         }
         ${
           isAdmin
             ? `
-              <button id="hideBtn-${post.id}" data-status="hidden" class="info-btn info-btn-outline">Ocultar</button>
-              <button id="deleteBtn-${post.id}" data-status="deleted" class="info-btn info-btn-outline">Eliminar</button>
+              <button id="hideBtn-${post.id}" data-status="hidden" class="info-btn info-btn-outline">${t("button_hide")}</button>
+              <button id="deleteBtn-${post.id}" data-status="deleted" class="info-btn info-btn-outline">${t("button_delete")}</button>
             `
             : ""
         }
@@ -585,8 +587,8 @@ window.handleNewReport = function (payload) {
     marker.bindPopup(
       `
       <div style="color:#111;max-width:240px;">
-        <strong>Reporte enviado a moderacion.</strong>
-        <div style="font-size:12px;margin-top:6px;">Se mostrara cuando sea aprobado.</div>
+        <strong>${t("message_pending_moderation")}</strong>
+        <div style="font-size:12px;margin-top:6px;">${t("message_will_show_when_approved")}</div>
       </div>
       `,
       { maxWidth: 260 }
@@ -641,7 +643,7 @@ function renderRecent(posts) {
   if (!container) return;
 
   if (!posts.length) {
-    container.innerHTML = `<div class="console-empty">Sin aportaciones visibles aun.</div>`;
+    container.innerHTML = `<div class="console-empty">${t("empty_recent_feed")}</div>`;
     return;
   }
 
@@ -660,7 +662,7 @@ function renderRecent(posts) {
           <div class="console-side">
             <div class="console-coords">${post.latitude.toFixed(4)}, ${post.longitude.toFixed(4)}</div>
             <div class="console-time">${post.created_at ? new Date(post.created_at).toLocaleString("es-ES") : ""}</div>
-            <button class="btn-secondary console-btn" data-pan-lat="${post.latitude}" data-pan-lng="${post.longitude}" data-post-id="${post.id}">Ver en mapa</button>
+            <button class="btn-secondary console-btn" data-pan-lat="${post.latitude}" data-pan-lng="${post.longitude}" data-post-id="${post.id}">${t("button_view_on_map")}</button>
           </div>
         </div>
       `;
@@ -701,7 +703,7 @@ function renderAlerts(posts) {
 
   const alerts = (posts || []).filter((post) => isAlertCategory(post.category?.slug));
   if (!alerts.length) {
-    container.innerHTML = `<div class="console-empty">Sin movimientos, desconexiones o acciones recientes.</div>`;
+    container.innerHTML = `<div class="console-empty">${t("empty_alerts_feed")}</div>`;
     return;
   }
 
@@ -710,8 +712,8 @@ function renderAlerts(posts) {
     .map((post) => {
       const safeTitle = escapeHtml(post.title || "");
       const safeCategory = escapeHtml(post.category?.name || "");
-      const safeProvince = escapeHtml(post.province || "N/D");
-      const safeMunicipality = escapeHtml(post.municipality || "N/D");
+      const safeProvince = escapeHtml(post.province || t("label_not_data_unknown"));
+      const safeMunicipality = escapeHtml(post.municipality || t("label_not_data_unknown"));
       const locationText = `${safeProvince} · ${safeMunicipality}`;
       const eventTime = post.movement_at || post.created_at;
       const timeText = eventTime ? new Date(eventTime).toLocaleString("es-ES") : "";
@@ -820,7 +822,7 @@ function focusSearchResult(result) {
   }
 
   searchMarker = L.marker([result.lat, result.lng], {
-    title: result.label || "Busqueda",
+    title: result.label || t("marker_title_search"),
   }).addTo(map);
 }
 
@@ -1028,8 +1030,8 @@ async function initMap() {
   L.control
     .layers(
       {
-        Mapa: streetsLayer,
-        Satelite: satelliteLayer,
+        [t("map_layer_streets")]: streetsLayer,
+        [t("map_layer_satellite")]: satelliteLayer,
       },
       {},
       { collapsed: true }
@@ -1058,7 +1060,7 @@ async function initMap() {
   const lngParam = parseFloat(params.get("lng"));
   if (Number.isFinite(latParam) && Number.isFinite(lngParam)) {
     map.setView([latParam, lngParam], Math.max(map.getZoom(), 14));
-    L.marker([latParam, lngParam], { title: "Ubicacion" }).addTo(map);
+    L.marker([latParam, lngParam], { title: t("marker_title_location") }).addTo(map);
   }
 
   const searchInput = document.getElementById("mapSearch");
@@ -1092,7 +1094,7 @@ async function initMap() {
       items = Array.from(new Set(items)).sort();
     }
     municipalitySelect.innerHTML =
-      `<option value="">Todos</option>` +
+      `<option value="">${t("dropdown_all_option")}</option>` +
       items.map((m) => `<option value="${m}" ${m === selected ? "selected" : ""}>${m}</option>`).join("");
   };
 
@@ -1115,8 +1117,8 @@ async function initMap() {
       .setLatLng(event.latlng)
       .setContent(`
         <div style="color:#111;max-width:240px;">
-          <div style="font-weight:600;margin-bottom:8px;">Crear reporte aqui</div>
-          <button type="button" data-create-report-btn style="background:#6ee7b7;border:none;padding:8px 10px;border-radius:6px;cursor:pointer;">Abrir formulario</button>
+          <div style="font-weight:600;margin-bottom:8px;">${t("heading_create_report_here")}</div>
+          <button type="button" data-create-report-btn style="background:#6ee7b7;border:none;padding:8px 10px;border-radius:6px;cursor:pointer;">${t("button_open_form")}</button>
         </div>
       `)
       .openOn(map);
