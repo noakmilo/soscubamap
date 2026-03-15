@@ -1,5 +1,6 @@
 import pytest
-from app.services.content_quality import validate_title, validate_description
+
+from app.services.content_quality import validate_description, validate_title
 
 
 class TestValidateTitle:
@@ -67,16 +68,22 @@ class TestValidateDescription:
         assert ok is False
 
     def test_repeated_chars(self):
-        ok, msg = validate_description("Esto tiene aaaaaaaaa muchos caracteres repetidos en la oración completa aquí")
+        ok, msg = validate_description(
+            "Esto tiene aaaaaaaaa muchos caracteres repetidos en la oración completa aquí"
+        )
         assert ok is False
         assert "repeticiones" in msg
 
     def test_low_letter_ratio(self):
-        ok, msg = validate_description("aa bb cc dd ee ff gg hh 111 222 333 444 555 666 777 888 999")
+        ok, msg = validate_description(
+            "aa bb cc dd ee ff gg hh 111 222 333 444 555 666 777 888 999"
+        )
         assert ok is False
         assert "incompleta" in msg
 
     def test_repeated_words(self):
-        ok, msg = validate_description("hola hola hola hola hola hola hola hola hola hola")
+        ok, msg = validate_description(
+            "hola hola hola hola hola hola hola hola hola hola"
+        )
         assert ok is False
         assert "repite" in msg

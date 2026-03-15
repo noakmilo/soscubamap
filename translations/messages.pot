@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-03-15 11:39+0000\n"
+"POT-Creation-Date: 2026-03-15 11:49+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,194 +17,194 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
-#: app/blueprints/admin/routes.py:85
+#: app/blueprints/admin/routes.py:91
 msgid "Moderación actualizada."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:154
+#: app/blueprints/admin/routes.py:160
 msgid "Monto obligatorio."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:156
+#: app/blueprints/admin/routes.py:162
 msgid "Vía obligatoria."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:158
+#: app/blueprints/admin/routes.py:164
 msgid "Fecha obligatoria."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:160
+#: app/blueprints/admin/routes.py:166
 msgid "Destino obligatorio."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:177
+#: app/blueprints/admin/routes.py:183
 msgid "Donación registrada."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:180
+#: app/blueprints/admin/routes.py:186
 msgid "Fecha inválida. Usa formato YYYY-MM-DD."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:198
+#: app/blueprints/admin/routes.py:204
 msgid "Completa todos los campos."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:207
+#: app/blueprints/admin/routes.py:213
 msgid "Donación actualizada."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:222
+#: app/blueprints/admin/routes.py:228
 msgid "Donación eliminada."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:248 app/blueprints/discussions/routes.py:127
+#: app/blueprints/admin/routes.py:254 app/blueprints/discussions/routes.py:147
 msgid "Título y contenido son obligatorios."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:257
+#: app/blueprints/admin/routes.py:263
 msgid "Discusión actualizada."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:278
+#: app/blueprints/admin/routes.py:284
 msgid "Discusión eliminada."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:289
+#: app/blueprints/admin/routes.py:295
 msgid "Comentario eliminado."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:299
+#: app/blueprints/admin/routes.py:305
 msgid "Estado inválido."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:305 app/blueprints/admin/routes.py:553
+#: app/blueprints/admin/routes.py:311 app/blueprints/admin/routes.py:585
 msgid "Reporte actualizado."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:316
+#: app/blueprints/admin/routes.py:324
 msgid "Selecciona al menos un reporte."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:322
+#: app/blueprints/admin/routes.py:330
 msgid "Selección inválida."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:329
+#: app/blueprints/admin/routes.py:337
 #, python-format
 msgid "%(count)s reporte(s) eliminado(s)."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:512 app/blueprints/map/routes.py:984
+#: app/blueprints/admin/routes.py:544 app/blueprints/map/routes.py:985
 msgid "Edición enviada a moderación."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:579
+#: app/blueprints/admin/routes.py:615
 msgid "Revisión inválida."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:629
+#: app/blueprints/admin/routes.py:665
 msgid "Reporte restaurado a una versión anterior."
 msgstr ""
 
-#: app/blueprints/auth/routes.py:28
+#: app/blueprints/auth/routes.py:30
 msgid "Ese email está reservado."
 msgstr ""
 
-#: app/blueprints/auth/routes.py:32
+#: app/blueprints/auth/routes.py:34
 msgid "Email y contraseña son obligatorios."
 msgstr ""
 
-#: app/blueprints/auth/routes.py:36
+#: app/blueprints/auth/routes.py:38
 msgid "Ese email ya está registrado."
 msgstr ""
 
-#: app/blueprints/auth/routes.py:65 app/blueprints/auth/routes.py:92
+#: app/blueprints/auth/routes.py:67 app/blueprints/auth/routes.py:94
 msgid "Credenciales inválidas."
 msgstr ""
 
-#: app/blueprints/discussions/routes.py:105
-#: app/blueprints/discussions/routes.py:186
+#: app/blueprints/discussions/routes.py:120
+#: app/blueprints/discussions/routes.py:206
 msgid "Verificación reCAPTCHA falló. Intenta nuevamente."
 msgstr ""
 
-#: app/blueprints/discussions/routes.py:123
-#: app/blueprints/discussions/routes.py:189 app/blueprints/map/routes.py:687
+#: app/blueprints/discussions/routes.py:141
+#: app/blueprints/discussions/routes.py:210 app/blueprints/map/routes.py:688
 msgid "Se detectó contenido sospechoso. Revisa y vuelve a intentar."
 msgstr ""
 
-#: app/blueprints/discussions/routes.py:162
+#: app/blueprints/discussions/routes.py:182
 msgid "Discusión publicada."
 msgstr ""
 
-#: app/blueprints/discussions/routes.py:192
+#: app/blueprints/discussions/routes.py:215
 msgid "El comentario no puede estar vacío."
 msgstr ""
 
-#: app/blueprints/discussions/routes.py:214
+#: app/blueprints/discussions/routes.py:239
 msgid "Comentario agregado."
 msgstr ""
 
-#: app/blueprints/map/routes.py:531 app/blueprints/map/routes.py:919
+#: app/blueprints/map/routes.py:532 app/blueprints/map/routes.py:920
 msgid "Latitud/longitud inválidas."
 msgstr ""
 
-#: app/blueprints/map/routes.py:535
+#: app/blueprints/map/routes.py:536
 msgid "La ubicación debe estar dentro del territorio cubano."
 msgstr ""
 
-#: app/blueprints/map/routes.py:542 app/blueprints/map/routes.py:926
+#: app/blueprints/map/routes.py:543 app/blueprints/map/routes.py:927
 msgid "Provincia y municipio son obligatorios."
 msgstr ""
 
-#: app/blueprints/map/routes.py:622
+#: app/blueprints/map/routes.py:623
 msgid "Reporte enviado a moderación."
 msgstr ""
 
-#: app/blueprints/map/routes.py:624
+#: app/blueprints/map/routes.py:625
 msgid "Reporte publicado."
 msgstr ""
 
-#: app/blueprints/map/routes.py:691
+#: app/blueprints/map/routes.py:692
 msgid "Describe por qué la ubicación es incorrecta."
 msgstr ""
 
-#: app/blueprints/map/routes.py:945
+#: app/blueprints/map/routes.py:946
 msgid "No se pudo subir la imagen."
 msgstr ""
 
-#: app/blueprints/map/routes.py:1037
+#: app/blueprints/map/routes.py:1038
 msgid "Edición aplicada."
 msgstr ""
 
-#: app/blueprints/moderation/routes.py:33
+#: app/blueprints/moderation/routes.py:44
 msgid "Reporte aprobado."
 msgstr ""
 
-#: app/blueprints/moderation/routes.py:46
+#: app/blueprints/moderation/routes.py:57
 msgid "Reporte rechazado."
 msgstr ""
 
-#: app/blueprints/moderation/routes.py:109
+#: app/blueprints/moderation/routes.py:120
 msgid "Edición aprobada."
 msgstr ""
 
-#: app/blueprints/moderation/routes.py:122
+#: app/blueprints/moderation/routes.py:133
 msgid "Debes indicar un motivo de rechazo."
 msgstr ""
 
-#: app/blueprints/moderation/routes.py:129
+#: app/blueprints/moderation/routes.py:140
 msgid "Edición rechazada."
 msgstr ""
 
-#: app/blueprints/panic/routes.py:35
+#: app/blueprints/panic/routes.py:36
 msgid "Coordenadas inválidas."
 msgstr ""
 
-#: app/blueprints/panic/routes.py:38
+#: app/blueprints/panic/routes.py:39
 msgid "Coordenadas fuera de rango."
 msgstr ""
 
-#: app/blueprints/panic/routes.py:44
+#: app/blueprints/panic/routes.py:45
 msgid "Sin categorías configuradas."
 msgstr ""
 

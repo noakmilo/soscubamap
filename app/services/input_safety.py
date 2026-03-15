@@ -1,6 +1,5 @@
 import re
 
-
 _PATTERNS = [
     (re.compile(r"<\s*script", re.IGNORECASE), "script"),
     (re.compile(r"javascript:", re.IGNORECASE), "js-protocol"),
@@ -12,7 +11,10 @@ _PATTERNS = [
     (re.compile(r"\bdrop\s+table\b", re.IGNORECASE), "drop-table"),
     (re.compile(r"\binsert\s+into\b", re.IGNORECASE), "insert-into"),
     (re.compile(r"\bupdate\b\s+.+\bset\b", re.IGNORECASE), "update-set"),
-    (re.compile(r"\bpg_sleep\b|\bsleep\s*\(|\bwaitfor\s+delay\b", re.IGNORECASE), "sleep"),
+    (
+        re.compile(r"\bpg_sleep\b|\bsleep\s*\(|\bwaitfor\s+delay\b", re.IGNORECASE),
+        "sleep",
+    ),
     (re.compile(r"\bbenchmark\s*\(", re.IGNORECASE), "benchmark"),
     (re.compile(r"\bnslookup\b|\bping\b|\bcurl\b|\bwget\b", re.IGNORECASE), "rce"),
     (re.compile(r"\$\{|\{\{|<%", re.IGNORECASE), "template"),

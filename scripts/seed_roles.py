@@ -3,7 +3,6 @@ from app.extensions import db
 from app.models.role import Role
 from app.models.user import User
 
-
 DEFAULT_ROLES = ["colaborador", "moderador", "administrador"]
 
 

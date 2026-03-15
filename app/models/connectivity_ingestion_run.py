@@ -8,7 +8,9 @@ class ConnectivityIngestionRun(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     scheduled_for_utc = db.Column(db.DateTime, index=True)
-    started_at_utc = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    started_at_utc = db.Column(
+        db.DateTime, default=datetime.utcnow, nullable=False, index=True
+    )
     finished_at_utc = db.Column(db.DateTime)
     status = db.Column(db.String(24), nullable=False, default="running", index=True)
     attempt_count = db.Column(db.Integer, nullable=False, default=0)

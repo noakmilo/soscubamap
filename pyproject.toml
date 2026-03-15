@@ -1,3 +1,10 @@
+[tool.black]
+target-version = ["py312"]
+
+[tool.isort]
+profile = "black"
+py_version = 312
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]

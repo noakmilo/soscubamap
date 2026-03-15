@@ -301,7 +301,9 @@ def parse_rss_items(xml_text, source_feed):
         link = canonicalize_source_url(_child_text(item, "link"))
         guid = (_child_text(item, "guid") or "").strip()
         pub_date = parse_rss_datetime(_child_text(item, "pubDate"))
-        merged_text = " ".join(part for part in [title, clean_description] if part).strip()
+        merged_text = " ".join(
+            part for part in [title, clean_description] if part
+        ).strip()
         if not merged_text:
             continue
         items.append(
@@ -556,7 +558,9 @@ def _build_gazetteer():
         province_lat, province_lng = province_centroids.get(province_norm, (None, None))
         for municipality_name in mun_list:
             mun_norm = _normalize_text(municipality_name)
-            lat, lng = municipality_centroids.get((mun_norm, province_norm), (None, None))
+            lat, lng = municipality_centroids.get(
+                (mun_norm, province_norm), (None, None)
+            )
             if lat is None or lng is None:
                 lat, lng = province_lat, province_lng
             _add_entry(
@@ -584,7 +588,9 @@ def _build_gazetteer():
         province_norm = _normalize_text(province_name)
         municipality_norm = _normalize_text(municipality_name)
         if (lat is None or lng is None) and municipality_name:
-            lat, lng = municipality_centroids.get((municipality_norm, province_norm), (None, None))
+            lat, lng = municipality_centroids.get(
+                (municipality_norm, province_norm), (None, None)
+            )
         if (lat is None or lng is None) and province_name:
             lat, lng = province_centroids.get(province_norm, (None, None))
         _add_entry(
@@ -778,13 +784,23 @@ def resolve_place(clean_text):
     feature_type = best_entry.get("type")
     precision = "unresolved"
     if feature_type == "locality":
-        precision = "exact_locality" if lat is not None and lng is not None else "approx_locality"
+        precision = (
+            "exact_locality"
+            if lat is not None and lng is not None
+            else "approx_locality"
+        )
     elif feature_type == "municipality":
         precision = (
-            "exact_municipality" if lat is not None and lng is not None else "approx_municipality"
+            "exact_municipality"
+            if lat is not None and lng is not None
+            else "approx_municipality"
         )
     elif feature_type == "province":
-        precision = "exact_province" if lat is not None and lng is not None else "approx_province"
+        precision = (
+            "exact_province"
+            if lat is not None and lng is not None
+            else "approx_province"
+        )
 
     return {
         "resolved": lat is not None and lng is not None,
@@ -812,7 +828,9 @@ def classify_event(clean_text, keyword_hits, place_result):
         score += 16
     if strong_count and context_count:
         score += 8
-    if "cacerolas" in (keyword_hits.get("strong") or []) and "libertad" in _normalize_text(clean_text):
+    if "cacerolas" in (
+        keyword_hits.get("strong") or []
+    ) and "libertad" in _normalize_text(clean_text):
         score += 6
     if not has_location:
         score -= 10
@@ -857,11 +875,17 @@ def should_show_on_map(event_payload):
         return False
 
     event_type = event_payload.get("event_type")
-    if event_type not in {"confirmed_protest", "probable_protest", "related_unrest", "unresolved_location"}:
+    if event_type not in {
+        "confirmed_protest",
+        "probable_protest",
+        "related_unrest",
+        "unresolved_location",
+    }:
         return False
 
     has_coords = (
-        event_payload.get("latitude") is not None and event_payload.get("longitude") is not None
+        event_payload.get("latitude") is not None
+        and event_payload.get("longitude") is not None
     )
     if not has_coords and not allow_unresolved:
         return False
@@ -873,7 +897,9 @@ def build_event_payload(item):
     clean_text = str(item.get("clean_text") or "").strip()
     keyword_hits = detect_keywords(clean_text)
     place_result = resolve_place(clean_text)
-    confidence_score, event_type = classify_event(clean_text, keyword_hits, place_result)
+    confidence_score, event_type = classify_event(
+        clean_text, keyword_hits, place_result
+    )
 
     source_url = canonicalize_source_url(item.get("link"))
     published_at = item.get("published_at_utc")

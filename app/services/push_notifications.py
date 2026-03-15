@@ -4,7 +4,7 @@ from datetime import datetime
 from flask import current_app, url_for
 
 try:
-    from pywebpush import webpush, WebPushException
+    from pywebpush import WebPushException, webpush
 except Exception:  # pragma: no cover - optional dependency at runtime
     webpush = None
     WebPushException = Exception
@@ -12,7 +12,6 @@ except Exception:  # pragma: no cover - optional dependency at runtime
 from app.extensions import db
 from app.models.push_subscription import PushSubscription
 from app.services.text_sanitize import sanitize_text
-
 
 ALERT_ICON_PATH = "/static/img/favico.png"
 
@@ -62,7 +61,9 @@ def send_alert_notification(post) -> int:
         return 0
 
     vapid_private_key = current_app.config.get("VAPID_PRIVATE_KEY")
-    vapid_subject = current_app.config.get("VAPID_SUBJECT", "mailto:soscubamap@proton.me")
+    vapid_subject = current_app.config.get(
+        "VAPID_SUBJECT", "mailto:soscubamap@proton.me"
+    )
     payload = json.dumps(_format_alert_payload(post))
 
     delivered = 0

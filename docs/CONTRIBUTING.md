@@ -49,6 +49,7 @@ pre-commit run --all-files
 
 Esto activa los checks locales de i18n antes de cada commit:
 
+- `black` e `isort` sobre archivos Python del proyecto
 - `messages.pot` actualizado si cambias strings en Python o Jinja
 - consistencia entre `translations/frontend/es.json` y los demás locales
 - separación correcta entre `requirements.txt` y `requirements-dev.txt`

@@ -10,7 +10,8 @@ import secrets
 from decimal import Decimal
 
 from flask import current_app, jsonify, request
-from flask_babel import gettext as _, lazy_gettext as _l
+from flask_babel import gettext as _
+from flask_babel import lazy_gettext as _l
 
 from app.extensions import db, limiter
 from app.models.category import Category

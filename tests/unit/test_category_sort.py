@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock
+
 from app.services.category_sort import sort_categories_for_forms
 
 

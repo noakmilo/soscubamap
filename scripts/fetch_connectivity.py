@@ -22,12 +22,14 @@ from app.services.connectivity import (
     serialize_snapshot_time,
     to_float,
 )
-from app.services.cuba_locations import PROVINCES, PROVINCE_RADAR_GEOIDS
+from app.services.cuba_locations import PROVINCE_RADAR_GEOIDS, PROVINCES
 from app.services.geo_lookup import list_provinces
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Ingesta de conectividad desde Cloudflare Radar")
+    parser = argparse.ArgumentParser(
+        description="Ingesta de conectividad desde Cloudflare Radar"
+    )
     parser.add_argument(
         "--single-call",
         action="store_true",
@@ -105,7 +107,11 @@ def _url_with_geoid(base_url, geo_id):
     if not text:
         return text
     parsed = urlparse(text)
-    query_pairs = [(key, value) for key, value in parse_qsl(parsed.query, keep_blank_values=True) if key != "geoId"]
+    query_pairs = [
+        (key, value)
+        for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+        if key != "geoId"
+    ]
     query_pairs.append(("geoId", str(geo_id)))
     query_pairs.append(("geoId", str(geo_id)))
     new_query = urlencode(query_pairs, doseq=True)
@@ -260,15 +266,23 @@ def _upsert_snapshot(run, best_payloads_by_province):
     if not province_rows:
         return None, "No se encontraron datapoints en ninguna provincia"
 
-    scores = [row["score"] for row in province_rows.values() if row.get("score") is not None]
+    scores = [
+        row["score"] for row in province_rows.values() if row.get("score") is not None
+    ]
     traffic_values = [
-        row["traffic_value"] for row in province_rows.values() if row.get("traffic_value") is not None
+        row["traffic_value"]
+        for row in province_rows.values()
+        if row.get("traffic_value") is not None
     ]
     baseline_values = [
-        row["baseline_value"] for row in province_rows.values() if row.get("baseline_value") is not None
+        row["baseline_value"]
+        for row in province_rows.values()
+        if row.get("baseline_value") is not None
     ]
     observed_candidates = [
-        row["observed_at_utc"] for row in province_rows.values() if row.get("observed_at_utc") is not None
+        row["observed_at_utc"]
+        for row in province_rows.values()
+        if row.get("observed_at_utc") is not None
     ]
 
     if not scores or not observed_candidates:
@@ -277,15 +291,19 @@ def _upsert_snapshot(run, best_payloads_by_province):
     score = sum(scores) / len(scores)
     status = score_to_status(score)
     traffic_value = sum(traffic_values) / len(traffic_values) if traffic_values else 0.0
-    baseline_value = sum(baseline_values) / len(baseline_values) if baseline_values else traffic_value
+    baseline_value = (
+        sum(baseline_values) / len(baseline_values)
+        if baseline_values
+        else traffic_value
+    )
     observed_at = max(observed_candidates)
     partial = bool(len(province_rows) < len(provinces)) or any(
         bool(row.get("is_partial")) for row in province_rows.values()
     )
 
-    previous_snapshot = (
-        ConnectivitySnapshot.query.order_by(ConnectivitySnapshot.observed_at_utc.desc()).first()
-    )
+    previous_snapshot = ConnectivitySnapshot.query.order_by(
+        ConnectivitySnapshot.observed_at_utc.desc()
+    ).first()
     if previous_snapshot:
         previous_score = to_float(previous_snapshot.score)
         if previous_score is not None and abs(score - previous_score) < 3:
@@ -395,7 +413,9 @@ def run_ingestion(single_call=False, scheduled_for=None):
             all_errors = []
             for round_attempts in attempt_rounds:
                 for province, attempt in round_attempts.items():
-                    all_errors.append(f"{province}: {attempt.get('error') or 'respuesta invalida'}")
+                    all_errors.append(
+                        f"{province}: {attempt.get('error') or 'respuesta invalida'}"
+                    )
             run.error_message = "; ".join(all_errors)[:1200]
             run.finished_at_utc = datetime.utcnow()
             run.payload_json = json.dumps(
@@ -452,7 +472,9 @@ def run_ingestion(single_call=False, scheduled_for=None):
                 {
                     "run_id": run.id,
                     "snapshot_id": snapshot.id,
-                    "observed_at_utc": serialize_snapshot_time(snapshot.observed_at_utc),
+                    "observed_at_utc": serialize_snapshot_time(
+                        snapshot.observed_at_utc
+                    ),
                     "score": round(snapshot.score or 0, 2),
                     "status": snapshot.status,
                     "attempts": total_attempts,

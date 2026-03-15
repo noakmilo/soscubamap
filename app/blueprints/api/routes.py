@@ -1,46 +1,41 @@
-from flask import jsonify, request, make_response, session, current_app
-import math
 import json
+import math
 import os
 import secrets
 import unicodedata
-from datetime import datetime, timedelta, date
-from sqlalchemy.exc import IntegrityError
-from flask_login import current_user
+from datetime import date, datetime, timedelta
+
 import requests
+from flask import current_app, jsonify, make_response, request, session
+from flask_login import current_user
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import selectinload
 
 from app.extensions import db, limiter
-from app.services.input_safety import has_malicious_input
-from app.services.recaptcha import verify_recaptcha, recaptcha_enabled
-from app.services.text_sanitize import sanitize_text
-from app.models.comment import Comment
-from app.models.user import User
-from app.models.role import Role
-from app.models.media import Media
-from app.models.post_revision import PostRevision
-from app.models.post_edit_request import PostEditRequest
-from app.models.site_setting import SiteSetting
-from app.services.media_upload import (
-    validate_files,
-    upload_files,
-    media_json_from_post,
-    get_media_payload,
-)
+from app.models.category import Category
 from app.models.chat_message import ChatMessage
 from app.models.chat_presence import ChatPresence
-from app.models.discussion_post import DiscussionPost
-from app.models.discussion_comment import DiscussionComment
-from app.models.push_subscription import PushSubscription
-from app.models.vote_record import VoteRecord
-from app.services.vote_identity import get_voter_hash
-from app.models.connectivity_snapshot import ConnectivitySnapshot
+from app.models.comment import Comment
 from app.models.connectivity_ingestion_run import ConnectivityIngestionRun
 from app.models.connectivity_province_status import ConnectivityProvinceStatus
+from app.models.connectivity_snapshot import ConnectivitySnapshot
+from app.models.discussion_comment import DiscussionComment
+from app.models.discussion_post import DiscussionPost
+from app.models.media import Media
+from app.models.post import Post
+from app.models.post_edit_request import PostEditRequest
+from app.models.post_revision import PostRevision
 from app.models.protest_event import ProtestEvent
 from app.models.protest_ingestion_run import ProtestIngestionRun
+from app.models.push_subscription import PushSubscription
+from app.models.role import Role
+from app.models.site_setting import SiteSetting
+from app.models.user import User
+from app.models.vote_record import VoteRecord
 from app.services.connectivity import (
-    STATUS_CRITICAL,
     STATUS_COLORS,
+    STATUS_CRITICAL,
     STATUS_LABELS,
     STATUS_UNKNOWN,
     extract_series_points,
@@ -55,17 +50,25 @@ from app.services.connectivity_geo import (
     load_province_geojson,
     province_names_from_geojson,
 )
-from app.services.geo_lookup import list_provinces
 from app.services.cuba_locations import PROVINCES
+from app.services.geo_lookup import list_provinces
+from app.services.input_safety import has_malicious_input
+from app.services.media_upload import (
+    get_media_payload,
+    media_json_from_post,
+    upload_files,
+    validate_files,
+)
 from app.services.protests import (
     get_frontend_refresh_seconds as protest_frontend_refresh_seconds,
+)
+from app.services.protests import (
     get_min_confidence_to_show as protest_min_confidence_to_show,
 )
+from app.services.recaptcha import recaptcha_enabled, verify_recaptcha
+from app.services.text_sanitize import sanitize_text
+from app.services.vote_identity import get_voter_hash
 
-from app.models.post import Post
-from sqlalchemy.orm import selectinload
-from app.models.category import Category
-from sqlalchemy import func
 from . import api_bp
 
 
@@ -130,7 +133,9 @@ def _canonical_province_name(value):
 
 
 def _cf_api_token():
-    return (current_app.config.get("CF_API_TOKEN") or os.getenv("CF_API_TOKEN") or "").strip()
+    return (
+        current_app.config.get("CF_API_TOKEN") or os.getenv("CF_API_TOKEN") or ""
+    ).strip()
 
 
 def _connectivity_payload_summary(payload):
@@ -166,7 +171,9 @@ def _connectivity_payload_summary(payload):
             "mode": payload.get("mode") or "province_geoid_v1",
             "province_count": len(provinces),
             "provinces_with_data": ok_count,
-            "latest_hourly_timestamp_utc": max(latest_points) if latest_points else None,
+            "latest_hourly_timestamp_utc": (
+                max(latest_points) if latest_points else None
+            ),
             "provinces": province_summaries,
         }
 
@@ -235,7 +242,8 @@ def _compute_window_summary_from_payload(payload, hours):
     main_points = [
         item
         for item in main_points_all
-        if item.get("timestamp") is not None and (window_start is None or item.get("timestamp") >= window_start)
+        if item.get("timestamp") is not None
+        and (window_start is None or item.get("timestamp") >= window_start)
     ]
     if not main_points:
         main_points = main_points_all[-hours:]
@@ -267,7 +275,9 @@ def _compute_window_summary_from_payload(payload, hours):
         and latest_previous_value is not None
         and latest_previous_value > 0
     ):
-        delta_pct = ((latest_main_value - latest_previous_value) / latest_previous_value) * 100.0
+        delta_pct = (
+            (latest_main_value - latest_previous_value) / latest_previous_value
+        ) * 100.0
 
     peak_main_value = max(main_values) if main_values else None
     min_main_value = min(main_values) if main_values else None
@@ -280,7 +290,9 @@ def _compute_window_summary_from_payload(payload, hours):
         and min_main_value is not None
         and peak_main_value > 0
     ):
-        max_drop_from_peak_pct = ((peak_main_value - min_main_value) / peak_main_value) * 100.0
+        max_drop_from_peak_pct = (
+            (peak_main_value - min_main_value) / peak_main_value
+        ) * 100.0
 
     score_latest_pct = None
     score_avg_pct = None
@@ -310,14 +322,20 @@ def _compute_window_summary_from_payload(payload, hours):
         weighted_parts.append((score_worst_pct, 0.15))
     if weighted_parts:
         total_weight = sum(weight for _, weight in weighted_parts)
-        score_window_pct = sum(value * weight for value, weight in weighted_parts) / total_weight
+        score_window_pct = (
+            sum(value * weight for value, weight in weighted_parts) / total_weight
+        )
         score_window_pct = max(0.0, min(score_window_pct, 100.0))
 
     return {
         "available": bool(main_points),
         "window_hours": hours,
         "score_method": score_method,
-        "latest_timestamp_utc": serialize_snapshot_time(main_points[-1].get("timestamp")) if main_points else None,
+        "latest_timestamp_utc": (
+            serialize_snapshot_time(main_points[-1].get("timestamp"))
+            if main_points
+            else None
+        ),
         "latest_main_value": latest_main_value,
         "latest_previous_value": latest_previous_value,
         "delta_pct": delta_pct,
@@ -330,11 +348,15 @@ def _compute_window_summary_from_payload(payload, hours):
         "score_worst_pct": score_worst_pct,
         "score_window_pct": score_window_pct,
         "series_main": [
-            point for point in (_serialize_timeseries_point(item) for item in main_points) if point
+            point
+            for point in (_serialize_timeseries_point(item) for item in main_points)
+            if point
         ],
         "series_previous_aligned": [
             point
-            for point in (_serialize_timeseries_point(item) for item in previous_aligned)
+            for point in (
+                _serialize_timeseries_point(item) for item in previous_aligned
+            )
             if point
         ],
     }
@@ -463,9 +485,7 @@ def _build_http_requests_window_summary(window_hours=24):
             else None
         )
         score_avg_pct = (
-            max(0.0, min(score_avg_pct, 100.0))
-            if score_avg_pct is not None
-            else None
+            max(0.0, min(score_avg_pct, 100.0)) if score_avg_pct is not None else None
         )
         score_worst_pct = (
             max(0.0, min(score_worst_pct, 100.0))
@@ -542,8 +562,12 @@ def _build_http_requests_24h_summary():
 
 
 def _cloudflare_probe():
-    api_url = (current_app.config.get("CLOUDFLARE_RADAR_HTTP_TIMESERIES_URL") or "").strip()
-    timeout_seconds = int(current_app.config.get("CONNECTIVITY_FETCH_TIMEOUT_SECONDS", 30))
+    api_url = (
+        current_app.config.get("CLOUDFLARE_RADAR_HTTP_TIMESERIES_URL") or ""
+    ).strip()
+    timeout_seconds = int(
+        current_app.config.get("CONNECTIVITY_FETCH_TIMEOUT_SECONDS", 30)
+    )
     token = _cf_api_token()
 
     result = {
@@ -613,7 +637,9 @@ def _remove_vote(record, value):
 def _get_verified_post_ids(post_ids):
     if not post_ids:
         return set()
-    voter_hash = get_voter_hash(current_user, request, current_app.config.get("SECRET_KEY", ""))
+    voter_hash = get_voter_hash(
+        current_user, request, current_app.config.get("SECRET_KEY", "")
+    )
     if not voter_hash:
         return set()
     rows = (
@@ -729,7 +755,11 @@ def _safe_keywords_json(raw_json):
 def _build_protest_feature(row):
     if row.latitude is None or row.longitude is None:
         return None
-    published_at_utc = row.source_published_at_utc.isoformat() + "Z" if row.source_published_at_utc else None
+    published_at_utc = (
+        row.source_published_at_utc.isoformat() + "Z"
+        if row.source_published_at_utc
+        else None
+    )
     confidence = to_float(row.confidence_score)
     return {
         "type": "Feature",
@@ -780,7 +810,9 @@ def connectivity_latest():
 
     snapshot = (
         ConnectivitySnapshot.query.options(selectinload(ConnectivitySnapshot.provinces))
-        .order_by(ConnectivitySnapshot.observed_at_utc.desc(), ConnectivitySnapshot.id.desc())
+        .order_by(
+            ConnectivitySnapshot.observed_at_utc.desc(), ConnectivitySnapshot.id.desc()
+        )
         .first()
     )
     window_snapshots = (
@@ -789,7 +821,9 @@ def connectivity_latest():
             ConnectivitySnapshot.observed_at_utc >= window_start,
             ConnectivitySnapshot.observed_at_utc <= now,
         )
-        .order_by(ConnectivitySnapshot.observed_at_utc.asc(), ConnectivitySnapshot.id.asc())
+        .order_by(
+            ConnectivitySnapshot.observed_at_utc.asc(), ConnectivitySnapshot.id.asc()
+        )
         .all()
     )
 
@@ -821,7 +855,10 @@ def connectivity_latest():
     }
 
     if snapshot:
-        stale = not snapshot.fetched_at_utc or (now - snapshot.fetched_at_utc) > stale_threshold
+        stale = (
+            not snapshot.fetched_at_utc
+            or (now - snapshot.fetched_at_utc) > stale_threshold
+        )
         snapshot_payload = {
             "id": snapshot.id,
             "observed_at_utc": serialize_snapshot_time(snapshot.observed_at_utc),
@@ -857,12 +894,11 @@ def connectivity_latest():
         else []
     )
     window_latest_utc = (
-        (window_series_main[-1].get("timestamp_utc") if window_series_main else None)
-        or (
-            http_requests_window.get("latest_timestamp_utc")
-            if isinstance(http_requests_window, dict)
-            else None
-        )
+        window_series_main[-1].get("timestamp_utc") if window_series_main else None
+    ) or (
+        http_requests_window.get("latest_timestamp_utc")
+        if isinstance(http_requests_window, dict)
+        else None
     )
     window_start_utc = (
         window_series_main[0].get("timestamp_utc")
@@ -888,13 +924,21 @@ def connectivity_latest():
                 "province": province,
                 "score": province_score,
                 "status": status_key,
-                "status_label": STATUS_LABELS.get(status_key, STATUS_LABELS[STATUS_UNKNOWN]),
-                "status_color": STATUS_COLORS.get(status_key, STATUS_COLORS[STATUS_UNKNOWN]),
+                "status_label": STATUS_LABELS.get(
+                    status_key, STATUS_LABELS[STATUS_UNKNOWN]
+                ),
+                "status_color": STATUS_COLORS.get(
+                    status_key, STATUS_COLORS[STATUS_UNKNOWN]
+                ),
                 "confidence": "province_level_radar_estimated",
                 "is_estimated": False,
             }
 
-        national_score = window_score if window_score is not None else _average_numeric(province_scores)
+        national_score = (
+            window_score
+            if window_score is not None
+            else _average_numeric(province_scores)
+        )
         national_status = score_to_status(national_score)
         national_confidence = "province_level_radar_aggregate"
         partial = province_available_count < len(window_by_province)
@@ -949,8 +993,12 @@ def connectivity_latest():
                 "province": province,
                 "score": province_score,
                 "status": status_key,
-                "status_label": STATUS_LABELS.get(status_key, STATUS_LABELS[STATUS_UNKNOWN]),
-                "status_color": STATUS_COLORS.get(status_key, STATUS_COLORS[STATUS_UNKNOWN]),
+                "status_label": STATUS_LABELS.get(
+                    status_key, STATUS_LABELS[STATUS_UNKNOWN]
+                ),
+                "status_color": STATUS_COLORS.get(
+                    status_key, STATUS_COLORS[STATUS_UNKNOWN]
+                ),
                 "confidence": "window_worst_estimated_country_level",
                 "is_estimated": True,
             }
@@ -1008,8 +1056,12 @@ def connectivity_latest():
                 "province": row.province,
                 "score": row.score,
                 "status": status_key,
-                "status_label": STATUS_LABELS.get(status_key, STATUS_LABELS[STATUS_UNKNOWN]),
-                "status_color": STATUS_COLORS.get(status_key, STATUS_COLORS[STATUS_UNKNOWN]),
+                "status_label": STATUS_LABELS.get(
+                    status_key, STATUS_LABELS[STATUS_UNKNOWN]
+                ),
+                "status_color": STATUS_COLORS.get(
+                    status_key, STATUS_COLORS[STATUS_UNKNOWN]
+                ),
                 "confidence": row.confidence or "estimated_country_level",
                 "is_estimated": True,
             }
@@ -1023,7 +1075,9 @@ def connectivity_latest():
                 "national_status_label": STATUS_LABELS.get(
                     national_status, STATUS_LABELS[STATUS_UNKNOWN]
                 ),
-                "latest_observed_at_utc": serialize_snapshot_time(snapshot.observed_at_utc),
+                "latest_observed_at_utc": serialize_snapshot_time(
+                    snapshot.observed_at_utc
+                ),
                 "start_utc": serialize_snapshot_time(window_start),
                 "end_utc": serialize_snapshot_time(now),
             }
@@ -1033,13 +1087,19 @@ def connectivity_latest():
     for province in sorted(province_names):
         state = status_by_province.get(province)
         if not state:
-            status_key = national_status if national_score is not None else STATUS_UNKNOWN
+            status_key = (
+                national_status if national_score is not None else STATUS_UNKNOWN
+            )
             state = {
                 "province": province,
                 "score": national_score,
                 "status": status_key,
-                "status_label": STATUS_LABELS.get(status_key, STATUS_LABELS[STATUS_UNKNOWN]),
-                "status_color": STATUS_COLORS.get(status_key, STATUS_COLORS[STATUS_UNKNOWN]),
+                "status_label": STATUS_LABELS.get(
+                    status_key, STATUS_LABELS[STATUS_UNKNOWN]
+                ),
+                "status_color": STATUS_COLORS.get(
+                    status_key, STATUS_COLORS[STATUS_UNKNOWN]
+                ),
                 "confidence": national_confidence,
                 "is_estimated": True,
             }
@@ -1070,7 +1130,9 @@ def connectivity_latest():
                 "url": "https://radar.cloudflare.com/",
                 "label": "Hecho con tecnologia de Cloudflare Radar",
             },
-            "refresh_seconds": int(current_app.config.get("CONNECTIVITY_FRONTEND_REFRESH_SECONDS", 300)),
+            "refresh_seconds": int(
+                current_app.config.get("CONNECTIVITY_FRONTEND_REFRESH_SECONDS", 300)
+            ),
         }
     )
 
@@ -1088,7 +1150,9 @@ def connectivity_debug():
 
     snapshot = (
         ConnectivitySnapshot.query.options(selectinload(ConnectivitySnapshot.provinces))
-        .order_by(ConnectivitySnapshot.observed_at_utc.desc(), ConnectivitySnapshot.id.desc())
+        .order_by(
+            ConnectivitySnapshot.observed_at_utc.desc(), ConnectivitySnapshot.id.desc()
+        )
         .first()
     )
     latest_runs = (
@@ -1108,7 +1172,10 @@ def connectivity_debug():
     snapshot_stale = True
     province_rows = []
     if snapshot:
-        snapshot_stale = not snapshot.fetched_at_utc or (now - snapshot.fetched_at_utc) > stale_threshold
+        snapshot_stale = (
+            not snapshot.fetched_at_utc
+            or (now - snapshot.fetched_at_utc) > stale_threshold
+        )
         province_rows = list(snapshot.provinces or [])
         snapshot_payload = {
             "id": snapshot.id,
@@ -1160,8 +1227,12 @@ def connectivity_debug():
             "api_url": current_app.config.get("CLOUDFLARE_RADAR_HTTP_TIMESERIES_URL"),
             "cf_api_token_configured": bool(_cf_api_token()),
             "cf_api_token_preview": _mask_secret(_cf_api_token()),
-            "connectivity_fetch_delay_seconds": int(current_app.config.get("CONNECTIVITY_FETCH_DELAY_SECONDS", 120)),
-            "connectivity_fetch_timeout_seconds": int(current_app.config.get("CONNECTIVITY_FETCH_TIMEOUT_SECONDS", 30)),
+            "connectivity_fetch_delay_seconds": int(
+                current_app.config.get("CONNECTIVITY_FETCH_DELAY_SECONDS", 120)
+            ),
+            "connectivity_fetch_timeout_seconds": int(
+                current_app.config.get("CONNECTIVITY_FETCH_TIMEOUT_SECONDS", 30)
+            ),
             "connectivity_stale_after_hours": stale_after_hours,
             "connectivity_frontend_refresh_seconds": int(
                 current_app.config.get("CONNECTIVITY_FRONTEND_REFRESH_SECONDS", 300)
@@ -1175,7 +1246,9 @@ def connectivity_debug():
         },
         "window_probe": {
             "hours": debug_window_hours,
-            "http_requests_window": _build_http_requests_window_summary(debug_window_hours),
+            "http_requests_window": _build_http_requests_window_summary(
+                debug_window_hours
+            ),
         },
         "snapshot": snapshot_payload,
         "ingestion_runs": runs_payload,
@@ -1185,18 +1258,28 @@ def connectivity_debug():
             "status_geometry_overlap_count": len(province_status_names & geojson_names),
             "likely_reasons_if_not_drawn": [
                 "No existe snapshot en BD" if not snapshot else None,
-                "Snapshot existe pero esta stale (sin datos recientes)" if snapshot_stale else None,
-                "GeoJSON provincial vacio o ruta incorrecta"
-                if not (geojson.get("features") or [])
-                else None,
-                "Nombres de provincias no coinciden entre BD y GeoJSON"
-                if province_rows and not (province_status_names & geojson_names)
-                else None,
+                (
+                    "Snapshot existe pero esta stale (sin datos recientes)"
+                    if snapshot_stale
+                    else None
+                ),
+                (
+                    "GeoJSON provincial vacio o ruta incorrecta"
+                    if not (geojson.get("features") or [])
+                    else None
+                ),
+                (
+                    "Nombres de provincias no coinciden entre BD y GeoJSON"
+                    if province_rows and not (province_status_names & geojson_names)
+                    else None
+                ),
             ],
         },
     }
     diagnostics["consistency"]["likely_reasons_if_not_drawn"] = [
-        item for item in diagnostics["consistency"]["likely_reasons_if_not_drawn"] if item
+        item
+        for item in diagnostics["consistency"]["likely_reasons_if_not_drawn"]
+        if item
     ]
 
     if _truthy_param(request.args.get("probe")):
@@ -1220,11 +1303,17 @@ def protests_geojson():
     min_conf_raw = (request.args.get("min_confidence") or "").strip()
     min_conf_default = protest_min_confidence_to_show()
     try:
-        min_confidence = max(0.0, min(100.0, float(min_conf_raw))) if min_conf_raw else min_conf_default
+        min_confidence = (
+            max(0.0, min(100.0, float(min_conf_raw)))
+            if min_conf_raw
+            else min_conf_default
+        )
     except Exception:
         min_confidence = min_conf_default
 
-    include_hidden = _is_admin_user() and _truthy_param(request.args.get("include_hidden"))
+    include_hidden = _is_admin_user() and _truthy_param(
+        request.args.get("include_hidden")
+    )
 
     base_query = ProtestEvent.query
     if not include_hidden:
@@ -1238,13 +1327,19 @@ def protests_geojson():
     if province:
         base_query = base_query.filter(ProtestEvent.matched_province == province)
     if municipality:
-        base_query = base_query.filter(ProtestEvent.matched_municipality == municipality)
+        base_query = base_query.filter(
+            ProtestEvent.matched_municipality == municipality
+        )
     if source_name:
         base_query = base_query.filter(ProtestEvent.source_name == source_name)
 
-    timeline_start_day = db.session.query(func.min(ProtestEvent.published_day_utc)).scalar()
+    timeline_start_day = db.session.query(
+        func.min(ProtestEvent.published_day_utc)
+    ).scalar()
     if timeline_start_day is None:
-        first_run_started = db.session.query(func.min(ProtestIngestionRun.started_at_utc)).scalar()
+        first_run_started = db.session.query(
+            func.min(ProtestIngestionRun.started_at_utc)
+        ).scalar()
         if first_run_started:
             timeline_start_day = first_run_started.date()
     timeline_end_day = today_utc
@@ -1270,7 +1365,9 @@ def protests_geojson():
         )
 
     rows = (
-        scoped_query.order_by(ProtestEvent.source_published_at_utc.asc(), ProtestEvent.id.asc())
+        scoped_query.order_by(
+            ProtestEvent.source_published_at_utc.asc(), ProtestEvent.id.asc()
+        )
         .limit(5000)
         .all()
     )
@@ -1341,8 +1438,16 @@ def protests_geojson():
         "latest_ingestion": {
             "id": latest_run.id if latest_run else None,
             "status": latest_run.status if latest_run else None,
-            "started_at_utc": serialize_snapshot_time(latest_run.started_at_utc) if latest_run else None,
-            "finished_at_utc": serialize_snapshot_time(latest_run.finished_at_utc) if latest_run else None,
+            "started_at_utc": (
+                serialize_snapshot_time(latest_run.started_at_utc)
+                if latest_run
+                else None
+            ),
+            "finished_at_utc": (
+                serialize_snapshot_time(latest_run.finished_at_utc)
+                if latest_run
+                else None
+            ),
         },
     }
     return jsonify(payload)
@@ -1422,7 +1527,9 @@ def protests_debug():
             "config": {
                 "protest_rss_feeds": [
                     item.strip()
-                    for item in str(current_app.config.get("PROTEST_RSS_FEEDS", "") or "").split(",")
+                    for item in str(
+                        current_app.config.get("PROTEST_RSS_FEEDS", "") or ""
+                    ).split(",")
                     if item.strip()
                 ],
                 "protest_fetch_timeout_seconds": int(
@@ -1433,9 +1540,15 @@ def protests_debug():
                 "protest_require_source_url": bool(
                     current_app.config.get("PROTEST_REQUIRE_SOURCE_URL", True)
                 ),
-                "geojson_provinces_path": current_app.config.get("GEOJSON_PROVINCES_PATH"),
-                "geojson_municipalities_path": current_app.config.get("GEOJSON_MUNICIPALITIES_PATH"),
-                "geojson_localities_path": current_app.config.get("GEOJSON_LOCALITIES_PATH"),
+                "geojson_provinces_path": current_app.config.get(
+                    "GEOJSON_PROVINCES_PATH"
+                ),
+                "geojson_municipalities_path": current_app.config.get(
+                    "GEOJSON_MUNICIPALITIES_PATH"
+                ),
+                "geojson_localities_path": current_app.config.get(
+                    "GEOJSON_LOCALITIES_PATH"
+                ),
             },
             "counts": {
                 "total_events": int(total_events),
@@ -1545,7 +1658,11 @@ def posts():
                 "repressor_name": p.repressor_name,
                 "other_type": p.other_type,
                 "created_at": p.created_at.isoformat(),
-                "anon": f"Anon-{p.author.anon_code}" if p.author and p.author.anon_code else "Anon",
+                "anon": (
+                    f"Anon-{p.author.anon_code}"
+                    if p.author and p.author.anon_code
+                    else "Anon"
+                ),
                 "polygon_geojson": p.polygon_geojson,
                 "links": json.loads(p.links_json) if p.links_json else [],
                 "media": get_media_payload(p)[:4],
@@ -1582,14 +1699,20 @@ def _serialize_post(post: Post):
         "verify_count": post.verify_count or 0,
         "created_at": post.created_at.isoformat() if post.created_at else None,
         "updated_at": post.updated_at.isoformat() if post.updated_at else None,
-        "anon": f"Anon-{post.author.anon_code}" if post.author and post.author.anon_code else "Anon",
-        "category": {
-            "id": post.category.id,
-            "name": post.category.name,
-            "slug": post.category.slug,
-        }
-        if post.category
-        else None,
+        "anon": (
+            f"Anon-{post.author.anon_code}"
+            if post.author and post.author.anon_code
+            else "Anon"
+        ),
+        "category": (
+            {
+                "id": post.category.id,
+                "name": post.category.name,
+                "slug": post.category.slug,
+            }
+            if post.category
+            else None
+        ),
     }
 
 
@@ -1688,17 +1811,21 @@ def _build_connectivity_outage_events(start_dt, end_dt, province=""):
     selected_province = (province or "").strip() or None
 
     if selected_province:
-        base_query = db.session.query(
-            ConnectivitySnapshot.id.label("snapshot_id"),
-            ConnectivitySnapshot.observed_at_utc.label("observed_at_utc"),
-            ConnectivityProvinceStatus.status.label("status"),
-            ConnectivityProvinceStatus.score.label("score"),
-            ConnectivityProvinceStatus.province.label("province"),
-        ).join(
-            ConnectivityProvinceStatus,
-            ConnectivityProvinceStatus.snapshot_id == ConnectivitySnapshot.id,
-        ).filter(
-            ConnectivityProvinceStatus.province == selected_province,
+        base_query = (
+            db.session.query(
+                ConnectivitySnapshot.id.label("snapshot_id"),
+                ConnectivitySnapshot.observed_at_utc.label("observed_at_utc"),
+                ConnectivityProvinceStatus.status.label("status"),
+                ConnectivityProvinceStatus.score.label("score"),
+                ConnectivityProvinceStatus.province.label("province"),
+            )
+            .join(
+                ConnectivityProvinceStatus,
+                ConnectivityProvinceStatus.snapshot_id == ConnectivitySnapshot.id,
+            )
+            .filter(
+                ConnectivityProvinceStatus.province == selected_province,
+            )
         )
     else:
         base_query = db.session.query(
@@ -1710,7 +1837,9 @@ def _build_connectivity_outage_events(start_dt, end_dt, province=""):
 
     previous_point = (
         base_query.filter(ConnectivitySnapshot.observed_at_utc < start_dt)
-        .order_by(ConnectivitySnapshot.observed_at_utc.desc(), ConnectivitySnapshot.id.desc())
+        .order_by(
+            ConnectivitySnapshot.observed_at_utc.desc(), ConnectivitySnapshot.id.desc()
+        )
         .first()
     )
     points_in_range = (
@@ -1718,7 +1847,9 @@ def _build_connectivity_outage_events(start_dt, end_dt, province=""):
             ConnectivitySnapshot.observed_at_utc >= start_dt,
             ConnectivitySnapshot.observed_at_utc <= end_dt,
         )
-        .order_by(ConnectivitySnapshot.observed_at_utc.asc(), ConnectivitySnapshot.id.asc())
+        .order_by(
+            ConnectivitySnapshot.observed_at_utc.asc(), ConnectivitySnapshot.id.asc()
+        )
         .all()
     )
 
@@ -1763,7 +1894,9 @@ def _build_connectivity_outage_events(start_dt, end_dt, province=""):
             end_raw = getattr(point, "observed_at_utc", None)
             duration_minutes = None
             if start_raw and end_raw:
-                duration_minutes = max(int((end_raw - start_raw).total_seconds() // 60), 0)
+                duration_minutes = max(
+                    int((end_raw - start_raw).total_seconds() // 60), 0
+                )
 
             open_event.update(
                 {
@@ -1838,15 +1971,16 @@ def analytics_v1():
     )
     if category_id:
         try:
-            reports_over_time = reports_over_time.filter(Post.category_id == int(category_id))
+            reports_over_time = reports_over_time.filter(
+                Post.category_id == int(category_id)
+            )
         except ValueError:
             pass
     if province:
         reports_over_time = reports_over_time.filter(Post.province == province)
 
     reports_series = [
-        {"date": row[0].isoformat(), "count": row[1]}
-        for row in reports_over_time.all()
+        {"date": row[0].isoformat(), "count": row[1]} for row in reports_over_time.all()
     ]
 
     category_distribution = (
@@ -1862,7 +1996,9 @@ def analytics_v1():
     )
     if category_id:
         try:
-            category_distribution = category_distribution.filter(Post.category_id == int(category_id))
+            category_distribution = category_distribution.filter(
+                Post.category_id == int(category_id)
+            )
         except ValueError:
             pass
     if province:
@@ -1887,14 +2023,17 @@ def analytics_v1():
     )
     if category_id:
         try:
-            province_distribution = province_distribution.filter(Post.category_id == int(category_id))
+            province_distribution = province_distribution.filter(
+                Post.category_id == int(category_id)
+            )
         except ValueError:
             pass
     if province:
         province_distribution = province_distribution.filter(Post.province == province)
 
     province_items = [
-        {"name": row[0], "count": row[1]} for row in province_distribution.limit(10).all()
+        {"name": row[0], "count": row[1]}
+        for row in province_distribution.limit(10).all()
     ]
 
     municipality_distribution = (
@@ -1911,14 +2050,19 @@ def analytics_v1():
     )
     if category_id:
         try:
-            municipality_distribution = municipality_distribution.filter(Post.category_id == int(category_id))
+            municipality_distribution = municipality_distribution.filter(
+                Post.category_id == int(category_id)
+            )
         except ValueError:
             pass
     if province:
-        municipality_distribution = municipality_distribution.filter(Post.province == province)
+        municipality_distribution = municipality_distribution.filter(
+            Post.province == province
+        )
 
     municipality_items = [
-        {"name": row[0], "count": row[1]} for row in municipality_distribution.limit(10).all()
+        {"name": row[0], "count": row[1]}
+        for row in municipality_distribution.limit(10).all()
     ]
 
     moderation_status = (
@@ -1985,12 +2129,16 @@ def analytics_v1():
 
     edit_status_query = (
         db.session.query(PostEditRequest.status, func.count(PostEditRequest.id))
-        .filter(PostEditRequest.created_at >= start_dt, PostEditRequest.created_at <= end_dt)
+        .filter(
+            PostEditRequest.created_at >= start_dt, PostEditRequest.created_at <= end_dt
+        )
         .group_by(PostEditRequest.status)
         .all()
     )
     edit_status_map = {status: count for status, count in edit_status_query}
-    connectivity_outages = _build_connectivity_outage_events(start_dt, end_dt, province=province)
+    connectivity_outages = _build_connectivity_outage_events(
+        start_dt, end_dt, province=province
+    )
     connectivity_24h = _build_http_requests_24h_summary()
 
     return jsonify(
@@ -2045,7 +2193,9 @@ def _get_or_create_anon_user():
 def verify_post(post_id):
     post = Post.query.get_or_404(post_id)
     cookie_key = f"verified_{post_id}"
-    voter_hash = get_voter_hash(current_user, request, current_app.config.get("SECRET_KEY", ""))
+    voter_hash = get_voter_hash(
+        current_user, request, current_app.config.get("SECRET_KEY", "")
+    )
 
     existing = VoteRecord.query.filter_by(
         target_type="post_verify",
@@ -2084,7 +2234,10 @@ def comments(post_id):
         if recaptcha_enabled():
             token = (data.get("recaptcha") or "").strip()
             if not verify_recaptcha(token, request.remote_addr):
-                return jsonify({"ok": False, "error": "Verificación reCAPTCHA falló."}), 400
+                return (
+                    jsonify({"ok": False, "error": "Verificación reCAPTCHA falló."}),
+                    400,
+                )
         if has_malicious_input([body]):
             return jsonify({"ok": False, "error": "Contenido sospechoso."}), 400
         if not body:
@@ -2092,7 +2245,9 @@ def comments(post_id):
 
         user = _get_or_create_anon_user()
         label = f"Anon-{user.anon_code}" if user and user.anon_code else "Anon"
-        comment = Comment(post_id=post.id, author_id=user.id, author_label=label, body=body)
+        comment = Comment(
+            post_id=post.id, author_id=user.id, author_label=label, body=body
+        )
         db.session.add(comment)
         db.session.commit()
 
@@ -2126,7 +2281,9 @@ def vote_comment(comment_id):
     if value not in (1, -1):
         return jsonify({"ok": False, "error": "Voto inválido."}), 400
 
-    voter_hash = get_voter_hash(current_user, request, current_app.config.get("SECRET_KEY", ""))
+    voter_hash = get_voter_hash(
+        current_user, request, current_app.config.get("SECRET_KEY", "")
+    )
     existing = VoteRecord.query.filter_by(
         target_type="comment",
         target_id=comment.id,
@@ -2202,7 +2359,9 @@ def vote_discussion_post(post_id):
     if value not in (1, -1):
         return jsonify({"ok": False, "error": "Voto inválido."}), 400
 
-    voter_hash = get_voter_hash(current_user, request, current_app.config.get("SECRET_KEY", ""))
+    voter_hash = get_voter_hash(
+        current_user, request, current_app.config.get("SECRET_KEY", "")
+    )
     existing = VoteRecord.query.filter_by(
         target_type="discussion_post",
         target_id=post.id,
@@ -2253,7 +2412,9 @@ def vote_discussion_comment(comment_id):
     if value not in (1, -1):
         return jsonify({"ok": False, "error": "Voto inválido."}), 400
 
-    voter_hash = get_voter_hash(current_user, request, current_app.config.get("SECRET_KEY", ""))
+    voter_hash = get_voter_hash(
+        current_user, request, current_app.config.get("SECRET_KEY", "")
+    )
     existing = VoteRecord.query.filter_by(
         target_type="discussion_comment",
         target_id=comment.id,
@@ -2335,7 +2496,11 @@ def upload_post_media(post_id):
         edit = PostEditRequest(
             post_id=post.id,
             editor_id=current_user.id if current_user.is_authenticated else None,
-            editor_label=f"Anon-{current_user.anon_code}" if current_user.is_authenticated and current_user.anon_code else "Anon",
+            editor_label=(
+                f"Anon-{current_user.anon_code}"
+                if current_user.is_authenticated and current_user.anon_code
+                else "Anon"
+            ),
             reason="Imagen añadida",
             title=post.title,
             description=post.description,
@@ -2358,7 +2523,11 @@ def upload_post_media(post_id):
     revision = PostRevision(
         post_id=post.id,
         editor_id=current_user.id if current_user.is_authenticated else None,
-        editor_label=f"Anon-{current_user.anon_code}" if current_user.is_authenticated and current_user.anon_code else "Anon",
+        editor_label=(
+            f"Anon-{current_user.anon_code}"
+            if current_user.is_authenticated and current_user.anon_code
+            else "Anon"
+        ),
         reason="Imagen añadida",
         title=post.title,
         description=post.description,
@@ -2427,7 +2596,9 @@ def chat_messages():
 
         presence = ChatPresence.query.filter_by(session_id=session_id).first()
         if not presence:
-            presence = ChatPresence(session_id=session_id, nickname=nickname, last_seen=now)
+            presence = ChatPresence(
+                session_id=session_id, nickname=nickname, last_seen=now
+            )
             db.session.add(presence)
         else:
             presence.nickname = nickname
@@ -2441,7 +2612,9 @@ def chat_messages():
         nickname = _get_chat_nick()
         presence = ChatPresence.query.filter_by(session_id=session_id).first()
         if not presence:
-            presence = ChatPresence(session_id=session_id, nickname=nickname, last_seen=now)
+            presence = ChatPresence(
+                session_id=session_id, nickname=nickname, last_seen=now
+            )
             db.session.add(presence)
         else:
             presence.last_seen = now

@@ -1,6 +1,5 @@
 from app.services.settings import get_setting, set_setting
 
-
 MAP_PROVIDER_LEAFLET = "leaflet"
 MAP_PROVIDER_GOOGLE = "google"
 ALLOWED_MAP_PROVIDERS = {MAP_PROVIDER_LEAFLET, MAP_PROVIDER_GOOGLE}

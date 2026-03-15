@@ -1,5 +1,6 @@
 import pytest
-from app.services.input_safety import is_malicious, has_malicious_input
+
+from app.services.input_safety import has_malicious_input, is_malicious
 
 
 class TestIsMalicious:
@@ -16,7 +17,7 @@ class TestIsMalicious:
         assert is_malicious("javascript:alert(1)") is True
 
     def test_inline_handler(self):
-        assert is_malicious('onerror=alert(1)') is True
+        assert is_malicious("onerror=alert(1)") is True
 
     def test_union_select(self):
         assert is_malicious("1 UNION SELECT * FROM users") is True

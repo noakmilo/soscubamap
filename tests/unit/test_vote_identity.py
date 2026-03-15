@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock
+
 from app.services.vote_identity import get_voter_hash
 
 

@@ -1,6 +1,5 @@
-import markdown as md
 import bleach
-
+import markdown as md
 
 ALLOWED_TAGS = [
     "p",

@@ -4,7 +4,6 @@ import math
 import statistics
 from datetime import datetime, timezone
 
-
 STATUS_NORMAL = "normal"
 STATUS_DEGRADED = "degraded"
 STATUS_SEVERE = "severe"

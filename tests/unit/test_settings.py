@@ -1,4 +1,5 @@
 import pytest
+
 from app.services.settings import get_setting, set_setting
 
 

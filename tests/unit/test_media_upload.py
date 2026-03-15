@@ -1,14 +1,16 @@
 import io
 import json
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from app.services.media_upload import (
-    parse_media_json,
     get_media_payload,
     get_media_urls,
     media_json_from_post,
-    validate_files,
+    parse_media_json,
     upload_files,
+    validate_files,
 )
 
 

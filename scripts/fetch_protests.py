@@ -225,8 +225,12 @@ def run_ingestion(feeds):
             run.hidden_items = hidden_items
             run.payload_json = json.dumps(summary, ensure_ascii=False)
             run.finished_at_utc = utcnow_naive()
-            run.status = "failed" if len(summary["errors"]) == len(feed_urls) else "success"
-            run.error_message = "; ".join(summary["errors"])[:1200] if summary["errors"] else None
+            run.status = (
+                "failed" if len(summary["errors"]) == len(feed_urls) else "success"
+            )
+            run.error_message = (
+                "; ".join(summary["errors"])[:1200] if summary["errors"] else None
+            )
 
             db.session.commit()
             print(

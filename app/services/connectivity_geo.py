@@ -211,7 +211,11 @@ def load_province_geojson():
         _CACHE["geojson"] = _load_geojson_from_disk(path, keys)
         _CACHE["signature"] = signature
 
-    return copy.deepcopy(_CACHE["geojson"]) if _CACHE["geojson"] else {"type": "FeatureCollection", "features": []}
+    return (
+        copy.deepcopy(_CACHE["geojson"])
+        if _CACHE["geojson"]
+        else {"type": "FeatureCollection", "features": []}
+    )
 
 
 def province_names_from_geojson(geojson):

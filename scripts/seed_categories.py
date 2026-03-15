@@ -2,9 +2,12 @@ from app import create_app
 from app.extensions import db
 from app.models.category import Category
 
-
 DEFAULT_CATEGORIES = [
-    ("Accion represiva del gobierno", "accion-represiva", "Operativos, detenciones y violencia estatal."),
+    (
+        "Accion represiva del gobierno",
+        "accion-represiva",
+        "Operativos, detenciones y violencia estatal.",
+    ),
     (
         "Movimiento de tropas",
         "movimiento-tropas",
@@ -15,20 +18,48 @@ DEFAULT_CATEGORIES = [
         "desconexion-internet",
         "Desconexiones de internet en vivo. Indica fecha, hora, duración y zonas afectadas.",
     ),
-    ("Residencia de represor", "residencia-represor", "Direcciones o zonas asociadas a represores."),
-    ("Centro Penitenciario", "centro-penitenciario", "Carceles y centros de detencion."),
+    (
+        "Residencia de represor",
+        "residencia-represor",
+        "Direcciones o zonas asociadas a represores.",
+    ),
+    (
+        "Centro Penitenciario",
+        "centro-penitenciario",
+        "Carceles y centros de detencion.",
+    ),
     ("Estacion de Policia", "estacion-policia", "Unidades policiales y puestos."),
-    ("Escuela del Partido Comunista", "escuela-pcc", "Instituciones de formacion del PCC."),
-    ("Sede del Partido Comunista", "sede-pcc", "Sedes provinciales o municipales del PCC."),
-    ("Sede del Gobierno", "sede-gobierno", "Sedes provinciales o municipales del Gobierno."),
+    (
+        "Escuela del Partido Comunista",
+        "escuela-pcc",
+        "Instituciones de formacion del PCC.",
+    ),
+    (
+        "Sede del Partido Comunista",
+        "sede-pcc",
+        "Sedes provinciales o municipales del PCC.",
+    ),
+    (
+        "Sede del Gobierno",
+        "sede-gobierno",
+        "Sedes provinciales o municipales del Gobierno.",
+    ),
     (
         "Sede de la Unión de Jóvenes Comunistas",
         "sede-ujc",
         "Sedes provinciales o municipales de la UJC.",
     ),
-    ("Sede de la Seguridad del Estado", "sede-seguridad-estado", "Instalaciones de la Seguridad del Estado."),
+    (
+        "Sede de la Seguridad del Estado",
+        "sede-seguridad-estado",
+        "Instalaciones de la Seguridad del Estado.",
+    ),
     ("Unidad militar", "unidad-militar", "Bases y unidades militares."),
-    ("Base de espionaje", "base-espionaje", "Infraestructura de inteligencia o espionaje."),
+    (
+        "Base de espionaje",
+        "base-espionaje",
+        "Infraestructura de inteligencia o espionaje.",
+    ),
     ("Otros", "otros", "Reportes generales o difíciles de clasificar."),
 ]
 

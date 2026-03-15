@@ -1,16 +1,19 @@
 import json
-from flask import render_template, redirect, url_for, flash, request
+
+from flask import flash, redirect, render_template, request, url_for
+from flask_babel import gettext as _
+from flask_babel import lazy_gettext as _l
 from flask_login import login_required
 
 from app.extensions import db
-from app.models.post import Post
 from app.models.category import Category
-from app.models.post_revision import PostRevision
-from app.models.post_edit_request import PostEditRequest
 from app.models.media import Media
-from app.services.media_upload import media_json_from_post, parse_media_json
-from flask_babel import gettext as _, lazy_gettext as _l
+from app.models.post import Post
+from app.models.post_edit_request import PostEditRequest
+from app.models.post_revision import PostRevision
 from app.services.authz import role_required
+from app.services.media_upload import media_json_from_post, parse_media_json
+
 from . import moderation_bp
 
 
@@ -18,9 +21,17 @@ from . import moderation_bp
 @login_required
 @role_required("moderador", "administrador")
 def dashboard():
-    pending = Post.query.filter_by(status="pending").order_by(Post.created_at.desc()).all()
-    pending_edits = PostEditRequest.query.filter_by(status="pending").order_by(PostEditRequest.created_at.desc()).all()
-    return render_template("moderation/dashboard.html", pending=pending, pending_edits=pending_edits)
+    pending = (
+        Post.query.filter_by(status="pending").order_by(Post.created_at.desc()).all()
+    )
+    pending_edits = (
+        PostEditRequest.query.filter_by(status="pending")
+        .order_by(PostEditRequest.created_at.desc())
+        .all()
+    )
+    return render_template(
+        "moderation/dashboard.html", pending=pending, pending_edits=pending_edits
+    )
 
 
 @moderation_bp.route("/aprobar/<int:post_id>", methods=["POST"])

@@ -1,8 +1,31 @@
-from flask import render_template, redirect, url_for, request, flash, current_app
-from flask_login import login_required
+import json
+from datetime import datetime
+from decimal import Decimal
 
+from flask import current_app, flash, redirect, render_template, request, url_for
+from flask_babel import gettext as _
+from flask_babel import lazy_gettext as _l
+from flask_login import current_user, login_required
+from sqlalchemy import func
+
+from app.extensions import db
+from app.models.category import Category
+from app.models.discussion_comment import DiscussionComment
+from app.models.discussion_post import DiscussionPost
+from app.models.discussion_tag import DiscussionTag
+from app.models.donation_log import DonationLog
+from app.models.location_report import LocationReport
+from app.models.media import Media
+from app.models.post import Post
+from app.models.post_edit_request import PostEditRequest
+from app.models.post_revision import PostRevision
 from app.services.authz import role_required
-from app.services.settings import get_setting, set_setting
+from app.services.category_rules import is_other_type_allowed
+from app.services.category_sort import sort_categories_for_forms
+from app.services.content_quality import validate_description, validate_title
+from app.services.discussion_tags import upsert_tags
+from app.services.geo_lookup import list_provinces, lookup_location, municipalities_map
+from app.services.input_safety import has_malicious_input
 from app.services.map_providers import (
     MAP_PROVIDER_GOOGLE,
     MAP_PROVIDER_LEAFLET,
@@ -12,31 +35,14 @@ from app.services.map_providers import (
     set_map_provider_forms,
     set_map_provider_main,
 )
-from app.models.post import Post
-from app.models.discussion_post import DiscussionPost
-from app.models.discussion_comment import DiscussionComment
-from app.models.discussion_tag import DiscussionTag
-from app.models.location_report import LocationReport
-from app.models.post_revision import PostRevision
-from app.models.post_edit_request import PostEditRequest
-from app.models.category import Category
-from app.models.donation_log import DonationLog
-from app.extensions import db
-from app.models.media import Media
-from app.services.media_upload import media_json_from_post, parse_media_json, get_media_payload
-from app.services.input_safety import has_malicious_input
-from app.services.content_quality import validate_title, validate_description
-from app.services.category_rules import is_other_type_allowed
-from app.services.category_sort import sort_categories_for_forms
-from app.services.geo_lookup import lookup_location, list_provinces, municipalities_map
-from flask_login import current_user
-import json
-from datetime import datetime
-from decimal import Decimal
-from sqlalchemy import func
 from app.services.markdown_utils import render_markdown
-from app.services.discussion_tags import upsert_tags
-from flask_babel import gettext as _, lazy_gettext as _l
+from app.services.media_upload import (
+    get_media_payload,
+    media_json_from_post,
+    parse_media_json,
+)
+from app.services.settings import get_setting, set_setting
+
 from . import admin_bp
 
 
@@ -60,9 +66,7 @@ def dashboard():
     map_provider_main = get_map_provider_main()
     map_provider_forms = get_map_provider_forms()
     location_reports = (
-        LocationReport.query.order_by(LocationReport.created_at.desc())
-        .limit(10)
-        .all()
+        LocationReport.query.order_by(LocationReport.created_at.desc()).limit(10).all()
     )
     return render_template(
         "admin/dashboard.html",
@@ -71,7 +75,9 @@ def dashboard():
         map_provider_forms=map_provider_forms,
         provider_leaflet=MAP_PROVIDER_LEAFLET,
         provider_google=MAP_PROVIDER_GOOGLE,
-        google_maps_configured=bool((current_app.config.get("GOOGLE_MAPS_API_KEY") or "").strip()),
+        google_maps_configured=bool(
+            (current_app.config.get("GOOGLE_MAPS_API_KEY") or "").strip()
+        ),
         location_reports=location_reports,
     )
 
@@ -303,7 +309,9 @@ def update_report_status(post_id):
     post.status = status
     db.session.commit()
     flash(_("Reporte actualizado."), "success")
-    return redirect(url_for("admin.reports", status=request.args.get("status", "approved")))
+    return redirect(
+        url_for("admin.reports", status=request.args.get("status", "approved"))
+    )
 
 
 @admin_bp.route("/reportes/bulk-delete", methods=["POST"])
@@ -335,7 +343,9 @@ def bulk_delete_reports():
 @role_required("administrador")
 def edit_report(post_id):
     post = Post.query.get_or_404(post_id)
-    categories = sort_categories_for_forms(Category.query.order_by(Category.id.asc()).all())
+    categories = sort_categories_for_forms(
+        Category.query.order_by(Category.id.asc()).all()
+    )
     links = []
     if post.links_json:
         try:
@@ -379,7 +389,9 @@ def edit_report(post_id):
             ]
             + links_list
         ):
-            errors["form"] = "Se detectó contenido sospechoso. Revisa y vuelve a intentar."
+            errors["form"] = (
+                "Se detectó contenido sospechoso. Revisa y vuelve a intentar."
+            )
 
         if not form_data["title"]:
             errors["title"] = "El título es obligatorio."
@@ -400,7 +412,9 @@ def edit_report(post_id):
                 errors["title"] = msg_title
         if form_data["description"] and "description" not in errors:
             if len(form_data["description"]) < 50:
-                errors["description"] = "La descripción debe tener al menos 50 caracteres."
+                errors["description"] = (
+                    "La descripción debe tener al menos 50 caracteres."
+                )
             else:
                 ok_desc, msg_desc = validate_description(form_data["description"])
                 if not ok_desc:
@@ -439,10 +453,18 @@ def edit_report(post_id):
         movement_at = None
         if slug == "residencia-represor":
             if not form_data["repressor_name"]:
-                errors["repressor_name"] = "Debes indicar el nombre o apodo del represor."
+                errors["repressor_name"] = (
+                    "Debes indicar el nombre o apodo del represor."
+                )
             if existing_media_count < 1:
                 errors["images"] = "Debes subir al menos una imagen del represor."
-        if slug in {"accion-represiva", "accion-represiva-del-gobierno", "movimiento-tropas", "movimiento-militar", "desconexion-internet"}:
+        if slug in {
+            "accion-represiva",
+            "accion-represiva-del-gobierno",
+            "movimiento-tropas",
+            "movimiento-militar",
+            "desconexion-internet",
+        }:
             if not form_data["movement_date"]:
                 errors["movement_date"] = "Debes indicar la fecha del evento."
             if not form_data["movement_time"]:
@@ -456,7 +478,9 @@ def edit_report(post_id):
                     errors["movement_date"] = "Fecha u hora inválida."
         if slug == "otros":
             if not form_data["other_type"]:
-                errors["other_type"] = "Debes especificar el tipo en la categoría Otros."
+                errors["other_type"] = (
+                    "Debes especificar el tipo en la categoría Otros."
+                )
             elif not is_other_type_allowed(form_data["other_type"]):
                 errors["other_type"] = (
                     "El tipo en “Otros” no puede referirse a represores. Usa la categoría correspondiente."
@@ -475,7 +499,9 @@ def edit_report(post_id):
                 provinces=list_provinces(),
                 municipalities_map=municipalities_map(),
                 map_provider_forms=get_map_provider_forms(),
-                google_maps_api_key=(current_app.config.get("GOOGLE_MAPS_API_KEY") or "").strip(),
+                google_maps_api_key=(
+                    current_app.config.get("GOOGLE_MAPS_API_KEY") or ""
+                ).strip(),
             )
 
         moderation_enabled = get_setting("moderation_enabled", "true") == "true"
@@ -487,7 +513,13 @@ def edit_report(post_id):
             else:
                 editor_label = current_user.email
 
-        if moderation_enabled and slug not in {"accion-represiva", "accion-represiva-del-gobierno", "movimiento-tropas", "movimiento-militar", "desconexion-internet"}:
+        if moderation_enabled and slug not in {
+            "accion-represiva",
+            "accion-represiva-del-gobierno",
+            "movimiento-tropas",
+            "movimiento-militar",
+            "desconexion-internet",
+        }:
             edit_req = PostEditRequest(
                 post_id=post.id,
                 editor_id=current_user.id if current_user.is_authenticated else None,
@@ -562,14 +594,18 @@ def edit_report(post_id):
         provinces=list_provinces(),
         municipalities_map=municipalities_map(),
         map_provider_forms=get_map_provider_forms(),
-        google_maps_api_key=(current_app.config.get("GOOGLE_MAPS_API_KEY") or "").strip(),
+        google_maps_api_key=(
+            current_app.config.get("GOOGLE_MAPS_API_KEY") or ""
+        ).strip(),
         form_data=None,
         errors={},
         form_links=links,
     )
 
 
-@admin_bp.route("/reportes/<int:post_id>/revisiones/<int:revision_id>/restaurar", methods=["POST"])
+@admin_bp.route(
+    "/reportes/<int:post_id>/revisiones/<int:revision_id>/restaurar", methods=["POST"]
+)
 @login_required
 @role_required("administrador")
 def restore_revision(post_id, revision_id):

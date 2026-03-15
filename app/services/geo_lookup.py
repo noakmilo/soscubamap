@@ -2,8 +2,7 @@ import json
 import os
 import unicodedata
 
-from app.services.cuba_locations import PROVINCES, MUNICIPALITIES
-
+from app.services.cuba_locations import MUNICIPALITIES, PROVINCES
 
 DEFAULT_PROVINCE_KEYS = [
     "province",
@@ -53,9 +52,7 @@ def _normalize(value):
 
 PROVINCE_CANONICAL = {_normalize(p): p for p in PROVINCES}
 MUNICIPALITY_CANONICAL = {
-    _normalize(m): m
-    for province, muns in MUNICIPALITIES.items()
-    for m in muns
+    _normalize(m): m for province, muns in MUNICIPALITIES.items() for m in muns
 }
 
 
@@ -124,7 +121,9 @@ def _extract_polygons(geometry):
     return []
 
 
-def _load_features(path, keys, canonical_map, province_keys=None, province_canonical=None):
+def _load_features(
+    path, keys, canonical_map, province_keys=None, province_canonical=None
+):
     if not path or not os.path.exists(path):
         return []
     with open(path, "r", encoding="utf-8") as fh:
@@ -149,7 +148,9 @@ def _load_features(path, keys, canonical_map, province_keys=None, province_canon
             if province_val:
                 province_norm = _normalize(province_val)
                 if province_canonical:
-                    province = province_canonical.get(province_norm, str(province_val).strip())
+                    province = province_canonical.get(
+                        province_norm, str(province_val).strip()
+                    )
                 else:
                     province = str(province_val).strip()
         items.append({"name": name, "polygons": polygons, "province": province})
@@ -203,15 +204,25 @@ def _load_layers():
     mun_keys = _get_env_or_config("GEOJSON_MUNICIPALITY_KEYS")
     mun_prov_keys = _get_env_or_config("GEOJSON_MUNICIPALITY_PROVINCE_KEYS")
 
-    prov_keys = [k.strip() for k in (prov_keys or "").split(",") if k.strip()] or DEFAULT_PROVINCE_KEYS
-    mun_keys = [k.strip() for k in (mun_keys or "").split(",") if k.strip()] or DEFAULT_MUNICIPALITY_KEYS
-    mun_prov_keys = [k.strip() for k in (mun_prov_keys or "").split(",") if k.strip()] or DEFAULT_MUNICIPALITY_PROVINCE_KEYS
+    prov_keys = [
+        k.strip() for k in (prov_keys or "").split(",") if k.strip()
+    ] or DEFAULT_PROVINCE_KEYS
+    mun_keys = [
+        k.strip() for k in (mun_keys or "").split(",") if k.strip()
+    ] or DEFAULT_MUNICIPALITY_KEYS
+    mun_prov_keys = [
+        k.strip() for k in (mun_prov_keys or "").split(",") if k.strip()
+    ] or DEFAULT_MUNICIPALITY_PROVINCE_KEYS
 
     if _cache["paths"].get("provinces") != (prov_path, tuple(prov_keys)):
         _cache["provinces"] = _load_features(prov_path, prov_keys, PROVINCE_CANONICAL)
         _cache["paths"]["provinces"] = (prov_path, tuple(prov_keys))
 
-    if _cache["paths"].get("municipalities") != (mun_path, tuple(mun_keys), tuple(mun_prov_keys)):
+    if _cache["paths"].get("municipalities") != (
+        mun_path,
+        tuple(mun_keys),
+        tuple(mun_prov_keys),
+    ):
         _cache["municipalities"] = _load_features(
             mun_path,
             mun_keys,
@@ -219,7 +230,11 @@ def _load_layers():
             province_keys=mun_prov_keys,
             province_canonical=PROVINCE_CANONICAL,
         )
-        _cache["paths"]["municipalities"] = (mun_path, tuple(mun_keys), tuple(mun_prov_keys))
+        _cache["paths"]["municipalities"] = (
+            mun_path,
+            tuple(mun_keys),
+            tuple(mun_prov_keys),
+        )
 
 
 def lookup_location(lat, lng):

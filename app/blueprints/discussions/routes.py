@@ -1,24 +1,37 @@
 import json
 import secrets
-from flask import render_template, request, redirect, url_for, flash, session, current_app
-from sqlalchemy import func
+
+from flask import (
+    current_app,
+    flash,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
+from flask_babel import gettext as _
+from flask_babel import lazy_gettext as _l
 from flask_login import current_user
+from sqlalchemy import func
 
 from app.extensions import db, limiter
-from app.models.discussion_post import DiscussionPost
 from app.models.discussion_comment import DiscussionComment
+from app.models.discussion_post import DiscussionPost
 from app.models.discussion_tag import DiscussionTag
-from app.services.markdown_utils import render_markdown
-from app.services.discussion_tags import upsert_tags, normalize_tag
-from app.services.media_upload import validate_files, upload_files, parse_media_json
-from app.services.recaptcha import verify_recaptcha, recaptcha_enabled
+from app.services.discussion_tags import normalize_tag, upsert_tags
 from app.services.input_safety import has_malicious_input
-from flask_babel import gettext as _, lazy_gettext as _l
+from app.services.markdown_utils import render_markdown
+from app.services.media_upload import parse_media_json, upload_files, validate_files
+from app.services.recaptcha import recaptcha_enabled, verify_recaptcha
+
 from . import discussions_bp
 
 
 def _get_discussion_nick():
-    allow_admin = current_user.is_authenticated and current_user.has_role("administrador")
+    allow_admin = current_user.is_authenticated and current_user.has_role(
+        "administrador"
+    )
     nick = session.get("discussion_nick")
     if nick and (nick.lower() != "admin" or allow_admin):
         return nick
@@ -30,7 +43,9 @@ def _get_discussion_nick():
 
 
 def _resolve_discussion_nick(nickname: str) -> str:
-    allow_admin = current_user.is_authenticated and current_user.has_role("administrador")
+    allow_admin = current_user.is_authenticated and current_user.has_role(
+        "administrador"
+    )
     value = (nickname or "").strip()
     if not value:
         value = _get_discussion_nick()
@@ -119,8 +134,13 @@ def new_discussion():
         ]
         image_captions = request.form.getlist("image_captions[]")
 
-        if has_malicious_input([title, body, nickname] + links_list + selected_tags + new_tags):
-            flash(_("Se detectó contenido sospechoso. Revisa y vuelve a intentar."), "error")
+        if has_malicious_input(
+            [title, body, nickname] + links_list + selected_tags + new_tags
+        ):
+            flash(
+                _("Se detectó contenido sospechoso. Revisa y vuelve a intentar."),
+                "error",
+            )
             return redirect(url_for("discussions.new_discussion"))
 
         if not title or not body:
@@ -186,7 +206,10 @@ def detail(post_id):
                 flash(_("Verificación reCAPTCHA falló. Intenta nuevamente."), "error")
                 return redirect(url_for("discussions.detail", post_id=post.id))
         if has_malicious_input([body, nickname]):
-            flash(_("Se detectó contenido sospechoso. Revisa y vuelve a intentar."), "error")
+            flash(
+                _("Se detectó contenido sospechoso. Revisa y vuelve a intentar."),
+                "error",
+            )
             return redirect(url_for("discussions.detail", post_id=post.id))
         if not body:
             flash(_("El comentario no puede estar vacío."), "error")
@@ -198,7 +221,9 @@ def detail(post_id):
         if parent_id:
             try:
                 parent_id_int = int(parent_id)
-                parent = DiscussionComment.query.filter_by(id=parent_id_int, post_id=post.id).first()
+                parent = DiscussionComment.query.filter_by(
+                    id=parent_id_int, post_id=post.id
+                ).first()
             except Exception:
                 parent = None
 
@@ -222,7 +247,11 @@ def detail(post_id):
             links = []
 
     images = parse_media_json(post.images_json)
-    comments = DiscussionComment.query.filter_by(post_id=post.id).order_by(DiscussionComment.created_at.asc()).all()
+    comments = (
+        DiscussionComment.query.filter_by(post_id=post.id)
+        .order_by(DiscussionComment.created_at.asc())
+        .all()
+    )
     comment_map = {c.id: c for c in comments}
     roots = []
     for comment in comments:

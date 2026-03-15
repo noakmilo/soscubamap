@@ -1,7 +1,8 @@
 import json
-import pytest
-from unittest.mock import MagicMock, patch
 from datetime import datetime
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 class TestPushEnabled:
@@ -10,6 +11,7 @@ class TestPushEnabled:
             app.config["VAPID_PUBLIC_KEY"] = "pub"
             app.config["VAPID_PRIVATE_KEY"] = "priv"
             from app.services.push_notifications import push_enabled
+
             assert push_enabled() is True
 
     def test_disabled_no_keys(self, app):
@@ -17,6 +19,7 @@ class TestPushEnabled:
             app.config["VAPID_PUBLIC_KEY"] = ""
             app.config["VAPID_PRIVATE_KEY"] = ""
             from app.services.push_notifications import push_enabled
+
             assert push_enabled() is False
 
 
@@ -24,6 +27,7 @@ class TestFormatAlertPayload:
     def test_format(self, app):
         with app.app_context():
             from app.services.push_notifications import _format_alert_payload
+
             cat = MagicMock(name="Acción represiva")
             # MagicMock overrides .name, need to set explicitly
             cat.name = "Acción represiva"
@@ -45,6 +49,7 @@ class TestFormatAlertPayload:
     def test_no_category(self, app):
         with app.app_context():
             from app.services.push_notifications import _format_alert_payload
+
             post = MagicMock(
                 id=1,
                 title="Test",
@@ -65,16 +70,24 @@ class TestSendAlertNotification:
         with app.app_context():
             app.config["VAPID_PUBLIC_KEY"] = "pub"
             app.config["VAPID_PRIVATE_KEY"] = "priv"
-            sub = MagicMock(endpoint="https://push/1", p256dh="key", auth="auth", active=True)
+            sub = MagicMock(
+                endpoint="https://push/1", p256dh="key", auth="auth", active=True
+            )
             mock_model.query.filter_by.return_value.all.return_value = [sub]
 
             cat = MagicMock()
             cat.name = "Alerta"
             post = MagicMock(
-                id=1, title="Test", province=None, municipality=None,
-                movement_at=None, created_at=None, category=cat,
+                id=1,
+                title="Test",
+                province=None,
+                municipality=None,
+                movement_at=None,
+                created_at=None,
+                category=cat,
             )
             from app.services.push_notifications import send_alert_notification
+
             count = send_alert_notification(post)
             assert count == 1
             mock_webpush.assert_called_once()
@@ -85,20 +98,29 @@ class TestSendAlertNotification:
         with app.app_context():
             app.config["VAPID_PUBLIC_KEY"] = "pub"
             app.config["VAPID_PRIVATE_KEY"] = "priv"
-            sub = MagicMock(endpoint="https://push/1", p256dh="k", auth="a", active=True)
+            sub = MagicMock(
+                endpoint="https://push/1", p256dh="k", auth="a", active=True
+            )
             mock_model.query.filter_by.return_value.all.return_value = [sub]
 
             from app.services.push_notifications import WebPushException
+
             resp = MagicMock(status_code=410)
             mock_webpush.side_effect = WebPushException("gone", response=resp)
 
             cat = MagicMock()
             cat.name = "Test"
             post = MagicMock(
-                id=1, title="T", province=None, municipality=None,
-                movement_at=None, created_at=None, category=cat,
+                id=1,
+                title="T",
+                province=None,
+                municipality=None,
+                movement_at=None,
+                created_at=None,
+                category=cat,
             )
             from app.services.push_notifications import send_alert_notification
+
             count = send_alert_notification(post)
             assert count == 0
             assert sub.active is False
@@ -107,6 +129,7 @@ class TestSendAlertNotification:
         with app.app_context():
             app.config["VAPID_PUBLIC_KEY"] = ""
             from app.services.push_notifications import send_alert_notification
+
             post = MagicMock()
             assert send_alert_notification(post) == 0
 
@@ -117,5 +140,6 @@ class TestSendAlertNotification:
             app.config["VAPID_PRIVATE_KEY"] = "priv"
             mock_model.query.filter_by.return_value.all.return_value = []
             from app.services.push_notifications import send_alert_notification
+
             post = MagicMock()
             assert send_alert_notification(post) == 0

@@ -1,18 +1,20 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
+
 from app.services.geo_lookup import (
+    _cache,
+    _contains,
+    _extract_polygons,
     _normalize,
     _pick_name,
-    _extract_polygons,
-    _point_in_ring,
     _point_in_polygon,
-    _contains,
+    _point_in_ring,
     is_within_cuba_bounds,
-    lookup_location,
-    list_provinces,
     list_municipalities,
+    list_provinces,
+    lookup_location,
     municipalities_map,
-    _cache,
 )
 
 
@@ -114,8 +116,12 @@ class TestLookupLocation:
     @patch("app.services.geo_lookup._load_layers")
     def test_returns_province_and_municipality(self, mock_load):
         square = [[[-83, 22], [-81, 22], [-81, 24], [-83, 24], [-83, 22]]]
-        _cache["provinces"] = [{"name": "La Habana", "polygons": [square], "province": None}]
-        _cache["municipalities"] = [{"name": "Playa", "polygons": [square], "province": "La Habana"}]
+        _cache["provinces"] = [
+            {"name": "La Habana", "polygons": [square], "province": None}
+        ]
+        _cache["municipalities"] = [
+            {"name": "Playa", "polygons": [square], "province": "La Habana"}
+        ]
         prov, mun = lookup_location(23.0, -82.0)
         assert prov == "La Habana"
         assert mun == "Playa"
@@ -132,7 +138,9 @@ class TestLookupLocation:
     def test_municipality_provides_province(self, mock_load):
         square = [[[-83, 22], [-81, 22], [-81, 24], [-83, 24], [-83, 22]]]
         _cache["provinces"] = []
-        _cache["municipalities"] = [{"name": "Playa", "polygons": [square], "province": "La Habana"}]
+        _cache["municipalities"] = [
+            {"name": "Playa", "polygons": [square], "province": "La Habana"}
+        ]
         prov, mun = lookup_location(23.0, -82.0)
         assert prov == "La Habana"
         assert mun == "Playa"

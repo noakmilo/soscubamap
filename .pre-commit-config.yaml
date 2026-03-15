@@ -1,4 +1,14 @@
 repos:
+  - repo: https://github.com/psf/black
+    rev: 24.10.0
+    hooks:
+      - id: black
+        files: ^(app|config|scripts|tests)/.*\.py$
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        files: ^(app|config|scripts|tests)/.*\.py$
   - repo: local
     hooks:
       - id: i18n-pot

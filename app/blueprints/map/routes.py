@@ -18,6 +18,8 @@ from flask import (
     session,
     url_for,
 )
+from flask_babel import gettext as _
+from flask_babel import lazy_gettext as _l
 from flask_login import current_user
 from sqlalchemy.orm import selectinload
 
@@ -44,6 +46,7 @@ from app.services.geo_lookup import (
     municipalities_map,
 )
 from app.services.input_safety import has_malicious_input
+from app.services.map_providers import get_map_provider_forms, get_map_provider_main
 from app.services.media_upload import (
     get_media_payload,
     media_json_from_post,
@@ -54,8 +57,6 @@ from app.services.media_upload import (
 from app.services.push_notifications import push_enabled, send_alert_notification
 from app.services.recaptcha import recaptcha_enabled, verify_recaptcha
 from app.services.vote_identity import get_voter_hash
-from app.services.map_providers import get_map_provider_forms, get_map_provider_main
-from flask_babel import gettext as _, lazy_gettext as _l
 
 from . import map_bp
 

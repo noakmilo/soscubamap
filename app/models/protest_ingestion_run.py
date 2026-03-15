@@ -7,7 +7,9 @@ class ProtestIngestionRun(db.Model):
     __tablename__ = "protest_ingestion_runs"
 
     id = db.Column(db.Integer, primary_key=True)
-    started_at_utc = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    started_at_utc = db.Column(
+        db.DateTime, nullable=False, default=datetime.utcnow, index=True
+    )
     finished_at_utc = db.Column(db.DateTime, index=True)
     status = db.Column(db.String(24), nullable=False, default="running", index=True)
     feed_count = db.Column(db.Integer, nullable=False, default=0)

@@ -1,4 +1,4 @@
-from app.services.cuba_locations import PROVINCES, MUNICIPALITIES
+from app.services.cuba_locations import MUNICIPALITIES, PROVINCES
 
 
 class TestCubaLocations:

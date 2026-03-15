@@ -1,10 +1,12 @@
-from flask import render_template, redirect, url_for, request, flash, current_app
-from flask_login import login_user, logout_user, login_required
-from flask_babel import gettext as _, lazy_gettext as _l
+from flask import current_app, flash, redirect, render_template, request, url_for
+from flask_babel import gettext as _
+from flask_babel import lazy_gettext as _l
+from flask_login import login_required, login_user, logout_user
 
 from app.extensions import db
-from app.models.user import User
 from app.models.role import Role
+from app.models.user import User
+
 from . import auth_bp
 
 
