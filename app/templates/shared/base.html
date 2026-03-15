@@ -15,7 +15,8 @@
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/favico.png') }}">
     <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}?v={{ config.ASSET_VERSION }}" />
-    <script src="{{ url_for('static', filename='js/i18n/' ~ g.locale ~ '.js') }}?v={{ config.ASSET_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/i18n/runtime.js') }}?v={{ config.ASSET_VERSION }}"></script>
+    <script src="{{ url_for('frontend_i18n_js', lang=g.locale) }}?v={{ config.ASSET_VERSION }}"></script>
     {% block head_extra %}{% endblock %}
     <link
       rel="stylesheet"
@@ -62,9 +63,17 @@
           <button class="btn-cta" type="button" data-open-report data-url="{{ url_for('map.new_post') }}">{{ _("Hacer reporte") }}</button>
         {% endif %}
         <div class="lang-switcher">
-          <a href="{{ url_for('set_language', lang='es') }}" class="{{ 'active' if g.locale == 'es' else '' }}">ES</a>
-          |
-          <a href="{{ url_for('set_language', lang='en') }}" class="{{ 'active' if g.locale == 'en' else '' }}">EN</a>
+          <select
+            class="lang-switcher-select"
+            aria-label="Language"
+            onchange="if (this.value) { window.location.href = this.value; }"
+          >
+            {% for language in g.language_choices %}
+              <option value="{{ url_for('set_language', lang=language.code) }}" {{ 'selected' if language.code == g.locale else '' }}>
+                {{ language.label }}
+              </option>
+            {% endfor %}
+          </select>
         </div>
       </nav>
     </header>

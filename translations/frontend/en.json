@@ -1,17 +1,6 @@
-window.t = (key, vars = {}) => {
-  let str = (window.TRANSLATIONS || {})[key] || key;
-  Object.entries(vars).forEach(([k, v]) => {
-    str = str.replaceAll(`{${k}}`, String(v));
-  });
-  return str;
-};
-
-window.TRANSLATIONS = {
-  // chat.js
+{
   "empty_chat_message": "No messages yet.",
   "anonymous_user_default": "Anon",
-
-  // shared (discussions, new_post, edit_post, report_detail)
   "error_max_images_exceeded": "Maximum {maxFiles} images per submission.",
   "error_invalid_file_format": "Format not allowed: {ext}.",
   "error_image_too_large": "Each image must be <= {maxMb}MB.",
@@ -21,8 +10,6 @@ window.TRANSLATIONS = {
   "label_image_caption_optional": "Short description (optional)",
   "label_image_caption_numbered": "Short description (image {idx})",
   "alt_image_preview": "Preview {idx}",
-
-  // new_post.js / edit_post.js
   "label_choose_municipality": "Choose municipality",
   "error_location_outside_cuba": "The location must be within Cuban territory.",
   "error_image_required_for_residence": "You must upload at least one image of the repressor.",
@@ -30,8 +17,6 @@ window.TRANSLATIONS = {
   "error_date_time_required": "You must specify the date and time of the event.",
   "placeholder_link_url": "Link URL",
   "placeholder_example_url": "https://example.com/source",
-
-  // map.js
   "search_placeholder_1": "E.g.: PNR Sector",
   "search_placeholder_2": "E.g.: Prison",
   "search_placeholder_3": "E.g.: Military Unit",
@@ -68,8 +53,6 @@ window.TRANSLATIONS = {
   "button_open_form": "Open form",
   "marker_title_location": "Location",
   "marker_title_search": "Search",
-
-  // push_alerts.js
   "status_alerts_unavailable": "Alerts unavailable",
   "status_notifications_disabled": "Notifications disabled on the server.",
   "button_install_pwa": "Install the PWA",
@@ -84,8 +67,6 @@ window.TRANSLATIONS = {
   "error_notification_service_init": "Could not initialize the notification service.",
   "error_subscription_failed": "Could not register subscription.",
   "error_unsubscribe_failed": "Could not deactivate subscription.",
-
-  // report_detail.js / reports.js
   "empty_comments": "No comments yet.",
   "confirmation_delete_comment": "Delete comment?",
   "fallback_copy_manual": "Copy manually",
@@ -97,8 +78,6 @@ window.TRANSLATIONS = {
   "error_upload_failed": "Upload error.",
   "status_sent_to_moderation": "Sent to moderation.",
   "status_images_added": "Images added.",
-
-  // analytics.js
   "error_analytics_load_failed": "Could not load analytics",
   "status_approved": "Approved",
   "status_pending": "Pending",
@@ -107,5 +86,5 @@ window.TRANSLATIONS = {
   "chart_label_report_comments": "Comments on reports",
   "chart_label_discussion_comments": "Comments on discussions",
   "button_loading": "Loading...",
-  "button_refresh": "Refresh",
-};
+  "button_refresh": "Refresh"
+}

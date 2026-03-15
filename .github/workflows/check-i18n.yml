@@ -1,0 +1,41 @@
+name: check-i18n
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/**/*.py"
+      - "app/templates/**/*.html"
+      - "translations/**"
+      - "babel.cfg"
+      - "crowdin.yml"
+
+jobs:
+  backend-pot-check:
+    name: "Backend: messages.pot up to date"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Babel
+        run: pip install --quiet flask-babel
+
+      - name: Verify messages.pot is up to date
+        run: python scripts/check_i18n.py pot
+
+  frontend-translations-check:
+    name: "Frontend: JSON translation files consistent"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify frontend translation files
+        run: python scripts/check_i18n.py frontend

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-03-14 15:48-0600\n"
+"POT-Creation-Date: 2026-03-15 10:46+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -208,7 +208,7 @@ msgstr ""
 msgid "Sin categorías configuradas."
 msgstr ""
 
-#: app/templates/admin/dashboard.html:2 app/templates/shared/base.html:49
+#: app/templates/admin/dashboard.html:2 app/templates/shared/base.html:51
 msgid "Admin"
 msgstr ""
 
@@ -222,7 +222,7 @@ msgstr ""
 
 #: app/templates/admin/dashboard.html:9
 #: app/templates/moderation/dashboard.html:2
-#: app/templates/moderation/dashboard.html:5 app/templates/shared/base.html:46
+#: app/templates/moderation/dashboard.html:5 app/templates/shared/base.html:48
 msgid "Moderación"
 msgstr ""
 
@@ -240,8 +240,8 @@ msgstr ""
 
 #: app/templates/admin/dashboard.html:27 app/templates/admin/reports.html:2
 #: app/templates/admin/reports.html:5 app/templates/map/reports.html:2
-#: app/templates/map/reports.html:6 app/templates/shared/base.html:39
-#: app/templates/shared/base.html:53
+#: app/templates/map/reports.html:6 app/templates/shared/base.html:41
+#: app/templates/shared/base.html:55
 msgid "Reportes"
 msgstr ""
 
@@ -273,7 +273,7 @@ msgstr ""
 #: app/templates/admin/dashboard.html:35 app/templates/admin/discussions.html:2
 #: app/templates/admin/discussions.html:5
 #: app/templates/discussions/index.html:2
-#: app/templates/discussions/index.html:11 app/templates/shared/base.html:36
+#: app/templates/discussions/index.html:11 app/templates/shared/base.html:38
 msgid "Discusiones"
 msgstr ""
 
@@ -303,7 +303,7 @@ msgid "Mensaje"
 msgstr ""
 
 #: app/templates/admin/dashboard.html:51 app/templates/map/dashboard.html:2
-#: app/templates/shared/base.html:35
+#: app/templates/shared/base.html:37
 msgid "Mapa"
 msgstr ""
 
@@ -678,7 +678,7 @@ msgstr ""
 msgid "No hay reportes para este estado."
 msgstr ""
 
-#: app/templates/auth/login.html:2 app/templates/shared/base.html:58
+#: app/templates/auth/login.html:2 app/templates/shared/base.html:60
 msgid "Login"
 msgstr ""
 
@@ -698,7 +698,7 @@ msgstr ""
 msgid "Entrar"
 msgstr ""
 
-#: app/templates/auth/register.html:2 app/templates/shared/base.html:59
+#: app/templates/auth/register.html:2 app/templates/shared/base.html:61
 msgid "Registro"
 msgstr ""
 
@@ -826,7 +826,7 @@ msgid "Publicar discusión"
 msgstr ""
 
 #: app/templates/map/about.html:2 app/templates/map/about.html:6
-#: app/templates/shared/base.html:42 app/templates/shared/base.html:56
+#: app/templates/shared/base.html:44 app/templates/shared/base.html:58
 msgid "Acerca de"
 msgstr ""
 
@@ -866,8 +866,8 @@ msgstr ""
 msgid "¡Viva Cuba Libre!"
 msgstr ""
 
-#: app/templates/map/analytics.html:3 app/templates/shared/base.html:41
-#: app/templates/shared/base.html:55
+#: app/templates/map/analytics.html:3 app/templates/shared/base.html:43
+#: app/templates/shared/base.html:57
 msgid "Analíticas"
 msgstr ""
 
@@ -1214,8 +1214,8 @@ msgstr ""
 msgid "Edición enviada"
 msgstr ""
 
-#: app/templates/map/export.html:3 app/templates/shared/base.html:40
-#: app/templates/shared/base.html:54
+#: app/templates/map/export.html:3 app/templates/shared/base.html:42
+#: app/templates/shared/base.html:56
 msgid "Exportar"
 msgstr ""
 
@@ -1254,7 +1254,7 @@ msgid "Para acceso de escritura, contáctanos en"
 msgstr ""
 
 #: app/templates/map/new_post.html:2 app/templates/map/new_post.html:23
-#: app/templates/shared/base.html:38 app/templates/shared/base.html:103
+#: app/templates/shared/base.html:40 app/templates/shared/base.html:113
 msgid "Nuevo reporte"
 msgstr ""
 
@@ -1676,19 +1676,19 @@ msgid ""
 "tiempo real."
 msgstr ""
 
-#: app/templates/shared/base.html:43 app/templates/shared/base.html:57
+#: app/templates/shared/base.html:45 app/templates/shared/base.html:59
 msgid "Donar"
 msgstr ""
 
-#: app/templates/shared/base.html:51
+#: app/templates/shared/base.html:53
 msgid "Salir"
 msgstr ""
 
-#: app/templates/shared/base.html:61
+#: app/templates/shared/base.html:63
 msgid "Hacer reporte"
 msgstr ""
 
-#: app/templates/shared/base.html:92
+#: app/templates/shared/base.html:102
 msgid "Plataforma colaborativa y anónima."
 msgstr ""
 
