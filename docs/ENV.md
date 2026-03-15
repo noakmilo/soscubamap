@@ -47,6 +47,12 @@ Rutas a archivos GeoJSON para la resolución automática de provincia/municipio 
 | `GEOJSON_PROVINCE_KEYS`         | Nombres de propiedades en el GeoJSON para buscar provincia. | (vacío) |
 | `GEOJSON_MUNICIPALITY_KEYS`     | Nombres de propiedades para buscar municipio.            | (vacío)  |
 | `GEOJSON_MUNICIPALITY_PROVINCE_KEYS` | Propiedades que vinculan municipio con provincia.   | (vacío)  |
+| `GEOJSON_PROVINCE_KEYS`          | Nombres de propiedades en el GeoJSON para buscar provincia. | (vacío) |
+| `GEOJSON_MUNICIPALITY_KEYS`      | Nombres de propiedades para buscar municipio.            | (vacío)  |
+| `GEOJSON_MUNICIPALITY_PROVINCE_KEYS` | Propiedades que vinculan municipio con provincia.   | (vacío)  |
+| `GEOJSON_LOCALITY_KEYS`          | Nombres de propiedades para buscar localidad.            | (vacío)  |
+| `GEOJSON_LOCALITY_MUNICIPALITY_KEYS` | Propiedades que vinculan localidad con municipio.   | (vacío)  |
+| `GEOJSON_LOCALITY_PROVINCE_KEYS` | Propiedades que vinculan localidad con provincia.        | (vacío)  |
 
 ## Push Notifications (VAPID)
 
@@ -79,6 +85,49 @@ python -c "from pywebpush import webpush; from py_vapid import Vapid; v = Vapid(
 | `RATELIMIT_STORAGE_URL` | Backend de almacenamiento para rate limits.         | `memory://` |
 
 En producción con múltiples workers, usar Redis: `redis://localhost:6379/0`.
+
+## Conectividad (Cloudflare Radar)
+
+Layer de datos de conectividad a internet por provincias, alimentado por Cloudflare Radar.
+
+| Variable                                   | Descripción                                               | Default  |
+|--------------------------------------------|-----------------------------------------------------------|----------|
+| `CF_API_TOKEN`                             | Token de API de Cloudflare con permiso `Radar:Read`.      | (vacío — layer deshabilitado) |
+| `CLOUDFLARE_RADAR_HTTP_TIMESERIES_URL`     | URL del endpoint de series temporales de Radar.           | (URL pública de Cuba) |
+| `CF_RADAR_PROVINCE_GEOIDS_JSON`            | JSON mapeando nombre de provincia → GeoID de Cloudflare.  | (vacío)  |
+| `CONNECTIVITY_FETCH_DELAY_SECONDS`         | Segundos entre peticiones al fetcher en background.       | `120`    |
+| `CONNECTIVITY_FETCH_TIMEOUT_SECONDS`       | Timeout HTTP para peticiones a Radar.                     | `30`     |
+| `CONNECTIVITY_STALE_AFTER_HOURS`           | Horas tras las que un snapshot se considera obsoleto.     | `8`      |
+| `CONNECTIVITY_FRONTEND_REFRESH_SECONDS`    | Frecuencia de refresco del layer en el navegador.         | `300`    |
+
+## Protestas (RSS / NLP)
+
+Layer de eventos de protesta inferidos automáticamente desde fuentes RSS.
+
+| Variable                          | Descripción                                                          | Default |
+|-----------------------------------|----------------------------------------------------------------------|---------|
+| `PROTEST_RSS_FEEDS`               | URLs de feeds RSS separadas por comas.                               | (vacío — layer deshabilitado) |
+| `PROTEST_FETCH_TIMEOUT_SECONDS`   | Timeout HTTP al descargar cada feed.                                 | `30`    |
+| `PROTEST_FRONTEND_REFRESH_SECONDS`| Frecuencia de refresco del layer en el navegador.                    | `300`   |
+| `PROTEST_MIN_CONFIDENCE_TO_SHOW`  | Puntuación mínima de confianza (0–100) para mostrar un evento.       | `35`    |
+| `PROTEST_REQUIRE_SOURCE_URL`      | `1` = solo mostrar eventos con URL de fuente verificada.             | `1`     |
+| `PROTEST_ALLOW_UNRESOLVED_TO_MAP` | `1` = mostrar eventos sin coordenadas resueltas.                     | `0`     |
+| `PROTEST_MAX_ITEMS_PER_FEED`      | Máximo de ítems a procesar por feed en cada ciclo.                   | `120`   |
+| `PROTEST_MAX_POST_AGE_DAYS`       | Ignorar ítems del feed con más de N días de antigüedad.              | `30`    |
+| `PROTEST_KEYWORDS_STRONG`         | Palabras clave de alta confianza (CSV). Aumentan score fuertemente.  | (vacío) |
+| `PROTEST_KEYWORDS_CONTEXT`        | Palabras de contexto (CSV). Requieren keyword fuerte para sumar.     | (vacío) |
+| `PROTEST_KEYWORDS_WEAK`           | Palabras clave débiles (CSV). Suman poco score individualmente.      | (vacío) |
+| `PROTEST_PLACE_ALIASES_JSON`      | JSON de alias de lugares cubanos para mejorar geocodificación.       | (vacío) |
+
+
+## GitHub Actions / Crowdin
+
+Secretos necesarios en **Settings → Secrets and variables → Actions** del repositorio para el workflow de i18n.
+
+| Secret                   | Descripción                                                      |
+|--------------------------|------------------------------------------------------------------|
+| `CROWDIN_PROJECT_ID`     | ID numérico del proyecto en Crowdin.                             |
+| `CROWDIN_PERSONAL_TOKEN` | Token personal de Crowdin con permiso de lectura/escritura.      |
 
 ## Aplicación
 
