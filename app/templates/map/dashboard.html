@@ -98,6 +98,9 @@
     class="map-canvas"
     data-new-url="{{ url_for('map.new_post') }}"
     data-is-admin="{{ 1 if current_user.is_authenticated and current_user.has_role('administrador') else 0 }}"
+    data-connectivity-refresh-seconds="{{ connectivity_refresh_seconds }}"
+    data-protest-refresh-seconds="{{ protest_refresh_seconds }}"
+    data-map-provider="{{ map_provider_main }}"
     data-allow-zoom="1"
   >
     <div class="map-placeholder">
@@ -108,7 +111,7 @@
   </div>
 </section>
 
-<section class="legend">
+<section class="legend" id="reportLegendSection">
   {% set alert_slugs = ["accion-represiva", "movimiento-tropas", "desconexion-internet"] %}
   <div class="legend-header">
     <div class="legend-title">{{ _("Leyenda de íconos") }}</div>
@@ -165,6 +168,12 @@
   crossorigin=""
 />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+{% if map_provider_main == 'google' and google_maps_api_key %}
+<script
+  src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key|urlencode }}&v=weekly"
+></script>
+<script src="https://unpkg.com/leaflet.gridlayer.googlemutant@0.15.0/Leaflet.GoogleMutant.js" crossorigin=""></script>
+{% endif %}
 <script>
   window.CUBA_MUNICIPALITIES = {{ municipalities_map|tojson }};
 </script>
