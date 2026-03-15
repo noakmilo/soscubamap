@@ -134,6 +134,73 @@ def _load_geojson_from_disk(path, keys):
     }
 
 
+def diagnose_province_geojson():
+    configured_path = _get_env_or_config("GEOJSON_PROVINCES_PATH", "")
+    resolved_path = _resolve_path(configured_path)
+    keys = _configured_keys()
+
+    exists = bool(resolved_path and os.path.exists(resolved_path))
+    file_size_bytes = None
+    raw_feature_count = 0
+    polygon_feature_count = 0
+    normalized_feature_count = 0
+    sample_property_keys = []
+    sample_raw_names = []
+    sample_normalized_names = []
+    error = None
+
+    if exists:
+        try:
+            file_size_bytes = os.path.getsize(resolved_path)
+        except Exception:
+            file_size_bytes = None
+
+        try:
+            with open(resolved_path, "r", encoding="utf-8") as fh:
+                data = json.load(fh)
+            features = data.get("features") or []
+            raw_feature_count = len(features)
+            for feature in features:
+                if not isinstance(feature, dict):
+                    continue
+                geometry = feature.get("geometry")
+                if not _is_polygon_geometry(geometry):
+                    continue
+                polygon_feature_count += 1
+                props = feature.get("properties") or {}
+                if len(sample_property_keys) < 30:
+                    for key in props.keys():
+                        if key not in sample_property_keys:
+                            sample_property_keys.append(str(key))
+                            if len(sample_property_keys) >= 30:
+                                break
+                raw_name = _pick_province_name(props, keys)
+                if raw_name and len(sample_raw_names) < 8:
+                    sample_raw_names.append(raw_name)
+        except Exception as exc:
+            error = str(exc)
+
+    normalized_geo = _load_geojson_from_disk(resolved_path, keys)
+    normalized_features = normalized_geo.get("features") or []
+    normalized_feature_count = len(normalized_features)
+    sample_normalized_names = province_names_from_geojson(normalized_geo)[:8]
+
+    return {
+        "configured_path": configured_path,
+        "resolved_path": resolved_path,
+        "path_exists": exists,
+        "file_size_bytes": file_size_bytes,
+        "province_keys": keys,
+        "raw_feature_count": raw_feature_count,
+        "polygon_feature_count": polygon_feature_count,
+        "normalized_feature_count": normalized_feature_count,
+        "sample_property_keys": sample_property_keys,
+        "sample_raw_names": sample_raw_names,
+        "sample_normalized_names": sample_normalized_names,
+        "error": error,
+    }
+
+
 def load_province_geojson():
     configured_path = _get_env_or_config("GEOJSON_PROVINCES_PATH", "")
     path = _resolve_path(configured_path)

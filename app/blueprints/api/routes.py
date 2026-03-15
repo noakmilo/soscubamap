@@ -1,10 +1,12 @@
 from flask import jsonify, request, make_response, session, current_app
 import math
 import json
+import os
 import secrets
 from datetime import datetime, timedelta
 from sqlalchemy.exc import IntegrityError
 from flask_login import current_user
+import requests
 
 from app.extensions import db, limiter
 from app.services.input_safety import has_malicious_input
@@ -31,14 +33,18 @@ from app.models.push_subscription import PushSubscription
 from app.models.vote_record import VoteRecord
 from app.services.vote_identity import get_voter_hash
 from app.models.connectivity_snapshot import ConnectivitySnapshot
+from app.models.connectivity_ingestion_run import ConnectivityIngestionRun
 from app.services.connectivity import (
     STATUS_COLORS,
     STATUS_LABELS,
     STATUS_UNKNOWN,
+    extract_series_points,
+    get_latest_hourly_point,
     score_to_status,
     serialize_snapshot_time,
 )
 from app.services.connectivity_geo import (
+    diagnose_province_geojson,
     enrich_geojson_with_status,
     load_province_geojson,
     province_names_from_geojson,
@@ -82,6 +88,113 @@ def _push_enabled() -> bool:
         current_app.config.get("VAPID_PUBLIC_KEY")
         and current_app.config.get("VAPID_PRIVATE_KEY")
     )
+
+
+def _truthy_param(raw):
+    return str(raw or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _mask_secret(value):
+    text = (value or "").strip()
+    if not text:
+        return ""
+    if len(text) <= 10:
+        return "*" * len(text)
+    return f"{text[:4]}...{text[-4:]}"
+
+
+def _cf_api_token():
+    return (current_app.config.get("CF_API_TOKEN") or os.getenv("CF_API_TOKEN") or "").strip()
+
+
+def _connectivity_payload_summary(payload):
+    if not isinstance(payload, dict):
+        return {
+            "parse_ok": False,
+            "main_points": 0,
+            "previous_points": 0,
+            "latest_main": None,
+            "latest_previous": None,
+            "latest_main_hourly": None,
+        }
+
+    main_points = extract_series_points(payload, "main")
+    previous_points = extract_series_points(payload, "previous")
+    latest_main = main_points[-1] if main_points else None
+    latest_previous = previous_points[-1] if previous_points else None
+    latest_main_hourly = get_latest_hourly_point(payload, "main")
+
+    def _serialize_point(point):
+        if not point:
+            return None
+        return {
+            "timestamp_utc": serialize_snapshot_time(point.get("timestamp")),
+            "value": point.get("value"),
+        }
+
+    return {
+        "parse_ok": True,
+        "main_points": len(main_points),
+        "previous_points": len(previous_points),
+        "latest_main": _serialize_point(latest_main),
+        "latest_previous": _serialize_point(latest_previous),
+        "latest_main_hourly": _serialize_point(latest_main_hourly),
+    }
+
+
+def _cloudflare_probe():
+    api_url = (current_app.config.get("CLOUDFLARE_RADAR_HTTP_TIMESERIES_URL") or "").strip()
+    timeout_seconds = int(current_app.config.get("CONNECTIVITY_FETCH_TIMEOUT_SECONDS", 30))
+    token = _cf_api_token()
+
+    result = {
+        "requested_at_utc": serialize_snapshot_time(datetime.utcnow()),
+        "api_url": api_url,
+        "timeout_seconds": timeout_seconds,
+        "token_configured": bool(token),
+        "token_preview": _mask_secret(token),
+        "http_status": None,
+        "request_ok": False,
+        "cloudflare_success": None,
+        "errors": None,
+        "payload_summary": None,
+        "error": None,
+    }
+
+    if not api_url:
+        result["error"] = "CLOUDFLARE_RADAR_HTTP_TIMESERIES_URL no configurado"
+        return result
+    if not token:
+        result["error"] = "CF_API_TOKEN no configurado"
+        return result
+
+    try:
+        response = requests.get(
+            api_url,
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+            timeout=timeout_seconds,
+        )
+        result["http_status"] = response.status_code
+        result["request_ok"] = bool(response.ok)
+
+        payload = None
+        try:
+            payload = response.json()
+        except Exception:
+            payload = None
+
+        if isinstance(payload, dict):
+            result["cloudflare_success"] = payload.get("success")
+            result["errors"] = payload.get("errors")
+            result["payload_summary"] = _connectivity_payload_summary(payload)
+            if not response.ok and not result["errors"]:
+                result["error"] = (response.text or "").strip()[:400]
+        else:
+            result["error"] = "Respuesta no JSON o invalida"
+    except Exception as exc:
+        result["error"] = str(exc)
+
+    return result
 
 
 def _apply_vote(record, value):
@@ -215,6 +328,131 @@ def connectivity_latest():
             "refresh_seconds": int(current_app.config.get("CONNECTIVITY_FRONTEND_REFRESH_SECONDS", 300)),
         }
     )
+
+
+@api_bp.route("/connectivity/debug")
+@limiter.limit("30/minute")
+def connectivity_debug():
+    if not _is_admin_user():
+        return jsonify({"error": "Acceso denegado"}), 403
+
+    now = datetime.utcnow()
+    stale_after_hours = int(current_app.config.get("CONNECTIVITY_STALE_AFTER_HOURS", 8))
+    stale_threshold = timedelta(hours=max(stale_after_hours, 1))
+
+    snapshot = (
+        ConnectivitySnapshot.query.options(selectinload(ConnectivitySnapshot.provinces))
+        .order_by(ConnectivitySnapshot.observed_at_utc.desc(), ConnectivitySnapshot.id.desc())
+        .first()
+    )
+    latest_runs = (
+        ConnectivityIngestionRun.query.order_by(
+            ConnectivityIngestionRun.started_at_utc.desc(),
+            ConnectivityIngestionRun.id.desc(),
+        )
+        .limit(10)
+        .all()
+    )
+
+    geojson = load_province_geojson()
+    geojson_names = set(province_names_from_geojson(geojson))
+    geo_diagnostic = diagnose_province_geojson()
+
+    snapshot_payload = None
+    snapshot_stale = True
+    province_rows = []
+    if snapshot:
+        snapshot_stale = not snapshot.fetched_at_utc or (now - snapshot.fetched_at_utc) > stale_threshold
+        province_rows = list(snapshot.provinces or [])
+        snapshot_payload = {
+            "id": snapshot.id,
+            "observed_at_utc": serialize_snapshot_time(snapshot.observed_at_utc),
+            "fetched_at_utc": serialize_snapshot_time(snapshot.fetched_at_utc),
+            "traffic_value": snapshot.traffic_value,
+            "baseline_value": snapshot.baseline_value,
+            "score": snapshot.score,
+            "status": snapshot.status,
+            "is_partial": bool(snapshot.is_partial),
+            "confidence": snapshot.confidence,
+            "method": snapshot.method,
+            "stale": snapshot_stale,
+            "province_rows_count": len(province_rows),
+        }
+
+    province_status_names = {row.province for row in province_rows if row.province}
+    missing_geo_for_status = sorted(province_status_names - geojson_names)
+    missing_status_for_geo = sorted(geojson_names - province_status_names)
+
+    runs_payload = []
+    for run in latest_runs:
+        payload_summary = None
+        payload_parse_error = None
+        if run.payload_json:
+            try:
+                payload_obj = json.loads(run.payload_json)
+                payload_summary = _connectivity_payload_summary(payload_obj)
+            except Exception as exc:
+                payload_parse_error = str(exc)
+
+        runs_payload.append(
+            {
+                "id": run.id,
+                "status": run.status,
+                "attempt_count": run.attempt_count,
+                "scheduled_for_utc": serialize_snapshot_time(run.scheduled_for_utc),
+                "started_at_utc": serialize_snapshot_time(run.started_at_utc),
+                "finished_at_utc": serialize_snapshot_time(run.finished_at_utc),
+                "error_message": (run.error_message or "")[:500] or None,
+                "payload_parse_error": payload_parse_error,
+                "payload_summary": payload_summary,
+            }
+        )
+
+    diagnostics = {
+        "generated_at_utc": serialize_snapshot_time(now),
+        "config": {
+            "api_url": current_app.config.get("CLOUDFLARE_RADAR_HTTP_TIMESERIES_URL"),
+            "cf_api_token_configured": bool(_cf_api_token()),
+            "cf_api_token_preview": _mask_secret(_cf_api_token()),
+            "connectivity_fetch_delay_seconds": int(current_app.config.get("CONNECTIVITY_FETCH_DELAY_SECONDS", 120)),
+            "connectivity_fetch_timeout_seconds": int(current_app.config.get("CONNECTIVITY_FETCH_TIMEOUT_SECONDS", 30)),
+            "connectivity_stale_after_hours": stale_after_hours,
+            "connectivity_frontend_refresh_seconds": int(
+                current_app.config.get("CONNECTIVITY_FRONTEND_REFRESH_SECONDS", 300)
+            ),
+        },
+        "geojson": {
+            "has_geojson_features": bool((geojson.get("features") or [])),
+            "geojson_feature_count": len(geojson.get("features") or []),
+            "geojson_province_name_count": len(geojson_names),
+            "diagnostic": geo_diagnostic,
+        },
+        "snapshot": snapshot_payload,
+        "ingestion_runs": runs_payload,
+        "consistency": {
+            "status_provinces_without_geometry": missing_geo_for_status,
+            "geometry_provinces_without_status": missing_status_for_geo,
+            "status_geometry_overlap_count": len(province_status_names & geojson_names),
+            "likely_reasons_if_not_drawn": [
+                "No existe snapshot en BD" if not snapshot else None,
+                "Snapshot existe pero esta stale (sin datos recientes)" if snapshot_stale else None,
+                "GeoJSON provincial vacio o ruta incorrecta"
+                if not (geojson.get("features") or [])
+                else None,
+                "Nombres de provincias no coinciden entre BD y GeoJSON"
+                if province_rows and not (province_status_names & geojson_names)
+                else None,
+            ],
+        },
+    }
+    diagnostics["consistency"]["likely_reasons_if_not_drawn"] = [
+        item for item in diagnostics["consistency"]["likely_reasons_if_not_drawn"] if item
+    ]
+
+    if _truthy_param(request.args.get("probe")):
+        diagnostics["cloudflare_probe"] = _cloudflare_probe()
+
+    return jsonify(diagnostics)
 
 
 @api_bp.route("/push/subscribe", methods=["POST"])

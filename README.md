@@ -135,3 +135,10 @@ Cron recomendado (UTC, cada 2 horas):
 CRON_TZ=UTC
 0 */2 * * * cd /ruta/soscubamap && /ruta/.venv/bin/python -m scripts.fetch_connectivity >> /var/log/soscubamap-connectivity.log 2>&1
 ```
+
+Debug (solo admin autenticado):
+
+```bash
+curl -s http://127.0.0.1:8000/api/connectivity/debug
+curl -s "http://127.0.0.1:8000/api/connectivity/debug?probe=1"
+```
