@@ -27,13 +27,13 @@ STATUS_COLORS = {
     STATUS_UNKNOWN: "#667085",
 }
 
-# 80-100 verde, 50-80 amarillo, 20-50 naranja, <20 rojo
-STATUS_THRESHOLDS = (
-    (80.0, STATUS_NORMAL),
-    (50.0, STATUS_DEGRADED),
-    (20.0, STATUS_SEVERE),
-    (0.0, STATUS_CRITICAL),
-)
+# Ajuste operativo:
+# >=50 verde, >=30 amarillo, >=15 naranja, <5 rojo.
+# El rango 5-15 se mantiene en naranja para evitar huecos.
+SCORE_GREEN_MIN = 50.0
+SCORE_YELLOW_MIN = 30.0
+SCORE_ORANGE_MIN = 15.0
+SCORE_RED_MAX_EXCLUSIVE = 5.0
 
 _TIMESTAMP_KEYS = (
     "timestamp",
@@ -318,10 +318,15 @@ def score_to_status(score):
     except Exception:
         return STATUS_UNKNOWN
 
-    for threshold, status in STATUS_THRESHOLDS:
-        if numeric >= threshold:
-            return status
-    return STATUS_CRITICAL
+    if numeric >= SCORE_GREEN_MIN:
+        return STATUS_NORMAL
+    if numeric >= SCORE_YELLOW_MIN:
+        return STATUS_DEGRADED
+    if numeric >= SCORE_ORANGE_MIN:
+        return STATUS_SEVERE
+    if numeric < SCORE_RED_MAX_EXCLUSIVE:
+        return STATUS_CRITICAL
+    return STATUS_SEVERE
 
 
 def compute_connectivity_score(latest_value, baseline_value):
