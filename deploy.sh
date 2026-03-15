@@ -23,13 +23,16 @@ if [[ ! -x "${APP_DIR}/.venv/bin/flask" ]]; then
   exit 1
 fi
 
-echo "[1/3] Git pull"
+echo "[1/4] Git pull"
 run_as_app_user git -C "${APP_DIR}" pull
 
-echo "[2/3] Migraciones"
+echo "[2/4] Compilar traducciones"
+run_as_app_user "${APP_DIR}/.venv/bin/pybabel" compile -d "${APP_DIR}/translations"
+
+echo "[3/4] Migraciones"
 run_as_app_user "${APP_DIR}/.venv/bin/flask" --app run.py db upgrade
 
-echo "[3/3] Reinicio de servicio"
+echo "[4/4] Reinicio de servicio"
 if [[ $EUID -eq 0 ]]; then
   systemctl restart "${SERVICE_NAME}"
 else
