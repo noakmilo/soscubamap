@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-03-15 10:46+0000\n"
+"POT-Creation-Date: 2026-03-15 11:39+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,92 +17,92 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
-#: app/blueprints/admin/routes.py:69
+#: app/blueprints/admin/routes.py:85
 msgid "Moderación actualizada."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:119
+#: app/blueprints/admin/routes.py:154
 msgid "Monto obligatorio."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:121
+#: app/blueprints/admin/routes.py:156
 msgid "Vía obligatoria."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:123
+#: app/blueprints/admin/routes.py:158
 msgid "Fecha obligatoria."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:125
+#: app/blueprints/admin/routes.py:160
 msgid "Destino obligatorio."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:142
+#: app/blueprints/admin/routes.py:177
 msgid "Donación registrada."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:145
+#: app/blueprints/admin/routes.py:180
 msgid "Fecha inválida. Usa formato YYYY-MM-DD."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:163
+#: app/blueprints/admin/routes.py:198
 msgid "Completa todos los campos."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:172
+#: app/blueprints/admin/routes.py:207
 msgid "Donación actualizada."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:187
+#: app/blueprints/admin/routes.py:222
 msgid "Donación eliminada."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:213 app/blueprints/discussions/routes.py:127
+#: app/blueprints/admin/routes.py:248 app/blueprints/discussions/routes.py:127
 msgid "Título y contenido son obligatorios."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:222
+#: app/blueprints/admin/routes.py:257
 msgid "Discusión actualizada."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:243
+#: app/blueprints/admin/routes.py:278
 msgid "Discusión eliminada."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:254
+#: app/blueprints/admin/routes.py:289
 msgid "Comentario eliminado."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:264
+#: app/blueprints/admin/routes.py:299
 msgid "Estado inválido."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:270 app/blueprints/admin/routes.py:516
+#: app/blueprints/admin/routes.py:305 app/blueprints/admin/routes.py:553
 msgid "Reporte actualizado."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:281
+#: app/blueprints/admin/routes.py:316
 msgid "Selecciona al menos un reporte."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:287
+#: app/blueprints/admin/routes.py:322
 msgid "Selección inválida."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:294
+#: app/blueprints/admin/routes.py:329
 #, python-format
 msgid "%(count)s reporte(s) eliminado(s)."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:475 app/blueprints/map/routes.py:961
+#: app/blueprints/admin/routes.py:512 app/blueprints/map/routes.py:984
 msgid "Edición enviada a moderación."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:540
+#: app/blueprints/admin/routes.py:579
 msgid "Revisión inválida."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:590
+#: app/blueprints/admin/routes.py:629
 msgid "Reporte restaurado a una versión anterior."
 msgstr ""
 
@@ -128,7 +128,7 @@ msgid "Verificación reCAPTCHA falló. Intenta nuevamente."
 msgstr ""
 
 #: app/blueprints/discussions/routes.py:123
-#: app/blueprints/discussions/routes.py:189 app/blueprints/map/routes.py:667
+#: app/blueprints/discussions/routes.py:189 app/blueprints/map/routes.py:687
 msgid "Se detectó contenido sospechoso. Revisa y vuelve a intentar."
 msgstr ""
 
@@ -144,35 +144,35 @@ msgstr ""
 msgid "Comentario agregado."
 msgstr ""
 
-#: app/blueprints/map/routes.py:513 app/blueprints/map/routes.py:896
+#: app/blueprints/map/routes.py:531 app/blueprints/map/routes.py:919
 msgid "Latitud/longitud inválidas."
 msgstr ""
 
-#: app/blueprints/map/routes.py:517
+#: app/blueprints/map/routes.py:535
 msgid "La ubicación debe estar dentro del territorio cubano."
 msgstr ""
 
-#: app/blueprints/map/routes.py:524 app/blueprints/map/routes.py:903
+#: app/blueprints/map/routes.py:542 app/blueprints/map/routes.py:926
 msgid "Provincia y municipio son obligatorios."
 msgstr ""
 
-#: app/blueprints/map/routes.py:604
+#: app/blueprints/map/routes.py:622
 msgid "Reporte enviado a moderación."
 msgstr ""
 
-#: app/blueprints/map/routes.py:606
+#: app/blueprints/map/routes.py:624
 msgid "Reporte publicado."
 msgstr ""
 
-#: app/blueprints/map/routes.py:670
+#: app/blueprints/map/routes.py:691
 msgid "Describe por qué la ubicación es incorrecta."
 msgstr ""
 
-#: app/blueprints/map/routes.py:922
+#: app/blueprints/map/routes.py:945
 msgid "No se pudo subir la imagen."
 msgstr ""
 
-#: app/blueprints/map/routes.py:1014
+#: app/blueprints/map/routes.py:1037
 msgid "Edición aplicada."
 msgstr ""
 
@@ -238,84 +238,84 @@ msgstr ""
 msgid "Guardar"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:27 app/templates/admin/reports.html:2
+#: app/templates/admin/dashboard.html:53 app/templates/admin/reports.html:2
 #: app/templates/admin/reports.html:5 app/templates/map/reports.html:2
 #: app/templates/map/reports.html:6 app/templates/shared/base.html:41
 #: app/templates/shared/base.html:55
 msgid "Reportes"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:29
+#: app/templates/admin/dashboard.html:55
 msgid "Activos"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:30
+#: app/templates/admin/dashboard.html:56
 msgid "Ocultos"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:31
+#: app/templates/admin/dashboard.html:57
 msgid "Por moderar"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:32
+#: app/templates/admin/dashboard.html:58
 msgid "Eliminados"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:33 app/templates/map/dashboard.html:51
+#: app/templates/admin/dashboard.html:59 app/templates/map/dashboard.html:51
 #: app/templates/map/reports.html:22
 msgid "Todos"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:34 app/templates/admin/dashboard.html:41
+#: app/templates/admin/dashboard.html:60 app/templates/admin/dashboard.html:67
 msgid "Ubicaciones reportadas"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:35 app/templates/admin/discussions.html:2
+#: app/templates/admin/dashboard.html:61 app/templates/admin/discussions.html:2
 #: app/templates/admin/discussions.html:5
 #: app/templates/discussions/index.html:2
 #: app/templates/discussions/index.html:11 app/templates/shared/base.html:38
 msgid "Discusiones"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:36 app/templates/admin/donations.html:2
+#: app/templates/admin/dashboard.html:62 app/templates/admin/donations.html:2
 #: app/templates/map/donate.html:2
 msgid "Donaciones"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:47 app/templates/map/report_detail.html:2
+#: app/templates/admin/dashboard.html:73 app/templates/map/report_detail.html:2
 msgid "Reporte"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:48
-#: app/templates/admin/edit_report.html:53 app/templates/map/analytics.html:24
-#: app/templates/map/edit_report.html:54 app/templates/map/new_post.html:51
+#: app/templates/admin/dashboard.html:74
+#: app/templates/admin/edit_report.html:54 app/templates/map/analytics.html:24
+#: app/templates/map/edit_report.html:55 app/templates/map/new_post.html:52
 msgid "Categoría"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:49 app/templates/admin/donations.html:40
+#: app/templates/admin/dashboard.html:75 app/templates/admin/donations.html:40
 #: app/templates/map/donate.html:78
 msgid "Fecha"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:50
+#: app/templates/admin/dashboard.html:76
 #: app/templates/shared/chat_widget.html:45
 msgid "Mensaje"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:51 app/templates/map/dashboard.html:2
+#: app/templates/admin/dashboard.html:77 app/templates/map/dashboard.html:2
 #: app/templates/shared/base.html:37
 msgid "Mapa"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:66
+#: app/templates/admin/dashboard.html:92
 msgid "Ver en mapa"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:74
+#: app/templates/admin/dashboard.html:100
 msgid "Ver todos"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:77
+#: app/templates/admin/dashboard.html:103
 msgid "No hay ubicaciones reportadas."
 msgstr ""
 
@@ -437,9 +437,9 @@ msgid "Autor:"
 msgstr ""
 
 #: app/templates/admin/edit_discussion.html:10
-#: app/templates/admin/edit_report.html:46
-#: app/templates/discussions/new.html:20 app/templates/map/edit_report.html:47
-#: app/templates/map/new_post.html:44
+#: app/templates/admin/edit_report.html:47
+#: app/templates/discussions/new.html:20 app/templates/map/edit_report.html:48
+#: app/templates/map/new_post.html:45
 msgid "Título"
 msgstr ""
 
@@ -448,17 +448,17 @@ msgid "Contenido (Markdown)"
 msgstr ""
 
 #: app/templates/admin/edit_discussion.html:19
-#: app/templates/admin/edit_report.html:191
-#: app/templates/discussions/new.html:38 app/templates/map/edit_report.html:189
-#: app/templates/map/new_post.html:184 app/templates/map/report_detail.html:28
+#: app/templates/admin/edit_report.html:192
+#: app/templates/discussions/new.html:38 app/templates/map/edit_report.html:190
+#: app/templates/map/new_post.html:185 app/templates/map/report_detail.html:28
 #: app/templates/moderation/edit_detail.html:36
 msgid "Enlaces de interés"
 msgstr ""
 
 #: app/templates/admin/edit_discussion.html:20
-#: app/templates/admin/edit_report.html:192
-#: app/templates/discussions/new.html:39 app/templates/map/edit_report.html:190
-#: app/templates/map/new_post.html:185
+#: app/templates/admin/edit_report.html:193
+#: app/templates/discussions/new.html:39 app/templates/map/edit_report.html:191
+#: app/templates/map/new_post.html:186
 msgid "+ Agregar"
 msgstr ""
 
@@ -478,7 +478,7 @@ msgid "ej: reporte, denuncia"
 msgstr ""
 
 #: app/templates/admin/edit_discussion.html:52
-#: app/templates/map/edit_report.html:212
+#: app/templates/map/edit_report.html:213
 #: app/templates/map/report_detail.html:69
 msgid "Imágenes"
 msgstr ""
@@ -491,7 +491,7 @@ msgstr ""
 
 #: app/templates/admin/edit_discussion.html:67
 #: app/templates/admin/edit_donation.html:24
-#: app/templates/admin/edit_report.html:213
+#: app/templates/admin/edit_report.html:214
 msgid "Guardar cambios"
 msgstr ""
 
@@ -519,38 +519,38 @@ msgstr ""
 msgid "Dibuja o ajusta el área del reporte"
 msgstr ""
 
-#: app/templates/admin/edit_report.html:41
-#: app/templates/map/edit_report.html:42
+#: app/templates/admin/edit_report.html:42
+#: app/templates/map/edit_report.html:43
 msgid ""
 "Usa polígono, rectángulo o círculo. Puedes editar el área antes de "
 "guardar."
 msgstr ""
 
-#: app/templates/admin/edit_report.html:72
-#: app/templates/map/edit_report.html:70 app/templates/map/new_post.html:64
+#: app/templates/admin/edit_report.html:73
+#: app/templates/map/edit_report.html:71 app/templates/map/new_post.html:65
 msgid ""
 "Para \"Residencia de represor\" debes indicar el nombre o apodo del "
 "represor y subir al menos una imagen. Esto es obligatorio para evitar "
 "abuso de la app."
 msgstr ""
 
-#: app/templates/admin/edit_report.html:75
-#: app/templates/map/edit_report.html:73 app/templates/map/new_post.html:67
+#: app/templates/admin/edit_report.html:76
+#: app/templates/map/edit_report.html:74 app/templates/map/new_post.html:68
 msgid "Nombre o apodo del represor"
 msgstr ""
 
-#: app/templates/admin/edit_report.html:84
-#: app/templates/map/edit_report.html:82 app/templates/map/new_post.html:76
+#: app/templates/admin/edit_report.html:85
+#: app/templates/map/edit_report.html:83 app/templates/map/new_post.html:77
 msgid "Para \"Otros\" debes especificar el tipo del reporte."
 msgstr ""
 
-#: app/templates/admin/edit_report.html:87
-#: app/templates/map/edit_report.html:85 app/templates/map/new_post.html:79
+#: app/templates/admin/edit_report.html:88
+#: app/templates/map/edit_report.html:86 app/templates/map/new_post.html:80
 msgid "Tipo (Otros)"
 msgstr ""
 
-#: app/templates/admin/edit_report.html:96
-#: app/templates/map/edit_report.html:94 app/templates/map/new_post.html:88
+#: app/templates/admin/edit_report.html:97
+#: app/templates/map/edit_report.html:95 app/templates/map/new_post.html:89
 msgid ""
 "Para \"Acción represiva del gobierno\", \"Movimiento de tropas\" y "
 "\"Reporte de Desconexión de Internet\" debes indicar fecha y hora del "
@@ -558,70 +558,70 @@ msgid ""
 " motivo de la movilización)."
 msgstr ""
 
-#: app/templates/admin/edit_report.html:100
-#: app/templates/map/edit_report.html:98 app/templates/map/new_post.html:92
+#: app/templates/admin/edit_report.html:101
+#: app/templates/map/edit_report.html:99 app/templates/map/new_post.html:93
 msgid "Fecha del evento"
 msgstr ""
 
-#: app/templates/admin/edit_report.html:114
-#: app/templates/map/edit_report.html:112 app/templates/map/new_post.html:99
+#: app/templates/admin/edit_report.html:115
+#: app/templates/map/edit_report.html:113 app/templates/map/new_post.html:100
 msgid "Hora del evento"
 msgstr ""
 
-#: app/templates/admin/edit_report.html:130
-#: app/templates/map/edit_report.html:128 app/templates/map/new_post.html:108
+#: app/templates/admin/edit_report.html:131
+#: app/templates/map/edit_report.html:129 app/templates/map/new_post.html:109
 msgid "Descripción"
-msgstr ""
-
-#: app/templates/admin/edit_report.html:137
-#: app/templates/map/edit_report.html:135
-msgid "Motivo de edición"
 msgstr ""
 
 #: app/templates/admin/edit_report.html:138
 #: app/templates/map/edit_report.html:136
+msgid "Motivo de edición"
+msgstr ""
+
+#: app/templates/admin/edit_report.html:139
+#: app/templates/map/edit_report.html:137
 msgid "Explica por qué realizas este cambio."
 msgstr ""
 
-#: app/templates/admin/edit_report.html:145
-#: app/templates/map/edit_report.html:143 app/templates/map/new_post.html:116
+#: app/templates/admin/edit_report.html:146
+#: app/templates/map/edit_report.html:144 app/templates/map/new_post.html:117
 msgid "Latitud"
 msgstr ""
 
-#: app/templates/admin/edit_report.html:152
-#: app/templates/map/edit_report.html:150 app/templates/map/new_post.html:123
+#: app/templates/admin/edit_report.html:153
+#: app/templates/map/edit_report.html:151 app/templates/map/new_post.html:124
 msgid "Longitud"
 msgstr ""
 
-#: app/templates/admin/edit_report.html:160
-#: app/templates/map/edit_report.html:158 app/templates/map/new_post.html:131
+#: app/templates/admin/edit_report.html:161
+#: app/templates/map/edit_report.html:159 app/templates/map/new_post.html:132
 msgid "Dirección"
 msgstr ""
 
-#: app/templates/admin/edit_report.html:168 app/templates/map/analytics.html:33
-#: app/templates/map/dashboard.html:40 app/templates/map/edit_report.html:166
-#: app/templates/map/new_post.html:139 app/templates/map/reports.html:11
+#: app/templates/admin/edit_report.html:169 app/templates/map/analytics.html:33
+#: app/templates/map/dashboard.html:40 app/templates/map/edit_report.html:167
+#: app/templates/map/new_post.html:140 app/templates/map/reports.html:11
 msgid "Provincia"
 msgstr ""
 
-#: app/templates/admin/edit_report.html:170
-#: app/templates/map/edit_report.html:168 app/templates/map/new_post.html:141
+#: app/templates/admin/edit_report.html:171
+#: app/templates/map/edit_report.html:169 app/templates/map/new_post.html:142
 msgid "Elige provincia"
 msgstr ""
 
-#: app/templates/admin/edit_report.html:180 app/templates/map/dashboard.html:49
-#: app/templates/map/edit_report.html:178 app/templates/map/new_post.html:151
+#: app/templates/admin/edit_report.html:181 app/templates/map/dashboard.html:49
+#: app/templates/map/edit_report.html:179 app/templates/map/new_post.html:152
 #: app/templates/map/reports.html:20
 msgid "Municipio"
 msgstr ""
 
-#: app/templates/admin/edit_report.html:182
-#: app/templates/map/edit_report.html:180 app/templates/map/new_post.html:153
+#: app/templates/admin/edit_report.html:183
+#: app/templates/map/edit_report.html:181 app/templates/map/new_post.html:154
 msgid "Elige municipio"
 msgstr ""
 
-#: app/templates/admin/edit_report.html:217
-#: app/templates/map/edit_report.html:261
+#: app/templates/admin/edit_report.html:218
+#: app/templates/map/edit_report.html:262
 msgid "Ver historial público"
 msgstr ""
 
@@ -770,7 +770,7 @@ msgid "Imagen siguiente"
 msgstr ""
 
 #: app/templates/discussions/detail.html:121
-#: app/templates/map/dashboard.html:155
+#: app/templates/map/dashboard.html:158
 #: app/templates/map/report_detail.html:139
 msgid "Imagen ampliada"
 msgstr ""
@@ -816,7 +816,7 @@ msgstr ""
 msgid "Escribe en markdown..."
 msgstr ""
 
-#: app/templates/discussions/new.html:61 app/templates/map/new_post.html:165
+#: app/templates/discussions/new.html:61 app/templates/map/new_post.html:166
 #, python-format
 msgid "Imágenes (máx %(max)s, %(mb)sMB c/u)"
 msgstr ""
@@ -926,15 +926,15 @@ msgstr ""
 msgid "Ediciones y revisiones"
 msgstr ""
 
-#: app/templates/map/analytics.html:80
+#: app/templates/map/analytics.html:93
 msgid "Notas de transparencia"
 msgstr ""
 
-#: app/templates/map/analytics.html:82
+#: app/templates/map/analytics.html:95
 msgid "Los gráficos muestran datos públicos y agregados."
 msgstr ""
 
-#: app/templates/map/analytics.html:83 app/templates/map/api_docs.html:97
+#: app/templates/map/analytics.html:96 app/templates/map/api_docs.html:97
 msgid "Si necesitas endpoints de escritura, contáctanos en"
 msgstr ""
 
@@ -1001,7 +1001,7 @@ msgid "Devuelve un reporte específico por su ID."
 msgstr ""
 
 #: app/templates/map/api_docs.html:85 app/templates/map/dashboard.html:12
-#: app/templates/map/dashboard.html:29 app/templates/map/dashboard.html:140
+#: app/templates/map/dashboard.html:29 app/templates/map/dashboard.html:143
 msgid "Categorías"
 msgstr ""
 
@@ -1058,7 +1058,7 @@ msgstr ""
 msgid "Movimientos, desconexiones y acciones represivas"
 msgstr ""
 
-#: app/templates/map/dashboard.html:68 app/templates/map/dashboard.html:132
+#: app/templates/map/dashboard.html:68 app/templates/map/dashboard.html:135
 msgid "En vivo"
 msgstr ""
 
@@ -1082,23 +1082,23 @@ msgstr ""
 msgid "Ej: Sector PNR"
 msgstr ""
 
-#: app/templates/map/dashboard.html:105
+#: app/templates/map/dashboard.html:108
 msgid "Cargando mapa base."
 msgstr ""
 
-#: app/templates/map/dashboard.html:107
+#: app/templates/map/dashboard.html:110
 msgid "Haz click en el mapa para crear un reporte"
 msgstr ""
 
-#: app/templates/map/dashboard.html:114
+#: app/templates/map/dashboard.html:117
 msgid "Leyenda de íconos"
 msgstr ""
 
-#: app/templates/map/dashboard.html:131
+#: app/templates/map/dashboard.html:134
 msgid "Aportaciones recientes"
 msgstr ""
 
-#: app/templates/map/dashboard.html:135
+#: app/templates/map/dashboard.html:138
 msgid "Sin aportaciones visibles aún."
 msgstr ""
 
@@ -1182,12 +1182,12 @@ msgstr ""
 msgid "Todas las ediciones quedan registradas en el historial público."
 msgstr ""
 
-#: app/templates/map/edit_report.html:214
+#: app/templates/map/edit_report.html:215
 #: app/templates/map/report_detail.html:71
 msgid "Las imágenes nuevas pueden requerir moderación."
 msgstr ""
 
-#: app/templates/map/edit_report.html:221
+#: app/templates/map/edit_report.html:222
 #: app/templates/map/post_history.html:35
 #: app/templates/map/post_history.html:72
 #: app/templates/map/post_history.html:132
@@ -1195,18 +1195,18 @@ msgstr ""
 msgid "Imagen del reporte"
 msgstr ""
 
-#: app/templates/map/edit_report.html:225
+#: app/templates/map/edit_report.html:226
 #: app/templates/map/report_detail.html:87
 msgid "Aún no hay imágenes para este reporte."
 msgstr ""
 
-#: app/templates/map/edit_report.html:229
+#: app/templates/map/edit_report.html:230
 #: app/templates/map/report_detail.html:92
 #, python-format
 msgid "Subir imágenes (máx %(max)s, %(mb)sMB c/u)"
 msgstr ""
 
-#: app/templates/map/edit_report.html:257
+#: app/templates/map/edit_report.html:258
 msgid "Enviar edición"
 msgstr ""
 
@@ -1275,41 +1275,41 @@ msgstr ""
 msgid "Dibuja el área del reporte (opcional)"
 msgstr ""
 
-#: app/templates/map/new_post.html:39
+#: app/templates/map/new_post.html:40
 msgid "Usa el ícono de polígono para dibujar. Puedes borrar y volver a dibujar."
 msgstr ""
 
-#: app/templates/map/new_post.html:45
+#: app/templates/map/new_post.html:46
 msgid "Ej: Detención arbitraria"
 msgstr ""
 
-#: app/templates/map/new_post.html:53
+#: app/templates/map/new_post.html:54
 msgid "Elige categoría"
 msgstr ""
 
-#: app/templates/map/new_post.html:68
+#: app/templates/map/new_post.html:69
 msgid "Ej: Apodo o nombre"
 msgstr ""
 
-#: app/templates/map/new_post.html:80
+#: app/templates/map/new_post.html:81
 msgid "Ej: Centro de vigilancia, evento, etc."
 msgstr ""
 
-#: app/templates/map/new_post.html:109
+#: app/templates/map/new_post.html:110
 msgid ""
 "Incluye detalles que ayuden a identificar el lugar, fechas, contexto y "
 "referencias visibles."
 msgstr ""
 
-#: app/templates/map/new_post.html:161
+#: app/templates/map/new_post.html:162
 msgid "Imagen (URL)"
 msgstr ""
 
-#: app/templates/map/new_post.html:209 app/templates/map/new_post.html:216
+#: app/templates/map/new_post.html:210 app/templates/map/new_post.html:217
 msgid "Publicar reporte"
 msgstr ""
 
-#: app/templates/map/new_post.html:209 app/templates/map/new_post.html:215
+#: app/templates/map/new_post.html:210 app/templates/map/new_post.html:216
 msgid "Enviar a moderación"
 msgstr ""
 

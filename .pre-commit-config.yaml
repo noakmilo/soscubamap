@@ -1,0 +1,21 @@
+repos:
+  - repo: local
+    hooks:
+      - id: i18n-pot
+        name: i18n pot up to date
+        entry: python scripts/check_i18n.py pot
+        language: system
+        pass_filenames: false
+        files: ^(app/.*\.(py|html)|templates/.*\.(html|jinja|j2)|babel\.cfg|translations/messages\.pot)$
+      - id: i18n-frontend
+        name: i18n frontend consistency
+        entry: python scripts/check_i18n.py frontend
+        language: system
+        pass_filenames: false
+        files: ^translations/frontend/.*\.json$
+      - id: requirements-split
+        name: requirements split
+        entry: python scripts/check_requirements.py
+        language: system
+        pass_filenames: false
+        files: ^requirements(\-dev)?\.txt$

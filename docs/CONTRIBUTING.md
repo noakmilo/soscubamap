@@ -10,7 +10,7 @@ Gracias por tu interés en contribuir a SOSCuba Map. Esta guía explica cómo co
 git clone <repo-url> && cd soscubamap
 python3 -m venv .venv
 source .venv/bin/activate   # Linux/macOS
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
 
 ### 2. Base de datos local
@@ -39,6 +39,20 @@ cp .env.example .env
 # Los valores por defecto funcionan para desarrollo local
 ```
 
+### 3.1. Instalar hooks locales (recomendado)
+
+```bash
+pip install -r requirements-dev.txt
+pre-commit install
+pre-commit run --all-files
+```
+
+Esto activa los checks locales de i18n antes de cada commit:
+
+- `messages.pot` actualizado si cambias strings en Python o Jinja
+- consistencia entre `translations/frontend/es.json` y los demás locales
+- separación correcta entre `requirements.txt` y `requirements-dev.txt`
+
 ### 4. Inicializar datos
 
 ```bash
@@ -58,7 +72,7 @@ Para crear un usuario admin, configurar `ADMIN_EMAIL` y `ADMIN_PASSWORD` en `.en
 
 ## Estructura del proyecto
 
-```
+```text
 soscubamap/
 ├── app/
 │   ├── __init__.py          # create_app(), registro de blueprints
@@ -131,6 +145,7 @@ git commit -m "Descripción clara del cambio"
 ```
 
 Formato de mensajes de commit:
+
 - Usar español o inglés, pero ser consistente dentro del commit.
 - Ser descriptivo: "Agregar validación de longitud mínima en descripción" en vez de "fix bug".
 

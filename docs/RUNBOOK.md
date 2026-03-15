@@ -19,6 +19,7 @@ docker compose up --build -d
 ```
 
 El `entrypoint.sh` se encarga automáticamente de:
+
 1. Esperar a que PostgreSQL esté listo
 2. Ejecutar migraciones (`flask db upgrade heads`)
 3. Sembrar roles y categorías
@@ -154,13 +155,11 @@ flask --app run.py db history
 
 ## Scripts de datos
 
-| Script                          | Función                                       |
-|---------------------------------|-----------------------------------------------|
-| `python -m scripts.seed_roles`         | Crear roles: colaborador, moderador, administrador |
-| `python -m scripts.seed_categories`    | Crear categorías de reportes                  |
-| `python -m scripts.seed_discussion_tags` | Crear tags de discusión                     |
-| `python -m scripts.backfill_locations` | Rellenar provincia/municipio en posts existentes |
-| `python -m scripts.reverse_geocode_posts` | Geocodificación inversa de posts           |
+- `python -m scripts.seed_roles`: crear roles `colaborador`, `moderador` y `administrador`.
+- `python -m scripts.seed_categories`: crear categorías de reportes.
+- `python -m scripts.seed_discussion_tags`: crear tags de discusión.
+- `python -m scripts.backfill_locations`: rellenar provincia/municipio en posts existentes.
+- `python -m scripts.reverse_geocode_posts`: geocodificación inversa de posts.
 
 ## Self-hosted maps
 

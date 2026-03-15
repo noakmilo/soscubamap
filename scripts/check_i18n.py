@@ -10,6 +10,7 @@ Commands:
              with the source (translations/frontend/es.json).
 """
 
+import importlib.util
 import json
 import re
 import subprocess
@@ -35,6 +36,29 @@ def _normalize_pot(text: str) -> str:
     return _VOLATILE_HEADERS_RE.sub("", text).strip()
 
 
+def _python_with_babel() -> str:
+    """Return a Python executable that can import Babel.
+
+    Prefer the current interpreter. If it lacks Babel, fall back to the repo
+    virtualenv when present.
+    """
+    try:
+        if importlib.util.find_spec("babel.messages.frontend") is not None:
+            return sys.executable
+    except ModuleNotFoundError:
+        pass
+
+    candidates = [
+        ROOT / ".venv" / "Scripts" / "python.exe",
+        ROOT / ".venv" / "bin" / "python",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+
+    return sys.executable
+
+
 # ---------------------------------------------------------------------------
 # Check: backend messages.pot
 # ---------------------------------------------------------------------------
@@ -53,7 +77,17 @@ def check_pot() -> None:
 
     try:
         result = subprocess.run(
-            ["pybabel", "extract", "-F", "babel.cfg", "-o", str(tmp_path), "."],
+            [
+                _python_with_babel(),
+                "-m",
+                "babel.messages.frontend",
+                "extract",
+                "-F",
+                "babel.cfg",
+                "-o",
+                str(tmp_path),
+                ".",
+            ],
             capture_output=True,
             text=True,
             cwd=ROOT,

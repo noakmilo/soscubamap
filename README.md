@@ -36,7 +36,7 @@ Windows (PowerShell):
 ### 2. Instalar dependencias y configurar
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 cp .env.example .env
 # Editar .env con tus valores (ver docs/ENV.md para referencia completa)
 ```
@@ -58,7 +58,7 @@ python -m scripts.seed_categories
 
 Editar `.env`:
 
-```
+```env
 ADMIN_EMAIL=admin@soscuba.local
 ADMIN_PASSWORD=tu_password_seguro
 ```
