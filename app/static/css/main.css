@@ -824,6 +824,7 @@ h3 {
 .protest-detail-meta {
   color: #ffd4c3;
   font-size: 11px;
+  line-height: 1.4;
 }
 
 .protest-detail-link {
@@ -835,6 +836,13 @@ h3 {
 .protest-source-credit {
   color: #ffb998;
   font-size: 11px;
+}
+
+@media (min-width: 901px) {
+  .protest-detail-meta {
+    font-size: 13px;
+    line-height: 1.65;
+  }
 }
 
 .protest-marker-icon-wrap {
