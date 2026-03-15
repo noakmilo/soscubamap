@@ -21,6 +21,7 @@ from app.models.post_revision import PostRevision
 from app.models.post_edit_request import PostEditRequest
 from app.models.category import Category
 from app.models.donation_log import DonationLog
+from app.models.protest_event import ProtestEvent
 from app.extensions import db
 from app.models.media import Media
 from app.services.media_upload import media_json_from_post, parse_media_json, get_media_payload
@@ -36,6 +37,7 @@ from decimal import Decimal
 from sqlalchemy import func
 from app.services.markdown_utils import render_markdown
 from app.services.discussion_tags import upsert_tags
+from app.services.protests import get_rss_feed_urls
 from . import admin_bp
 
 
@@ -220,6 +222,81 @@ def delete_donation(log_id):
     db.session.commit()
     flash("Donación eliminada.", "success")
     return redirect(url_for("admin.donations"))
+
+
+@admin_bp.route("/protestas")
+@login_required
+@role_required("administrador")
+def protests_review():
+    status = (request.args.get("status") or "hidden").strip().lower()
+    if status not in {"hidden", "visible", "all"}:
+        status = "hidden"
+
+    try:
+        page = max(1, int(request.args.get("page", "1")))
+    except Exception:
+        page = 1
+
+    per_page = 50
+    base_query = ProtestEvent.query
+    if status == "hidden":
+        base_query = base_query.filter(ProtestEvent.visible_on_map.is_(False))
+    elif status == "visible":
+        base_query = base_query.filter(ProtestEvent.visible_on_map.is_(True))
+
+    total = base_query.count()
+    items = (
+        base_query.order_by(
+            ProtestEvent.source_published_at_utc.desc(),
+            ProtestEvent.id.desc(),
+        )
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
+
+    feed_urls = get_rss_feed_urls()
+    has_prev = page > 1
+    has_next = page * per_page < total
+
+    return render_template(
+        "admin/protests.html",
+        items=items,
+        status=status,
+        page=page,
+        per_page=per_page,
+        total=total,
+        has_prev=has_prev,
+        has_next=has_next,
+        feed_urls=feed_urls,
+    )
+
+
+@admin_bp.route("/protestas/<int:event_id>/visibilidad", methods=["POST"])
+@login_required
+@role_required("administrador")
+def protests_set_visibility(event_id):
+    event = ProtestEvent.query.get_or_404(event_id)
+    action = (request.form.get("action") or "").strip().lower()
+    next_url = (request.form.get("next") or "").strip()
+    if not next_url.startswith("/admin"):
+        next_url = url_for("admin.protests_review")
+
+    if action == "approve":
+        event.visible_on_map = True
+        event.review_status = "approved_manual"
+        flash("Evento de protesta aprobado manualmente y publicado en mapa.", "success")
+    elif action == "hide":
+        event.visible_on_map = False
+        event.review_status = "hidden_manual"
+        flash("Evento de protesta ocultado manualmente.", "success")
+    else:
+        flash("Acción inválida.", "error")
+        return redirect(next_url)
+
+    event.updated_at = datetime.utcnow()
+    db.session.commit()
+    return redirect(next_url)
 
 
 @admin_bp.route("/discusiones/<int:post_id>/editar", methods=["GET", "POST"])

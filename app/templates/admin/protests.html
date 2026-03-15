@@ -1,0 +1,123 @@
+{% extends "shared/base.html" %}
+{% block title %} | Protestas{% endblock %}
+{% block content %}
+<section class="panel">
+  <h1>Protestas - Revisión manual</h1>
+  <p class="muted">Revisa eventos ocultos y decide cuáles publicar en la capa de protestas.</p>
+
+  <div class="admin-section">
+    <h2>Feeds activos</h2>
+    <div class="muted">El backend tiene {{ feed_urls|length }} feed(s) cargado(s) desde PROTEST_RSS_FEEDS.</div>
+    {% if feed_urls %}
+      <div class="table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Feed</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for feed in feed_urls %}
+              <tr>
+                <td>{{ loop.index }}</td>
+                <td><code>{{ feed }}</code></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="muted">No hay feeds configurados.</div>
+    {% endif %}
+  </div>
+
+  <div class="admin-section">
+    <h2>Eventos</h2>
+    <div class="admin-links">
+      <a href="{{ url_for('admin.protests_review', status='hidden') }}">Ocultos</a>
+      <a href="{{ url_for('admin.protests_review', status='visible') }}">Visibles</a>
+      <a href="{{ url_for('admin.protests_review', status='all') }}">Todos</a>
+      <a href="{{ url_for('api.protests_debug') }}" target="_blank" rel="noopener noreferrer">Debug API</a>
+    </div>
+    <div class="muted">Estado actual: <strong>{{ status }}</strong>. Mostrando {{ items|length }} de {{ total }}.</div>
+
+    {% if items %}
+      <div class="table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Fecha UTC</th>
+              <th>Evento</th>
+              <th>Ubicación</th>
+              <th>Clasificación</th>
+              <th>Fuente</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in items %}
+              <tr>
+                <td>{{ item.id }}</td>
+                <td>{{ item.source_published_at_utc }}</td>
+                <td>
+                  <div><strong>{{ item.raw_title or "Sin título" }}</strong></div>
+                  <div class="muted">{{ (item.clean_text or "")[:240] }}{% if (item.clean_text or "")|length > 240 %}...{% endif %}</div>
+                </td>
+                <td>
+                  <div>{{ item.matched_feature_name or item.matched_place_text or "No resuelta" }}</div>
+                  <div class="muted">{{ item.matched_municipality or "-" }} / {{ item.matched_province or "-" }}</div>
+                </td>
+                <td>
+                  <div>{{ item.event_type }} · {{ "%.1f"|format(item.confidence_score or 0) }}%</div>
+                  <div class="muted">review_status: {{ item.review_status }}</div>
+                </td>
+                <td>
+                  <div>{{ item.source_name or "-" }}</div>
+                  {% if item.source_url %}
+                    <a href="{{ item.source_url }}" target="_blank" rel="noopener noreferrer">Abrir fuente</a>
+                  {% else %}
+                    <div class="muted">Sin enlace</div>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if item.visible_on_map %}
+                    <span style="color:#6ee7b7;">Visible</span>
+                  {% else %}
+                    <span style="color:#ffb998;">Oculto</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <form method="post" action="{{ url_for('admin.protests_set_visibility', event_id=item.id) }}" style="display:grid;gap:6px;">
+                    <input type="hidden" name="next" value="{{ request.full_path }}" />
+                    {% if item.visible_on_map %}
+                      <input type="hidden" name="action" value="hide" />
+                      <button type="submit" class="btn-secondary">Ocultar</button>
+                    {% else %}
+                      <input type="hidden" name="action" value="approve" />
+                      <button type="submit" class="btn-primary">Aprobar y mostrar</button>
+                    {% endif %}
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="admin-links">
+        {% if has_prev %}
+          <a href="{{ url_for('admin.protests_review', status=status, page=page-1) }}">Anterior</a>
+        {% endif %}
+        {% if has_next %}
+          <a href="{{ url_for('admin.protests_review', status=status, page=page+1) }}">Siguiente</a>
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="muted">No hay eventos para este filtro.</div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
