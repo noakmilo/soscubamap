@@ -12,10 +12,14 @@
 
     <div class="admin-section">
       <h2>Feeds RSS</h2>
-      <label>
-        URLs de feeds RSS (separadas por comas)
-        <textarea name="protest.rss_feeds" rows="3" placeholder="https://ejemplo.com/rss, https://otro.com/feed">{{ settings['protest.rss_feeds'] }}</textarea>
-      </label>
+      <label for="rss-feed-input">Agregar URL de feed RSS</label>
+      <div class="feed-editor-row">
+        <input id="rss-feed-input" type="url" placeholder="https://ejemplo.com/rss" autocomplete="off">
+        <button type="button" id="rss-feed-add" class="btn-secondary">Agregar</button>
+      </div>
+      <ul id="rss-feed-list" class="feed-list" aria-live="polite"></ul>
+      <input type="hidden" name="protest.rss_feeds" id="rss-feeds-hidden" value="{{ settings['protest.rss_feeds'] }}">
+      <p class="muted">Agrega cada fuente una por una. Se guardan en orden y sin duplicados.</p>
     </div>
 
     <div class="admin-section">
@@ -118,4 +122,100 @@
 
   </form>
 </section>
+<script>
+  (function () {
+    var input = document.getElementById("rss-feed-input");
+    var addButton = document.getElementById("rss-feed-add");
+    var list = document.getElementById("rss-feed-list");
+    var hidden = document.getElementById("rss-feeds-hidden");
+
+    if (!input || !addButton || !list || !hidden) {
+      return;
+    }
+
+    var feeds = (hidden.value || "")
+      .split(",")
+      .map(function (item) {
+        return item.trim();
+      })
+      .filter(function (item) {
+        return item.length > 0;
+      });
+
+    function syncHidden() {
+      hidden.value = feeds.join(", ");
+    }
+
+    function renderList() {
+      list.innerHTML = "";
+      feeds.forEach(function (url, index) {
+        var li = document.createElement("li");
+        li.className = "feed-list-item";
+
+        var span = document.createElement("span");
+        span.textContent = url;
+
+        var removeButton = document.createElement("button");
+        removeButton.type = "button";
+        removeButton.className = "btn-secondary";
+        removeButton.textContent = "Quitar";
+        removeButton.addEventListener("click", function () {
+          feeds.splice(index, 1);
+          syncHidden();
+          renderList();
+        });
+
+        li.appendChild(span);
+        li.appendChild(removeButton);
+        list.appendChild(li);
+      });
+
+      if (feeds.length === 0) {
+        var empty = document.createElement("li");
+        empty.className = "muted";
+        empty.textContent = "Sin fuentes agregadas.";
+        list.appendChild(empty);
+      }
+    }
+
+    function addFeed() {
+      var value = (input.value || "").trim();
+      if (!value) {
+        return;
+      }
+
+      try {
+        var parsed = new URL(value);
+        if (!parsed.protocol || (parsed.protocol !== "http:" && parsed.protocol !== "https:")) {
+          return;
+        }
+      } catch (e) {
+        return;
+      }
+
+      if (feeds.indexOf(value) !== -1) {
+        input.value = "";
+        input.focus();
+        return;
+      }
+
+      feeds.push(value);
+      syncHidden();
+      renderList();
+      input.value = "";
+      input.focus();
+    }
+
+    addButton.addEventListener("click", addFeed);
+    input.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addFeed();
+      }
+    });
+
+    syncHidden();
+    renderList();
+  })();
+</script>
 {% endblock %}
