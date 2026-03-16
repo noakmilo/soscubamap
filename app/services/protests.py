@@ -148,9 +148,63 @@ def _csv_env_list(value, defaults=None):
     return items or list(defaults or [])
 
 
+def _dedupe_urls(urls):
+    result = []
+    seen = set()
+    for raw_url in urls or []:
+        text = str(raw_url or "").strip()
+        if not text:
+            continue
+        canonical = canonicalize_source_url(text) or text
+        if canonical in seen:
+            continue
+        seen.add(canonical)
+        result.append(text)
+    return result
+
+
+def _feed_urls_from_json_payload(payload):
+    if isinstance(payload, dict):
+        items = payload.get("feeds")
+    elif isinstance(payload, list):
+        items = payload
+    else:
+        items = []
+    if not isinstance(items, list):
+        return []
+    return _dedupe_urls([str(item or "").strip() for item in items if str(item or "").strip()])
+
+
+def _load_rss_feed_urls_from_json():
+    json_path = str(
+        _get_env_or_config("PROTEST_RSS_FEEDS_JSON_PATH", "app/static/data/protest_feeds.json")
+        or ""
+    ).strip()
+    if not json_path:
+        return []
+    resolved = _resolve_path(json_path)
+    if not resolved or not os.path.exists(resolved):
+        return []
+    try:
+        with open(resolved, "r", encoding="utf-8") as fh:
+            payload = json.load(fh)
+    except Exception:
+        return []
+    return _feed_urls_from_json_payload(payload)
+
+
 def get_rss_feed_urls():
-    raw = _get_env_or_config("PROTEST_RSS_FEEDS", "")
-    return _csv_env_list(raw)
+    # JSON-only: lista de feeds gestionada en archivo para evitar
+    # problemas de parseo/sobrescritura en .env.
+    return _dedupe_urls(_load_rss_feed_urls_from_json())
+
+
+def get_fetch_interval_seconds():
+    raw = _get_env_or_config("PROTEST_FETCH_INTERVAL_SECONDS", "300")
+    try:
+        return max(60, int(raw))
+    except Exception:
+        return 300
 
 
 def get_fetch_timeout_seconds():
@@ -749,6 +803,22 @@ def _candidate_specificity(entry):
     return 0
 
 
+def _term_positions(normalized_text, term):
+    if not normalized_text or not term:
+        return []
+    pattern = rf"(?<!\w){re.escape(term)}(?!\w)"
+    return [match.start() for match in re.finditer(pattern, normalized_text)]
+
+
+def _first_sentence_end(normalized_text):
+    if not normalized_text:
+        return -1
+    match = re.search(r"[.!?;]", normalized_text)
+    if not match:
+        return -1
+    return match.start()
+
+
 def resolve_place(clean_text):
     normalized = _normalize_text(clean_text)
     if not normalized:
@@ -785,6 +855,7 @@ def resolve_place(clean_text):
     all_idx = gazetteer.get("all") or {}
     terms_sorted = gazetteer.get("terms_sorted") or []
     province_terms = gazetteer.get("province_terms") or set()
+    first_sentence_end = _first_sentence_end(normalized)
 
     context_provinces = set()
     for term in terms_sorted:
@@ -797,8 +868,10 @@ def resolve_place(clean_text):
     for term in terms_sorted:
         if term in GENERIC_PLACE_TERMS:
             continue
-        if not re.search(rf"(?<!\w){re.escape(term)}(?!\w)", normalized):
+        positions = _term_positions(normalized, term)
+        if not positions:
             continue
+        first_pos = positions[0]
         for entry in all_idx.get(term, []):
             province_norm = _normalize_text(entry.get("province"))
             score = _candidate_specificity(entry) + len(term) / 12.0
@@ -806,6 +879,13 @@ def resolve_place(clean_text):
                 score += 8.0
             if "," in normalized and term in normalized:
                 score += 1.0
+            # Prioriza menciones tempranas y de la primera frase.
+            score += max(0.0, 14.0 - (float(first_pos) / 16.0))
+            if first_sentence_end >= 0 and first_pos <= first_sentence_end:
+                score += 8.0
+            sentence_penalty = normalized[:first_pos].count(".") * 2.5
+            if sentence_penalty > 0:
+                score -= min(8.0, sentence_penalty)
             candidates.append((score, term, entry))
 
     if not candidates:
