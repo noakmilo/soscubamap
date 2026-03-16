@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-03-15 11:49+0000\n"
+"POT-Creation-Date: 2026-03-16 03:38+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,92 +17,92 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
-#: app/blueprints/admin/routes.py:91
+#: app/blueprints/admin/routes.py:93
 msgid "Moderación actualizada."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:160
+#: app/blueprints/admin/routes.py:162
 msgid "Monto obligatorio."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:162
+#: app/blueprints/admin/routes.py:164
 msgid "Vía obligatoria."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:164
+#: app/blueprints/admin/routes.py:166
 msgid "Fecha obligatoria."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:166
+#: app/blueprints/admin/routes.py:168
 msgid "Destino obligatorio."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:183
+#: app/blueprints/admin/routes.py:185
 msgid "Donación registrada."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:186
+#: app/blueprints/admin/routes.py:188
 msgid "Fecha inválida. Usa formato YYYY-MM-DD."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:204
+#: app/blueprints/admin/routes.py:206
 msgid "Completa todos los campos."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:213
+#: app/blueprints/admin/routes.py:215
 msgid "Donación actualizada."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:228
+#: app/blueprints/admin/routes.py:230
 msgid "Donación eliminada."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:254 app/blueprints/discussions/routes.py:147
+#: app/blueprints/admin/routes.py:331 app/blueprints/discussions/routes.py:147
 msgid "Título y contenido son obligatorios."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:263
+#: app/blueprints/admin/routes.py:340
 msgid "Discusión actualizada."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:284
+#: app/blueprints/admin/routes.py:361
 msgid "Discusión eliminada."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:295
+#: app/blueprints/admin/routes.py:372
 msgid "Comentario eliminado."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:305
+#: app/blueprints/admin/routes.py:382
 msgid "Estado inválido."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:311 app/blueprints/admin/routes.py:585
+#: app/blueprints/admin/routes.py:388 app/blueprints/admin/routes.py:662
 msgid "Reporte actualizado."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:324
+#: app/blueprints/admin/routes.py:401
 msgid "Selecciona al menos un reporte."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:330
+#: app/blueprints/admin/routes.py:407
 msgid "Selección inválida."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:337
+#: app/blueprints/admin/routes.py:414
 #, python-format
 msgid "%(count)s reporte(s) eliminado(s)."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:544 app/blueprints/map/routes.py:985
+#: app/blueprints/admin/routes.py:621 app/blueprints/map/routes.py:985
 msgid "Edición enviada a moderación."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:615
+#: app/blueprints/admin/routes.py:692
 msgid "Revisión inválida."
 msgstr ""
 
-#: app/blueprints/admin/routes.py:665
+#: app/blueprints/admin/routes.py:742
 msgid "Reporte restaurado a una versión anterior."
 msgstr ""
 
@@ -266,56 +266,60 @@ msgstr ""
 msgid "Todos"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:60 app/templates/admin/dashboard.html:67
+#: app/templates/admin/dashboard.html:60 app/templates/admin/dashboard.html:68
 msgid "Ubicaciones reportadas"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:61 app/templates/admin/discussions.html:2
+#: app/templates/admin/dashboard.html:61
+msgid "Protestas (revisión)"
+msgstr ""
+
+#: app/templates/admin/dashboard.html:62 app/templates/admin/discussions.html:2
 #: app/templates/admin/discussions.html:5
 #: app/templates/discussions/index.html:2
 #: app/templates/discussions/index.html:11 app/templates/shared/base.html:38
 msgid "Discusiones"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:62 app/templates/admin/donations.html:2
+#: app/templates/admin/dashboard.html:63 app/templates/admin/donations.html:2
 #: app/templates/map/donate.html:2
 msgid "Donaciones"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:73 app/templates/map/report_detail.html:2
+#: app/templates/admin/dashboard.html:74 app/templates/map/report_detail.html:2
 msgid "Reporte"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:74
+#: app/templates/admin/dashboard.html:75
 #: app/templates/admin/edit_report.html:54 app/templates/map/analytics.html:24
 #: app/templates/map/edit_report.html:55 app/templates/map/new_post.html:52
 msgid "Categoría"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:75 app/templates/admin/donations.html:40
+#: app/templates/admin/dashboard.html:76 app/templates/admin/donations.html:40
 #: app/templates/map/donate.html:78
 msgid "Fecha"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:76
+#: app/templates/admin/dashboard.html:77
 #: app/templates/shared/chat_widget.html:45
 msgid "Mensaje"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:77 app/templates/map/dashboard.html:2
+#: app/templates/admin/dashboard.html:78 app/templates/map/dashboard.html:2
 #: app/templates/shared/base.html:37
 msgid "Mapa"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:92
+#: app/templates/admin/dashboard.html:93
 msgid "Ver en mapa"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:100
+#: app/templates/admin/dashboard.html:101
 msgid "Ver todos"
 msgstr ""
 
-#: app/templates/admin/dashboard.html:103
+#: app/templates/admin/dashboard.html:104
 msgid "No hay ubicaciones reportadas."
 msgstr ""
 
