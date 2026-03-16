@@ -1,13 +1,15 @@
 from flask import Flask
 from werkzeug.middleware.proxy_fix import ProxyFix
-from .extensions import db, migrate, login_manager, limiter
-from .blueprints.auth import auth_bp
-from .blueprints.map import map_bp
+
 from .blueprints.admin import admin_bp
-from .blueprints.moderation import moderation_bp
 from .blueprints.api import api_bp
+from .blueprints.auth import auth_bp
 from .blueprints.discussions import discussions_bp
+from .blueprints.map import map_bp
+from .blueprints.moderation import moderation_bp
 from .blueprints.panic import panic_bp
+from .extensions import db, limiter, login_manager, migrate
+from .services.protest_scheduler import start_protest_scheduler
 
 
 def create_app(config_object="config.settings.Config"):
@@ -30,4 +32,8 @@ def create_app(config_object="config.settings.Config"):
     app.register_blueprint(discussions_bp)
     app.register_blueprint(panic_bp)
 
+    if app.config.get("PROTEST_SCHEDULER_IN_WEB", False):
+        start_protest_scheduler(app)
+
+    return app
     return app

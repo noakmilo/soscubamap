@@ -136,3 +136,5 @@ Secretos necesarios en **Settings → Secrets and variables → Actions** del re
 | `CHAT_DISABLED`       | Deshabilitar el chat en vivo. `1` = deshabilitado. | `0`     |
 | `ASSET_VERSION`       | Versión para cache-busting de assets estáticos.  | `1`      |
 | `TRUST_PROXY_HEADERS` | Confiar en cabeceras de proxy (X-Forwarded-For). `1` = sí. | `1` |
+| `PROTEST_SCHEDULER_ENABLED` | Habilita scheduler de protestas en el proceso actual. | `1` |
+| `PROTEST_SCHEDULER_IN_WEB` | Permite arrancar scheduler embebido en procesos web (Gunicorn). En producción se recomienda `0`. | `0` |

@@ -1,0 +1,20 @@
+[Unit]
+Description=SOSCuba Protest Analysis Worker
+After=network.target postgresql.service soscuba.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=soscuba
+WorkingDirectory=/home/soscuba/soscubamap
+EnvironmentFile=/home/soscuba/soscubamap/.env
+Environment=PROTEST_SCHEDULER_ENABLED=1
+Environment=PROTEST_SCHEDULER_IN_WEB=0
+ExecStart=/home/soscuba/soscubamap/.venv/bin/python -m scripts.run_protest_scheduler
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

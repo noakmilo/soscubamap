@@ -115,6 +115,31 @@ sudo systemctl enable soscuba
 sudo systemctl start soscuba
 ```
 
+### Worker dedicado para analisis de protestas (opcion recomendada)
+
+Para ejecutar la ingesta RSS/NLP fuera de Gunicorn, usa el servicio dedicado:
+
+```bash
+sudo cp deploy/systemd/soscuba-protest-worker.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now soscuba-protest-worker
+```
+
+Variables recomendadas en `/home/soscuba/soscubamap/.env`:
+
+```bash
+PROTEST_SCHEDULER_ENABLED=1
+PROTEST_SCHEDULER_IN_WEB=0
+```
+
+Con esto, la web no ejecuta scheduler en hilos de Gunicorn y el analisis corre en un proceso separado.
+
+Logs del worker:
+
+```bash
+sudo journalctl -u soscuba-protest-worker -f
+```
+
 ### Actualizar (script incluido)
 
 ```bash
