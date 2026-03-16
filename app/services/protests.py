@@ -112,6 +112,7 @@ def utcnow_naive():
 
 
 def _get_env_or_config(key, default=None):
+    """Kept for non-protest env/config lookups (e.g. GEOJSON paths)."""
     try:
         from flask import current_app
 
@@ -149,12 +150,15 @@ def _csv_env_list(value, defaults=None):
 
 
 def get_rss_feed_urls():
-    raw = _get_env_or_config("PROTEST_RSS_FEEDS", "")
-    return _csv_env_list(raw)
+    from app.services.protest_settings import get_rss_feeds_raw
+
+    return _csv_env_list(get_rss_feeds_raw())
 
 
 def get_fetch_timeout_seconds():
-    raw = _get_env_or_config("PROTEST_FETCH_TIMEOUT_SECONDS", "30")
+    from app.services.protest_settings import get_fetch_timeout_seconds_raw
+
+    raw = get_fetch_timeout_seconds_raw()
     try:
         return max(5, int(raw))
     except Exception:
@@ -162,7 +166,9 @@ def get_fetch_timeout_seconds():
 
 
 def get_frontend_refresh_seconds():
-    raw = _get_env_or_config("PROTEST_FRONTEND_REFRESH_SECONDS", "300")
+    from app.services.protest_settings import get_frontend_refresh_seconds_raw
+
+    raw = get_frontend_refresh_seconds_raw()
     try:
         return max(30, int(raw))
     except Exception:
@@ -170,7 +176,9 @@ def get_frontend_refresh_seconds():
 
 
 def get_min_confidence_to_show():
-    raw = _get_env_or_config("PROTEST_MIN_CONFIDENCE_TO_SHOW", "35")
+    from app.services.protest_settings import get_min_confidence_raw
+
+    raw = get_min_confidence_raw()
     try:
         return max(0.0, min(100.0, float(raw)))
     except Exception:
@@ -178,17 +186,21 @@ def get_min_confidence_to_show():
 
 
 def require_source_url_for_map():
-    raw = _get_env_or_config("PROTEST_REQUIRE_SOURCE_URL", "1")
-    return _truthy(raw)
+    from app.services.protest_settings import get_require_source_url_raw
+
+    return _truthy(get_require_source_url_raw())
 
 
 def allow_unresolved_location_on_map():
-    raw = _get_env_or_config("PROTEST_ALLOW_UNRESOLVED_TO_MAP", "0")
-    return _truthy(raw)
+    from app.services.protest_settings import get_allow_unresolved_raw
+
+    return _truthy(get_allow_unresolved_raw())
 
 
 def get_max_items_per_feed():
-    raw = _get_env_or_config("PROTEST_MAX_ITEMS_PER_FEED", "120")
+    from app.services.protest_settings import get_max_items_per_feed_raw
+
+    raw = get_max_items_per_feed_raw()
     try:
         return max(1, int(raw))
     except Exception:
@@ -196,7 +208,9 @@ def get_max_items_per_feed():
 
 
 def get_max_post_age_days():
-    raw = _get_env_or_config("PROTEST_MAX_POST_AGE_DAYS", "30")
+    from app.services.protest_settings import get_max_post_age_days_raw
+
+    raw = get_max_post_age_days_raw()
     try:
         return max(1, int(raw))
     except Exception:
@@ -204,18 +218,17 @@ def get_max_post_age_days():
 
 
 def get_protest_keyword_sets():
-    strong = _csv_env_list(
-        _get_env_or_config("PROTEST_KEYWORDS_STRONG", ""),
-        defaults=DEFAULT_STRONG_KEYWORDS,
+    from app.services.protest_settings import (
+        get_keywords_context_raw,
+        get_keywords_strong_raw,
+        get_keywords_weak_raw,
     )
+
+    strong = _csv_env_list(get_keywords_strong_raw(), defaults=DEFAULT_STRONG_KEYWORDS)
     context = _csv_env_list(
-        _get_env_or_config("PROTEST_KEYWORDS_CONTEXT", ""),
-        defaults=DEFAULT_CONTEXT_KEYWORDS,
+        get_keywords_context_raw(), defaults=DEFAULT_CONTEXT_KEYWORDS
     )
-    weak = _csv_env_list(
-        _get_env_or_config("PROTEST_KEYWORDS_WEAK", ""),
-        defaults=DEFAULT_WEAK_KEYWORDS,
-    )
+    weak = _csv_env_list(get_keywords_weak_raw(), defaults=DEFAULT_WEAK_KEYWORDS)
     return {
         "strong": sorted({_normalize_text(item) for item in strong if item}),
         "context": sorted({_normalize_text(item) for item in context if item}),
@@ -301,7 +314,9 @@ def parse_rss_items(xml_text, source_feed):
         link = canonicalize_source_url(_child_text(item, "link"))
         guid = (_child_text(item, "guid") or "").strip()
         pub_date = parse_rss_datetime(_child_text(item, "pubDate"))
-        merged_text = " ".join(part for part in [title, clean_description] if part).strip()
+        merged_text = " ".join(
+            part for part in [title, clean_description] if part
+        ).strip()
         if not merged_text:
             continue
         items.append(
@@ -328,7 +343,9 @@ def extract_source_name(feed_url):
 
 
 def _source_name_overrides():
-    raw = str(_get_env_or_config("PROTEST_SOURCE_NAME_OVERRIDES_JSON", "") or "").strip()
+    from app.services.protest_settings import get_source_name_overrides_json_raw
+
+    raw = str(get_source_name_overrides_json_raw() or "").strip()
     if not raw:
         return {}
     try:
@@ -504,7 +521,9 @@ def _add_entry(target, entry):
 
 
 def _parse_aliases():
-    raw = str(_get_env_or_config("PROTEST_PLACE_ALIASES_JSON", "") or "").strip()
+    from app.services.protest_settings import get_place_aliases_json_raw
+
+    raw = str(get_place_aliases_json_raw() or "").strip()
     if not raw:
         return {}
     try:
@@ -632,7 +651,9 @@ def _build_gazetteer():
         province_lat, province_lng = province_centroids.get(province_norm, (None, None))
         for municipality_name in mun_list:
             mun_norm = _normalize_text(municipality_name)
-            lat, lng = municipality_centroids.get((mun_norm, province_norm), (None, None))
+            lat, lng = municipality_centroids.get(
+                (mun_norm, province_norm), (None, None)
+            )
             if lat is None or lng is None:
                 lat, lng = province_lat, province_lng
             _add_entry(
@@ -660,7 +681,9 @@ def _build_gazetteer():
         province_norm = _normalize_text(province_name)
         municipality_norm = _normalize_text(municipality_name)
         if (lat is None or lng is None) and municipality_name:
-            lat, lng = municipality_centroids.get((municipality_norm, province_norm), (None, None))
+            lat, lng = municipality_centroids.get(
+                (municipality_norm, province_norm), (None, None)
+            )
         if (lat is None or lng is None) and province_name:
             lat, lng = province_centroids.get(province_norm, (None, None))
         _add_entry(
@@ -854,13 +877,23 @@ def resolve_place(clean_text):
     feature_type = best_entry.get("type")
     precision = "unresolved"
     if feature_type == "locality":
-        precision = "exact_locality" if lat is not None and lng is not None else "approx_locality"
+        precision = (
+            "exact_locality"
+            if lat is not None and lng is not None
+            else "approx_locality"
+        )
     elif feature_type == "municipality":
         precision = (
-            "exact_municipality" if lat is not None and lng is not None else "approx_municipality"
+            "exact_municipality"
+            if lat is not None and lng is not None
+            else "approx_municipality"
         )
     elif feature_type == "province":
-        precision = "exact_province" if lat is not None and lng is not None else "approx_province"
+        precision = (
+            "exact_province"
+            if lat is not None and lng is not None
+            else "approx_province"
+        )
 
     return {
         "resolved": lat is not None and lng is not None,
@@ -888,7 +921,9 @@ def classify_event(clean_text, keyword_hits, place_result):
         score += 16
     if strong_count and context_count:
         score += 8
-    if "cacerolas" in (keyword_hits.get("strong") or []) and "libertad" in _normalize_text(clean_text):
+    if "cacerolas" in (
+        keyword_hits.get("strong") or []
+    ) and "libertad" in _normalize_text(clean_text):
         score += 6
     if not has_location:
         score -= 10
@@ -933,11 +968,17 @@ def should_show_on_map(event_payload):
         return False
 
     event_type = event_payload.get("event_type")
-    if event_type not in {"confirmed_protest", "probable_protest", "related_unrest", "unresolved_location"}:
+    if event_type not in {
+        "confirmed_protest",
+        "probable_protest",
+        "related_unrest",
+        "unresolved_location",
+    }:
         return False
 
     has_coords = (
-        event_payload.get("latitude") is not None and event_payload.get("longitude") is not None
+        event_payload.get("latitude") is not None
+        and event_payload.get("longitude") is not None
     )
     if not has_coords and not allow_unresolved:
         return False
@@ -949,7 +990,9 @@ def build_event_payload(item):
     clean_text = str(item.get("clean_text") or "").strip()
     keyword_hits = detect_keywords(clean_text)
     place_result = resolve_place(clean_text)
-    confidence_score, event_type = classify_event(clean_text, keyword_hits, place_result)
+    confidence_score, event_type = classify_event(
+        clean_text, keyword_hits, place_result
+    )
 
     source_url = canonicalize_source_url(item.get("link"))
     published_at = item.get("published_at_utc")

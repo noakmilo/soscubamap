@@ -1,8 +1,29 @@
-from flask import render_template, redirect, url_for, request, flash, current_app
-from flask_login import login_required
+import json
+from datetime import datetime
+from decimal import Decimal
 
+from flask import current_app, flash, redirect, render_template, request, url_for
+from flask_login import current_user, login_required
+from sqlalchemy import func
+
+from app.extensions import db
+from app.models.category import Category
+from app.models.discussion_comment import DiscussionComment
+from app.models.discussion_post import DiscussionPost
+from app.models.discussion_tag import DiscussionTag
+from app.models.donation_log import DonationLog
+from app.models.location_report import LocationReport
+from app.models.media import Media
+from app.models.post import Post
+from app.models.post_edit_request import PostEditRequest
+from app.models.post_revision import PostRevision
 from app.services.authz import role_required
-from app.services.settings import get_setting, set_setting
+from app.services.category_rules import is_other_type_allowed
+from app.services.category_sort import sort_categories_for_forms
+from app.services.content_quality import validate_description, validate_title
+from app.services.discussion_tags import upsert_tags
+from app.services.geo_lookup import list_provinces, lookup_location, municipalities_map
+from app.services.input_safety import has_malicious_input
 from app.services.map_providers import (
     MAP_PROVIDER_GOOGLE,
     MAP_PROVIDER_LEAFLET,
@@ -12,30 +33,14 @@ from app.services.map_providers import (
     set_map_provider_forms,
     set_map_provider_main,
 )
-from app.models.post import Post
-from app.models.discussion_post import DiscussionPost
-from app.models.discussion_comment import DiscussionComment
-from app.models.discussion_tag import DiscussionTag
-from app.models.location_report import LocationReport
-from app.models.post_revision import PostRevision
-from app.models.post_edit_request import PostEditRequest
-from app.models.category import Category
-from app.models.donation_log import DonationLog
-from app.extensions import db
-from app.models.media import Media
-from app.services.media_upload import media_json_from_post, parse_media_json, get_media_payload
-from app.services.input_safety import has_malicious_input
-from app.services.content_quality import validate_title, validate_description
-from app.services.category_rules import is_other_type_allowed
-from app.services.category_sort import sort_categories_for_forms
-from app.services.geo_lookup import lookup_location, list_provinces, municipalities_map
-from flask_login import current_user
-import json
-from datetime import datetime
-from decimal import Decimal
-from sqlalchemy import func
 from app.services.markdown_utils import render_markdown
-from app.services.discussion_tags import upsert_tags
+from app.services.media_upload import (
+    get_media_payload,
+    media_json_from_post,
+    parse_media_json,
+)
+from app.services.settings import get_setting, set_setting
+
 from . import admin_bp
 
 
@@ -627,3 +632,24 @@ def restore_revision(post_id, revision_id):
 
     flash("Reporte restaurado a una versión anterior.", "success")
     return redirect(url_for("map.post_history", post_id=post.id))
+
+
+@admin_bp.route("/protestas", methods=["GET", "POST"])
+@login_required
+@role_required("administrador")
+def protest_settings():
+    from app.services.protest_settings import _DEFAULTS, get_all_raw, save_all
+
+    if request.method == "POST":
+        data = {key: request.form.get(key, "").strip() for key in _DEFAULTS}
+        save_all(data)
+        flash("Configuración de protestas guardada.", "success")
+        return redirect(url_for("admin.protest_settings"))
+
+    settings = get_all_raw()
+    return render_template("admin/protest_settings.html", settings=settings)
+        flash("Configuración de protestas guardada.", "success")
+        return redirect(url_for("admin.protest_settings"))
+
+    settings = get_all_raw()
+    return render_template("admin/protest_settings.html", settings=settings)

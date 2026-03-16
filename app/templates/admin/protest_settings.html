@@ -1,0 +1,121 @@
+{% extends "shared/base.html" %}
+{% block title %} | Admin · Protestas{% endblock %}
+{% block content %}
+<section class="panel">
+  <h1>Configuración de protestas</h1>
+  <p class="muted">
+    Ajustes del layer RSS/NLP de protestas. Dejar un campo vacío usa el valor por defecto del sistema.
+    La app funciona correctamente sin ningún valor configurado.
+  </p>
+
+  <form method="post" action="{{ url_for('admin.protest_settings') }}" class="form-grid">
+
+    <div class="admin-section">
+      <h2>Feeds RSS</h2>
+      <label>
+        URLs de feeds RSS (separadas por comas)
+        <textarea name="protest.rss_feeds" rows="3" placeholder="https://ejemplo.com/rss, https://otro.com/feed">{{ settings['protest.rss_feeds'] }}</textarea>
+      </label>
+    </div>
+
+    <div class="admin-section">
+      <h2>Umbrales y límites</h2>
+
+      <label>
+        Timeout de fetch (segundos, mín. 5)
+        <input type="number" name="protest.fetch_timeout_seconds" min="5" max="120"
+               value="{{ settings['protest.fetch_timeout_seconds'] }}" placeholder="30">
+      </label>
+
+      <label>
+        Refresh del frontend (segundos, mín. 30)
+        <input type="number" name="protest.frontend_refresh_seconds" min="30"
+               value="{{ settings['protest.frontend_refresh_seconds'] }}" placeholder="300">
+      </label>
+
+      <label>
+        Confianza mínima para mostrar en mapa (0–100)
+        <input type="number" name="protest.min_confidence_to_show" min="0" max="100" step="0.1"
+               value="{{ settings['protest.min_confidence_to_show'] }}" placeholder="35">
+      </label>
+
+      <label>
+        Máximo de ítems por feed
+        <input type="number" name="protest.max_items_per_feed" min="1"
+               value="{{ settings['protest.max_items_per_feed'] }}" placeholder="120">
+      </label>
+
+      <label>
+        Antigüedad máxima de publicaciones (días)
+        <input type="number" name="protest.max_post_age_days" min="1"
+               value="{{ settings['protest.max_post_age_days'] }}" placeholder="30">
+      </label>
+
+      <label class="switch-label-row">
+        <span>Requerir URL fuente para mostrar en mapa</span>
+        <label class="switch">
+          <input type="hidden" name="protest.require_source_url" value="0">
+          <input type="checkbox" name="protest.require_source_url" value="1"
+                 {% if settings['protest.require_source_url'] == '1' %}checked{% endif %}>
+          <span class="slider"></span>
+        </label>
+      </label>
+
+      <label class="switch-label-row">
+        <span>Permitir eventos sin ubicación resuelta en mapa</span>
+        <label class="switch">
+          <input type="hidden" name="protest.allow_unresolved_to_map" value="0">
+          <input type="checkbox" name="protest.allow_unresolved_to_map" value="1"
+                 {% if settings['protest.allow_unresolved_to_map'] == '1' %}checked{% endif %}>
+          <span class="slider"></span>
+        </label>
+      </label>
+    </div>
+
+    <div class="admin-section">
+      <h2>Palabras clave NLP</h2>
+      <p class="muted">CSV separado por comas. Vacío usa las palabras clave por defecto del sistema.</p>
+
+      <label>
+        Palabras clave fuertes (alta confianza)
+        <textarea name="protest.keywords_strong" rows="3"
+                  placeholder="protesta, manifestantes, cacerolazo, ...">{{ settings['protest.keywords_strong'] }}</textarea>
+      </label>
+
+      <label>
+        Palabras clave de contexto (confianza media)
+        <textarea name="protest.keywords_context" rows="3"
+                  placeholder="detenidos, represion, descontento social, ...">{{ settings['protest.keywords_context'] }}</textarea>
+      </label>
+
+      <label>
+        Palabras clave débiles (baja confianza)
+        <textarea name="protest.keywords_weak" rows="2"
+                  placeholder="situacion, movilizacion, ...">{{ settings['protest.keywords_weak'] }}</textarea>
+      </label>
+    </div>
+
+    <div class="admin-section">
+      <h2>Avanzado</h2>
+
+      <label>
+        Alias de lugares (JSON: <code>{"alias": "nombre_canónico"}</code>)
+        <textarea name="protest.place_aliases_json" rows="4"
+                  placeholder='{"oriente": "santiago de cuba", "capital": "la habana"}'>{{ settings['protest.place_aliases_json'] }}</textarea>
+      </label>
+
+      <label>
+        Nombres de fuentes personalizados (JSON: <code>{"url_feed": "Nombre"}</code>)
+        <textarea name="protest.source_name_overrides_json" rows="4"
+                  placeholder='{"https://14ymedio.com/rss": "14ymedio"}'>{{ settings['protest.source_name_overrides_json'] }}</textarea>
+      </label>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn-primary">Guardar configuración</button>
+      <a href="{{ url_for('admin.dashboard') }}" class="btn-secondary">Cancelar</a>
+    </div>
+
+  </form>
+</section>
+{% endblock %}
