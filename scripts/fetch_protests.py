@@ -132,6 +132,15 @@ def _upsert_event(payload):
     payload["updated_at"] = now
     event = ProtestEvent(**payload)
     db.session.add(event)
+    try:
+        db.session.flush()
+    except Exception:
+        db.session.rollback()
+        # Race condition or duplicate feed+guid: treat as deduped
+        existing = _find_existing_event(payload)
+        if existing:
+            return "deduped", existing
+        raise
     return "stored", event
 
 
