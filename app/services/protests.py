@@ -721,6 +721,7 @@ def _build_gazetteer():
 
 def _gazetteer():
     from app.services.protest_settings import get_place_aliases_json_raw
+
     signature = (
         _get_env_or_config("GEOJSON_PROVINCES_PATH", ""),
         _get_env_or_config("GEOJSON_MUNICIPALITIES_PATH", ""),

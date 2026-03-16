@@ -64,9 +64,7 @@ def dashboard():
     map_provider_main = get_map_provider_main()
     map_provider_forms = get_map_provider_forms()
     location_reports = (
-        LocationReport.query.order_by(LocationReport.created_at.desc())
-        .limit(10)
-        .all()
+        LocationReport.query.order_by(LocationReport.created_at.desc()).limit(10).all()
     )
     return render_template(
         "admin/dashboard.html",
@@ -75,7 +73,9 @@ def dashboard():
         map_provider_forms=map_provider_forms,
         provider_leaflet=MAP_PROVIDER_LEAFLET,
         provider_google=MAP_PROVIDER_GOOGLE,
-        google_maps_configured=bool((current_app.config.get("GOOGLE_MAPS_API_KEY") or "").strip()),
+        google_maps_configured=bool(
+            (current_app.config.get("GOOGLE_MAPS_API_KEY") or "").strip()
+        ),
         location_reports=location_reports,
     )
 
@@ -307,7 +307,9 @@ def update_report_status(post_id):
     post.status = status
     db.session.commit()
     flash("Reporte actualizado.", "success")
-    return redirect(url_for("admin.reports", status=request.args.get("status", "approved")))
+    return redirect(
+        url_for("admin.reports", status=request.args.get("status", "approved"))
+    )
 
 
 @admin_bp.route("/reportes/bulk-delete", methods=["POST"])
@@ -339,7 +341,9 @@ def bulk_delete_reports():
 @role_required("administrador")
 def edit_report(post_id):
     post = Post.query.get_or_404(post_id)
-    categories = sort_categories_for_forms(Category.query.order_by(Category.id.asc()).all())
+    categories = sort_categories_for_forms(
+        Category.query.order_by(Category.id.asc()).all()
+    )
     links = []
     if post.links_json:
         try:
@@ -383,7 +387,9 @@ def edit_report(post_id):
             ]
             + links_list
         ):
-            errors["form"] = "Se detectó contenido sospechoso. Revisa y vuelve a intentar."
+            errors["form"] = (
+                "Se detectó contenido sospechoso. Revisa y vuelve a intentar."
+            )
 
         if not form_data["title"]:
             errors["title"] = "El título es obligatorio."
@@ -404,7 +410,9 @@ def edit_report(post_id):
                 errors["title"] = msg_title
         if form_data["description"] and "description" not in errors:
             if len(form_data["description"]) < 50:
-                errors["description"] = "La descripción debe tener al menos 50 caracteres."
+                errors["description"] = (
+                    "La descripción debe tener al menos 50 caracteres."
+                )
             else:
                 ok_desc, msg_desc = validate_description(form_data["description"])
                 if not ok_desc:
@@ -443,10 +451,18 @@ def edit_report(post_id):
         movement_at = None
         if slug == "residencia-represor":
             if not form_data["repressor_name"]:
-                errors["repressor_name"] = "Debes indicar el nombre o apodo del represor."
+                errors["repressor_name"] = (
+                    "Debes indicar el nombre o apodo del represor."
+                )
             if existing_media_count < 1:
                 errors["images"] = "Debes subir al menos una imagen del represor."
-        if slug in {"accion-represiva", "accion-represiva-del-gobierno", "movimiento-tropas", "movimiento-militar", "desconexion-internet"}:
+        if slug in {
+            "accion-represiva",
+            "accion-represiva-del-gobierno",
+            "movimiento-tropas",
+            "movimiento-militar",
+            "desconexion-internet",
+        }:
             if not form_data["movement_date"]:
                 errors["movement_date"] = "Debes indicar la fecha del evento."
             if not form_data["movement_time"]:
@@ -460,7 +476,9 @@ def edit_report(post_id):
                     errors["movement_date"] = "Fecha u hora inválida."
         if slug == "otros":
             if not form_data["other_type"]:
-                errors["other_type"] = "Debes especificar el tipo en la categoría Otros."
+                errors["other_type"] = (
+                    "Debes especificar el tipo en la categoría Otros."
+                )
             elif not is_other_type_allowed(form_data["other_type"]):
                 errors["other_type"] = (
                     "El tipo en “Otros” no puede referirse a represores. Usa la categoría correspondiente."
@@ -479,7 +497,9 @@ def edit_report(post_id):
                 provinces=list_provinces(),
                 municipalities_map=municipalities_map(),
                 map_provider_forms=get_map_provider_forms(),
-                google_maps_api_key=(current_app.config.get("GOOGLE_MAPS_API_KEY") or "").strip(),
+                google_maps_api_key=(
+                    current_app.config.get("GOOGLE_MAPS_API_KEY") or ""
+                ).strip(),
             )
 
         moderation_enabled = get_setting("moderation_enabled", "true") == "true"
@@ -491,7 +511,13 @@ def edit_report(post_id):
             else:
                 editor_label = current_user.email
 
-        if moderation_enabled and slug not in {"accion-represiva", "accion-represiva-del-gobierno", "movimiento-tropas", "movimiento-militar", "desconexion-internet"}:
+        if moderation_enabled and slug not in {
+            "accion-represiva",
+            "accion-represiva-del-gobierno",
+            "movimiento-tropas",
+            "movimiento-militar",
+            "desconexion-internet",
+        }:
             edit_req = PostEditRequest(
                 post_id=post.id,
                 editor_id=current_user.id if current_user.is_authenticated else None,
@@ -566,14 +592,18 @@ def edit_report(post_id):
         provinces=list_provinces(),
         municipalities_map=municipalities_map(),
         map_provider_forms=get_map_provider_forms(),
-        google_maps_api_key=(current_app.config.get("GOOGLE_MAPS_API_KEY") or "").strip(),
+        google_maps_api_key=(
+            current_app.config.get("GOOGLE_MAPS_API_KEY") or ""
+        ).strip(),
         form_data=None,
         errors={},
         form_links=links,
     )
 
 
-@admin_bp.route("/reportes/<int:post_id>/revisiones/<int:revision_id>/restaurar", methods=["POST"])
+@admin_bp.route(
+    "/reportes/<int:post_id>/revisiones/<int:revision_id>/restaurar", methods=["POST"]
+)
 @login_required
 @role_required("administrador")
 def restore_revision(post_id, revision_id):
@@ -643,11 +673,6 @@ def protest_settings():
     if request.method == "POST":
         data = {key: request.form.get(key, "").strip() for key in _DEFAULTS}
         save_all(data)
-        flash("Configuración de protestas guardada.", "success")
-        return redirect(url_for("admin.protest_settings"))
-
-    settings = get_all_raw()
-    return render_template("admin/protest_settings.html", settings=settings)
         flash("Configuración de protestas guardada.", "success")
         return redirect(url_for("admin.protest_settings"))
 
