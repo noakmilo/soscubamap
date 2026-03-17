@@ -513,6 +513,98 @@ h3 {
   font-size: 11px;
 }
 
+.connectivity-region-panel {
+  margin-top: 4px;
+  border-top: 1px solid rgba(214, 251, 231, 0.15);
+  padding-top: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.connectivity-region-title {
+  color: #d6fbe7;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 700;
+}
+
+.connectivity-region-chart {
+  width: 100%;
+  height: 160px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(214, 251, 231, 0.12);
+}
+
+.connectivity-region-chart .grid-line {
+  stroke: rgba(183, 221, 208, 0.18);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.connectivity-region-chart .region-series {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.connectivity-region-note {
+  color: #9ec4b8;
+  font-size: 10px;
+}
+
+.connectivity-region-legend {
+  display: grid;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding-right: 4px;
+}
+
+.connectivity-region-legend-item {
+  border: 1px solid rgba(214, 251, 231, 0.15);
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.02);
+  display: grid;
+  grid-template-columns: 12px 1fr auto auto;
+  gap: 6px;
+  align-items: center;
+  font-size: 10px;
+  color: #d6fbe7;
+}
+
+.connectivity-region-legend-empty {
+  border: 1px dashed rgba(214, 251, 231, 0.25);
+  border-radius: 8px;
+  padding: 8px;
+  color: #9ec4b8;
+  font-size: 10px;
+}
+
+.connectivity-region-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  display: inline-block;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.45);
+}
+
+.connectivity-region-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.connectivity-region-value,
+.connectivity-region-change {
+  color: #b7ddd0;
+  font-variant-numeric: tabular-nums;
+}
+
 .connectivity-traffic-panel {
   margin-top: 4px;
   border-top: 1px solid rgba(214, 251, 231, 0.15);

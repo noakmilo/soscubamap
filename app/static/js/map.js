@@ -31,6 +31,10 @@ let connectivityProvinceRange;
 let connectivityProvinceChartMain;
 let connectivityProvinceChartPrev;
 let connectivityProvinceLog;
+let connectivityRegionPanel;
+let connectivityRegionChart;
+let connectivityRegionLegend;
+let connectivityRegionNote;
 let protestLayerGroup;
 let protestRefreshTimer;
 let protestRefreshSeconds = 300;
@@ -89,6 +93,24 @@ const CONNECTIVITY_STATUS_LABELS = {
   critical: "Apagon o conectividad critica",
   unknown: "Sin datos",
 };
+const CONNECTIVITY_REGION_COLORS = [
+  "#6ee7b7",
+  "#f59e0b",
+  "#38bdf8",
+  "#fb7185",
+  "#f97316",
+  "#22d3ee",
+  "#a3e635",
+  "#facc15",
+  "#2dd4bf",
+  "#93c5fd",
+  "#f472b6",
+  "#34d399",
+  "#eab308",
+  "#60a5fa",
+  "#4ade80",
+  "#fda4af",
+];
 const PROTEST_EVENT_LABELS = {
   confirmed_protest: "Protesta confirmada",
   probable_protest: "Protesta probable",
@@ -547,6 +569,192 @@ function buildSparklinePath(values, minValue, maxValue, width = 280, height = 56
     path += `${path ? " L" : "M"} ${x.toFixed(2)} ${y.toFixed(2)}`;
   });
   return path;
+}
+
+function buildTimeseriesPath(
+  points,
+  minTsMs,
+  maxTsMs,
+  minValue,
+  maxValue,
+  width = 280,
+  height = 160,
+  pad = 8
+) {
+  if (!Array.isArray(points) || points.length < 2) return "";
+  const valid = points.filter(
+    (point) => Number.isFinite(Number(point?.ts_ms)) && Number.isFinite(Number(point?.value))
+  );
+  if (valid.length < 2) return "";
+
+  const tsMin = Number.isFinite(minTsMs) ? Number(minTsMs) : valid[0].ts_ms;
+  const tsMax = Number.isFinite(maxTsMs) ? Number(maxTsMs) : valid[valid.length - 1].ts_ms;
+  const valueMin = Number.isFinite(minValue)
+    ? Number(minValue)
+    : Math.min(...valid.map((point) => Number(point.value)));
+  const valueMax = Number.isFinite(maxValue)
+    ? Number(maxValue)
+    : Math.max(...valid.map((point) => Number(point.value)));
+
+  const tsSpan = Math.max(tsMax - tsMin, 1);
+  const valueSpan = Math.max(valueMax - valueMin, 1e-9);
+  const innerWidth = Math.max(width - pad * 2, 1);
+  const innerHeight = Math.max(height - pad * 2, 1);
+
+  let path = "";
+  valid.forEach((point) => {
+    const x = pad + ((point.ts_ms - tsMin) / tsSpan) * innerWidth;
+    const y = height - pad - ((Number(point.value) - valueMin) / valueSpan) * innerHeight;
+    path += `${path ? " L" : "M"} ${x.toFixed(2)} ${y.toFixed(2)}`;
+  });
+  return path;
+}
+
+function getConnectivityRegionSeries(payload) {
+  const byProvince = payload?.http_requests_window_by_province;
+  if (!byProvince || typeof byProvince !== "object") return [];
+
+  return Object.entries(byProvince)
+    .map(([provinceName, summary]) => {
+      const regionName = String(provinceName || "").trim();
+      const baseSeries = Array.isArray(summary?.series_main) ? summary.series_main : [];
+      const dedupedByTs = new Map();
+      baseSeries.forEach((point) => {
+        const timestampText = String(point?.timestamp_utc || "").trim();
+        const tsMs = Date.parse(timestampText);
+        const value = Number(point?.value);
+        if (!Number.isFinite(tsMs) || !Number.isFinite(value)) return;
+        dedupedByTs.set(tsMs, {
+          timestamp_utc: timestampText,
+          ts_ms: tsMs,
+          value,
+        });
+      });
+      const series = Array.from(dedupedByTs.values()).sort((a, b) => a.ts_ms - b.ts_ms);
+      if (!regionName || !series.length) return null;
+
+      const first = series[0];
+      const latest = series[series.length - 1];
+      const changePct =
+        Number.isFinite(first?.value) && first.value > 0
+          ? ((latest.value - first.value) / first.value) * 100
+          : null;
+
+      return {
+        name: regionName,
+        series,
+        latest_value: latest.value,
+        change_pct: changePct,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }));
+}
+
+function getConnectivityRegionColor(regionName) {
+  const text = String(regionName || "");
+  let hash = 0;
+  for (let idx = 0; idx < text.length; idx += 1) {
+    hash = (hash * 31 + text.charCodeAt(idx)) >>> 0;
+  }
+  return CONNECTIVITY_REGION_COLORS[hash % CONNECTIVITY_REGION_COLORS.length];
+}
+
+function renderConnectivityRegionChart(payload) {
+  if (
+    !connectivityRegionPanel ||
+    !connectivityRegionChart ||
+    !connectivityRegionLegend ||
+    !connectivityRegionNote
+  ) {
+    return;
+  }
+
+  const regionSeries = getConnectivityRegionSeries(payload);
+  if (!payload || !regionSeries.length) {
+    connectivityRegionChart.innerHTML = "";
+    connectivityRegionNote.textContent = "Sin serie regional disponible para la ventana activa.";
+    connectivityRegionLegend.innerHTML =
+      '<div class="connectivity-region-legend-empty">Sin regiones con datos.</div>';
+    return;
+  }
+
+  const allPoints = regionSeries.flatMap((item) => item.series || []);
+  const allTimestamps = allPoints.map((point) => Number(point.ts_ms)).filter(Number.isFinite);
+  const allValues = allPoints.map((point) => Number(point.value)).filter(Number.isFinite);
+  if (!allTimestamps.length || !allValues.length) {
+    connectivityRegionChart.innerHTML = "";
+    connectivityRegionNote.textContent = "No hay puntos validos para dibujar la serie regional.";
+    connectivityRegionLegend.innerHTML =
+      '<div class="connectivity-region-legend-empty">Sin regiones con datos.</div>';
+    return;
+  }
+
+  const chartWidth = 280;
+  const chartHeight = 160;
+  const chartPad = 8;
+  const minTsMs = Math.min(...allTimestamps);
+  const maxTsMs = Math.max(...allTimestamps);
+  let minValue = Math.min(...allValues);
+  let maxValue = Math.max(...allValues);
+  if (minValue === maxValue) {
+    minValue -= 0.5;
+    maxValue += 0.5;
+  }
+
+  const innerHeight = Math.max(chartHeight - chartPad * 2, 1);
+  const guideLines = [0.25, 0.5, 0.75]
+    .map((ratio) => {
+      const y = chartHeight - chartPad - ratio * innerHeight;
+      return `<line class="grid-line" x1="${chartPad}" y1="${y.toFixed(
+        2
+      )}" x2="${(chartWidth - chartPad).toFixed(2)}" y2="${y.toFixed(2)}"></line>`;
+    })
+    .join("");
+
+  const seriesMarkup = regionSeries
+    .map((item) => {
+      const color = getConnectivityRegionColor(item.name);
+      const path = buildTimeseriesPath(
+        item.series,
+        minTsMs,
+        maxTsMs,
+        minValue,
+        maxValue,
+        chartWidth,
+        chartHeight,
+        chartPad
+      );
+      if (!path) return "";
+      return `<path class="region-series" d="${path}" style="stroke:${color};"></path>`;
+    })
+    .join("");
+
+  connectivityRegionChart.innerHTML = `${guideLines}${seriesMarkup}`;
+
+  const startLabel = formatUtcAndCuba(new Date(minTsMs).toISOString());
+  const endLabel = formatUtcAndCuba(new Date(maxTsMs).toISOString());
+  const windowHours = Number(payload?.window?.hours);
+  const windowLabel = [2, 6, 24].includes(windowHours) ? `${windowHours}h` : "ventana activa";
+  connectivityRegionNote.textContent = `${regionSeries.length} regiones con datos · ${windowLabel} · ${startLabel} -> ${endLabel}`;
+
+  connectivityRegionLegend.innerHTML = regionSeries
+    .map((item) => {
+      const color = getConnectivityRegionColor(item.name);
+      const latestValueText = formatMetricValue(item.latest_value);
+      const changeText = Number.isFinite(Number(item.change_pct))
+        ? formatPercentValue(item.change_pct)
+        : "N/D";
+      return `
+        <div class="connectivity-region-legend-item">
+          <span class="connectivity-region-swatch" style="background:${color};"></span>
+          <span class="connectivity-region-name">${escapeHtml(item.name)}</span>
+          <span class="connectivity-region-value">${escapeHtml(latestValueText)}</span>
+          <span class="connectivity-region-change">${escapeHtml(changeText)}</span>
+        </div>
+      `;
+    })
+    .join("");
 }
 
 function getSelectedCategoryIds() {
@@ -1013,16 +1221,10 @@ function onConnectivityFeature(feature, layer) {
 
   layer.on("click", () => {
     selectedConnectivityProvince = province;
-    selectedConnectivityProvinceState = {
-      province,
-      status: feature?.properties?.status || "unknown",
-      status_label: label,
-      score: Number.isFinite(Number(score)) ? Number(score) : null,
-    };
     if (connectivityGeoLayer?.setStyle) {
       connectivityGeoLayer.setStyle(styleForConnectivityFeature);
     }
-    renderConnectivityProvincePanel(connectivityLastPayload);
+    renderConnectivityRegionChart(connectivityLastPayload);
   });
 }
 
@@ -1342,21 +1544,19 @@ async function refreshConnectivityLayer() {
       connectivityLastSnapshotId = snapshotId;
       connectivityLastRenderKey = renderKey;
     }
-    syncSelectedProvinceStateFromPayload(payload);
     if (selectedConnectivityProvince && connectivityGeoLayer?.setStyle) {
       connectivityGeoLayer.setStyle(styleForConnectivityFeature);
     }
     updateConnectivityUpdatedLabel(payload);
-    updateConnectivityTrafficPanel(payload);
-    renderConnectivityProvincePanel(payload);
+    renderConnectivityRegionChart(payload);
   } catch (err) {
     if (connectivityUpdatedLabel) {
       connectivityUpdatedLabel.textContent = "No fue posible actualizar conectividad.";
     }
-    if (connectivityTrafficNote) {
-      connectivityTrafficNote.textContent = "No fue posible cargar la serie HTTP de la ventana.";
+    if (connectivityRegionNote) {
+      connectivityRegionNote.textContent = "No fue posible cargar la serie regional de la ventana.";
     }
-    renderConnectivityProvincePanel(null);
+    renderConnectivityRegionChart(null);
   }
 }
 
@@ -1388,11 +1588,10 @@ function disableConnectivityMode() {
   connectivityLastRenderKey = null;
   connectivityLastPayload = null;
   selectedConnectivityProvince = "";
-  selectedConnectivityProvinceState = null;
   setConnectivityLegendVisible(false);
   setReportLegendVisible(true);
   setMapHintVisible(true);
-  renderConnectivityProvincePanel(null);
+  renderConnectivityRegionChart(null);
 }
 
 function clearProtestLayer() {
@@ -2166,6 +2365,10 @@ async function initMap() {
   connectivityProvinceChartMain = document.getElementById("connectivityProvinceChartMain");
   connectivityProvinceChartPrev = document.getElementById("connectivityProvinceChartPrev");
   connectivityProvinceLog = document.getElementById("connectivityProvinceLog");
+  connectivityRegionPanel = document.getElementById("connectivityRegionPanel");
+  connectivityRegionChart = document.getElementById("connectivityRegionChart");
+  connectivityRegionLegend = document.getElementById("connectivityRegionLegend");
+  connectivityRegionNote = document.getElementById("connectivityRegionNote");
   connectivityWindowButtons = Array.from(
     document.querySelectorAll("[data-connectivity-window-hours]")
   );
@@ -2181,7 +2384,7 @@ async function initMap() {
   protestSummary = document.getElementById("protestSummary");
   protestDetailPanel = document.getElementById("protestDetailPanel");
   setActiveConnectivityWindow(connectivityWindowHours);
-  renderConnectivityProvincePanel(null);
+  renderConnectivityRegionChart(null);
   renderProtestDetail(null);
   setProtestOverlayVisible(false);
 
