@@ -1,4 +1,5 @@
 from flask import Flask
+from dotenv import load_dotenv
 from werkzeug.middleware.proxy_fix import ProxyFix
 from .extensions import db, migrate, login_manager, limiter
 from .blueprints.auth import auth_bp
@@ -11,6 +12,7 @@ from .blueprints.panic import panic_bp
 
 
 def create_app(config_object="config.settings.Config"):
+    load_dotenv()
     app = Flask(__name__)
     app.config.from_object(config_object)
 
