@@ -2,12 +2,24 @@
 {% block title %} | Protestas{% endblock %}
 {% block content %}
 <section class="panel">
-  <h1>Protestas - Revisión manual</h1>
-  <p class="muted">Revisa eventos ocultos y decide cuáles publicar en la capa de protestas.</p>
+  <div class="admin-hero">
+    <h1>Protestas - Revisión manual</h1>
+    <p class="muted">Revisa eventos ocultos y decide cuáles publicar en la capa de protestas.</p>
+  </div>
 
   <div class="admin-section">
-    <h2>Feeds activos</h2>
-    <div class="muted">El backend tiene {{ feed_urls|length }} feed(s) cargado(s) desde PROTEST_RSS_FEEDS_JSON_PATH.</div>
+    <div class="admin-toolbar">
+      <h2>Feeds activos</h2>
+      <div class="admin-actions">
+        <form method="post" action="{{ url_for('admin.protests_manual_ingestion') }}">
+          <input type="hidden" name="next" value="{{ request.full_path }}" />
+          <button type="submit" class="btn-primary">Correr ingesta manual</button>
+        </form>
+        <a class="btn-secondary" href="{{ url_for('admin.protests_feeds_settings') }}">Configurar feeds</a>
+        <a class="btn-secondary" href="{{ url_for('admin.protests_settings') }}">Parámetros</a>
+      </div>
+    </div>
+    <div class="muted">El backend tiene {{ feed_urls|length }} feed(s) cargado(s) desde {{ feeds_source_label }}.</div>
     {% if feed_urls %}
       <div class="table-wrap">
         <table class="admin-table">

@@ -100,6 +100,11 @@ PROTEST_SETTINGS_SCHEMA = [
     },
 ]
 
+PROTEST_SETTINGS_DEFAULTS = {
+    field["key"]: str(field.get("default", ""))
+    for field in PROTEST_SETTINGS_SCHEMA
+}
+
 
 def get_protest_settings_schema():
     return [dict(field) for field in PROTEST_SETTINGS_SCHEMA]
@@ -126,6 +131,22 @@ def get_protest_settings_values():
     for field in PROTEST_SETTINGS_SCHEMA:
         values[field["key"]] = str(settings_map.get(field["key"], field["default"]))
     return values
+
+
+def get_protest_setting_value(key, fallback=None):
+    default_value = fallback
+    if default_value is None:
+        default_value = PROTEST_SETTINGS_DEFAULTS.get(str(key or "").strip(), "")
+
+    try:
+        setting = SiteSetting.query.filter_by(key=str(key or "").strip()).first()
+    except Exception:
+        return str(default_value)
+    if not setting:
+        return str(default_value)
+
+    value = str(setting.value or "").strip()
+    return value if value else str(default_value)
 
 
 def validate_protest_settings_payload(payload):

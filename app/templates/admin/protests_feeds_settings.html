@@ -2,54 +2,55 @@
 {% block title %} | Feeds Protestas{% endblock %}
 {% block content %}
 <section class="panel">
-  <h1>Feeds RSS de Protestas</h1>
-  <p>Administra URLs de feeds en base de datos. Puedes agregar tantos como necesites.</p>
+  <div class="admin-hero">
+    <h1>Feeds RSS de Protestas</h1>
+    <p class="muted">Administra desde aquí las fuentes que usa la ingesta automática y manual.</p>
+  </div>
 
   <div class="admin-section">
+    <div class="admin-toolbar">
+      <span class="admin-badge">{{ feed_count }} feed(s) en formulario</span>
+      <div class="admin-actions">
+        <a class="btn-secondary" href="{{ url_for('admin.protests_settings') }}">Parámetros de protestas</a>
+        <a class="btn-secondary" href="{{ url_for('admin.dashboard') }}">Volver al Admin</a>
+      </div>
+    </div>
+
     <form method="post" class="form-grid">
-      <div>
-        <div class="muted" style="margin-bottom: 8px;">Total cargados en el formulario: {{ feed_count }}</div>
-        <div id="protestFeedsInputs" style="display:grid; gap:8px;">
-          {% for feed_url in feed_urls %}
-            <div class="feed-input-row" style="display:flex; gap:8px; align-items:center;">
-              <input
-                type="url"
-                name="feed_urls"
-                value="{{ feed_url }}"
-                placeholder="https://ejemplo.com/feed.xml"
-                style="flex:1;"
-              />
-              <button type="button" class="btn-secondary" data-remove-feed>Quitar</button>
-            </div>
-          {% endfor %}
-        </div>
+      <div id="protestFeedsInputs" style="display:grid; gap:8px;">
+        {% for feed_url in feed_urls %}
+          <div class="feed-input-row">
+            <input
+              type="url"
+              name="feed_urls"
+              value="{{ feed_url }}"
+              placeholder="https://ejemplo.com/feed.xml"
+            />
+            <button type="button" class="btn-secondary" data-remove-feed>Quitar</button>
+          </div>
+        {% endfor %}
       </div>
 
-      <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <button type="button" class="btn-secondary" id="addFeedInputBtn">Agregar más</button>
+      <div class="admin-actions">
+        <button type="button" class="btn-secondary" id="addFeedInputBtn">Agregar otro feed</button>
         <button type="submit" class="btn-primary">Guardar feeds</button>
       </div>
     </form>
   </div>
 
-  <div class="muted" style="margin-top: 12px;">
-    Nota: en este paso solo guardamos los feeds en BD. La ingesta seguirá usando el JSON hasta hacer la migración de consumo.
-  </div>
-
-  <div style="margin-top: 12px;">
-    <a class="btn-secondary" href="{{ url_for('admin.dashboard') }}">Volver a Admin</a>
-    <a class="btn-secondary" href="{{ url_for('admin.protests_settings') }}">Configurar parámetros de protestas</a>
+  <div class="admin-note">
+    Si dejas una URL vacía, se ignora. No se permiten duplicados ni URLs sin
+    <code>http://</code> o <code>https://</code>.
   </div>
 </section>
 
 <template id="protestFeedInputTemplate">
-  <div class="feed-input-row" style="display:flex; gap:8px; align-items:center;">
+  <div class="feed-input-row">
     <input
       type="url"
       name="feed_urls"
       value=""
       placeholder="https://ejemplo.com/feed.xml"
-      style="flex:1;"
     />
     <button type="button" class="btn-secondary" data-remove-feed>Quitar</button>
   </div>

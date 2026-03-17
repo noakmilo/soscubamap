@@ -1007,6 +1007,12 @@ h3 {
   justify-content: flex-end;
 }
 
+.protest-popup-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+}
+
 .protest-btn-danger {
   border-color: rgba(255, 138, 138, 0.7);
   background: rgba(198, 40, 40, 0.25);
@@ -1027,8 +1033,17 @@ h3 {
   font-size: 11px;
 }
 
+.protest-popup-admin-note {
+  color: #7f1d1d;
+  margin-top: 6px;
+}
+
 .protest-detail-admin-note.is-error {
   color: #ff9a9a;
+}
+
+.protest-popup-admin-note.is-error {
+  color: #b91c1c;
 }
 
 .protest-source-credit {
@@ -2981,6 +2996,97 @@ textarea {
   gap: 12px;
 }
 
+.admin-hero {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 14px;
+}
+
+.admin-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #111922 0%, #0c1218 100%);
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.admin-card h2,
+.admin-card h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.admin-meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.admin-kpi {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.admin-kpi-value {
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.admin-kpi-label {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.admin-note {
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: #0d141a;
+  padding: 10px 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.admin-badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--muted);
+  background: #0c1115;
+}
+
 .admin-links {
   display: flex;
   flex-wrap: wrap;
@@ -2994,6 +3100,11 @@ textarea {
   padding: 6px 10px;
   border-radius: 8px;
   background: #0c1115;
+}
+
+.admin-links a:hover {
+  border-color: #345d51;
+  background: #12202b;
 }
 
 .switch {
@@ -3071,6 +3182,16 @@ textarea {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   font-size: 11px;
+}
+
+.feed-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.feed-input-row input {
+  flex: 1;
 }
 
 .site-footer {

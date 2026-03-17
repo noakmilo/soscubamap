@@ -168,7 +168,9 @@ def run_ingestion(feeds):
         if not feed_urls:
             feed_urls = get_rss_feed_urls()
         if not feed_urls:
-            raise RuntimeError("No hay feeds RSS configurados en PROTEST_RSS_FEEDS_JSON_PATH")
+            raise RuntimeError(
+                "No hay feeds RSS configurados en base de datos ni en app/static/data/protest_feeds.json"
+            )
 
         timeout_seconds = get_fetch_timeout_seconds()
         run = ProtestIngestionRun(

@@ -11,12 +11,19 @@ def _build_beat_schedule(flask_app):
     if not enabled:
         return {}
 
-    interval_raw = flask_app.config.get("PROTEST_FETCH_INTERVAL_SECONDS", 300)
+    interval_seconds = 300
     try:
-        interval_seconds = int(interval_raw)
+        with flask_app.app_context():
+            from app.services.protests import get_fetch_interval_seconds
+
+            interval_seconds = get_fetch_interval_seconds()
     except Exception:
-        interval_seconds = 300
-    interval_seconds = max(60, interval_seconds)
+        interval_raw = flask_app.config.get("PROTEST_FETCH_INTERVAL_SECONDS", 300)
+        try:
+            interval_seconds = int(interval_raw)
+        except Exception:
+            interval_seconds = 300
+        interval_seconds = max(60, interval_seconds)
 
     queue_name = (flask_app.config.get("CELERY_PROTEST_QUEUE") or "ingestion").strip()
     if not queue_name:

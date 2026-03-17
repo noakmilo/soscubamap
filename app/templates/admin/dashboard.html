@@ -2,72 +2,108 @@
 {% block title %} | Admin{% endblock %}
 {% block content %}
 <section class="panel">
-  <h1>Administración</h1>
-  <p>Gestión de usuarios, roles, categorías y configuración del mapa.</p>
+  <div class="admin-hero">
+    <h1>Panel de Administración</h1>
+    <p class="muted">Control central de moderación, mapas, protestas y datos operativos.</p>
+  </div>
 
-  <div class="admin-section">
-    <h2>Moderación</h2>
-    <form method="post" action="{{ url_for('admin.toggle_moderation') }}">
-      <label class="switch">
-        <input type="checkbox" name="moderation_enabled" {% if moderation_enabled %}checked{% endif %} />
-        <span class="slider"></span>
-      </label>
-      <span class="switch-label">
+  <div class="admin-grid">
+    <article class="admin-card">
+      <h2>Moderación</h2>
+      <form method="post" action="{{ url_for('admin.toggle_moderation') }}" class="admin-inline-form">
+        <label class="switch">
+          <input type="checkbox" name="moderation_enabled" {% if moderation_enabled %}checked{% endif %} />
+          <span class="slider"></span>
+        </label>
+        <span class="switch-label">
+          {% if moderation_enabled %}
+            Activada
+          {% else %}
+            Desactivada
+          {% endif %}
+        </span>
+        <button type="submit" class="btn-primary">Guardar</button>
+      </form>
+      <div class="admin-meta">
         {% if moderation_enabled %}
-          Activada (los reportes van a moderación)
+          Los reportes nuevos pasan por revisión.
         {% else %}
-          Desactivada (los reportes se publican directo)
+          Los reportes nuevos se publican directo.
         {% endif %}
-      </span>
-      <button type="submit" class="btn-primary">Guardar</button>
-    </form>
-  </div>
-
-  <div class="admin-section">
-    <h2>Proveedor de mapas</h2>
-    <form method="post" action="{{ url_for('admin.update_map_providers') }}" class="form-grid">
-      <label>
-        Vista principal del mapa
-        <select name="map_provider_main" required>
-          <option value="{{ provider_leaflet }}" {% if map_provider_main == provider_leaflet %}selected{% endif %}>OSM + Leaflet</option>
-          <option value="{{ provider_google }}" {% if map_provider_main == provider_google %}selected{% endif %}>Google Maps</option>
-        </select>
-      </label>
-      <label>
-        Formulario de crear/editar reporte
-        <select name="map_provider_forms" required>
-          <option value="{{ provider_leaflet }}" {% if map_provider_forms == provider_leaflet %}selected{% endif %}>OSM + Leaflet</option>
-          <option value="{{ provider_google }}" {% if map_provider_forms == provider_google %}selected{% endif %}>Google Maps</option>
-        </select>
-      </label>
-      <button type="submit" class="btn-primary">Guardar proveedor</button>
-    </form>
-    {% if not google_maps_configured %}
-      <div class="muted" style="margin-top:8px;">
-        GOOGLE_MAPS_API_KEY no está configurada. Si seleccionas Google Maps, se usará Leaflet como fallback.
       </div>
-    {% endif %}
+    </article>
+
+    <article class="admin-card">
+      <h2>Proveedor de mapas</h2>
+      <form method="post" action="{{ url_for('admin.update_map_providers') }}" class="form-grid">
+        <label>
+          Vista principal
+          <select name="map_provider_main" required>
+            <option value="{{ provider_leaflet }}" {% if map_provider_main == provider_leaflet %}selected{% endif %}>OSM + Leaflet</option>
+            <option value="{{ provider_google }}" {% if map_provider_main == provider_google %}selected{% endif %}>Google Maps</option>
+          </select>
+        </label>
+        <label>
+          Formularios de reportes
+          <select name="map_provider_forms" required>
+            <option value="{{ provider_leaflet }}" {% if map_provider_forms == provider_leaflet %}selected{% endif %}>OSM + Leaflet</option>
+            <option value="{{ provider_google }}" {% if map_provider_forms == provider_google %}selected{% endif %}>Google Maps</option>
+          </select>
+        </label>
+        <button type="submit" class="btn-primary">Guardar proveedor</button>
+      </form>
+      {% if not google_maps_configured %}
+        <div class="admin-note">
+          GOOGLE_MAPS_API_KEY no está configurada. Si eliges Google Maps, se usará Leaflet como fallback.
+        </div>
+      {% endif %}
+    </article>
+
+    <article class="admin-card">
+      <h2>Ingesta de Protestas</h2>
+      <div class="admin-kpi">
+        <span class="admin-kpi-value">{{ protest_feed_count }}</span>
+        <span class="admin-kpi-label">feeds activos</span>
+      </div>
+      <div class="admin-meta">
+        {% if latest_protest_run %}
+          Última corrida: #{{ latest_protest_run.id }} · {{ latest_protest_run.status }} · {{ latest_protest_run.started_at_utc }}
+        {% else %}
+          Aún no hay corridas registradas.
+        {% endif %}
+      </div>
+      <form method="post" action="{{ url_for('admin.protests_manual_ingestion') }}">
+        <input type="hidden" name="next" value="{{ url_for('admin.dashboard') }}" />
+        <button type="submit" class="btn-primary">Correr ingesta manual</button>
+      </form>
+      <div class="admin-actions">
+        <a class="btn-secondary" href="{{ url_for('admin.protests_review', status='hidden') }}">Revisión de protestas</a>
+        <a class="btn-secondary" href="{{ url_for('admin.protests_settings') }}">Configuración</a>
+        <a class="btn-secondary" href="{{ url_for('admin.protests_feeds_settings') }}">Feeds RSS</a>
+      </div>
+    </article>
   </div>
 
   <div class="admin-section">
-    <h2>Reportes</h2>
+    <h2>Accesos rápidos</h2>
     <div class="admin-links">
-      <a href="{{ url_for('admin.reports', status='approved') }}">Activos</a>
-      <a href="{{ url_for('admin.reports', status='hidden') }}">Ocultos</a>
+      <a href="{{ url_for('admin.reports', status='approved') }}">Reportes activos</a>
+      <a href="{{ url_for('admin.reports', status='hidden') }}">Reportes ocultos</a>
       <a href="{{ url_for('admin.reports', status='pending') }}">Por moderar</a>
       <a href="{{ url_for('admin.reports', status='deleted') }}">Eliminados</a>
-      <a href="{{ url_for('admin.reports', status='all') }}">Todos</a>
+      <a href="{{ url_for('admin.reports', status='all') }}">Todos los reportes</a>
       <a href="{{ url_for('admin.location_reports') }}">Ubicaciones reportadas</a>
-      <a href="{{ url_for('admin.protests_review', status='hidden') }}">Protestas (revisión)</a>
-      <a href="{{ url_for('admin.protests_settings') }}">Protestas (configuración)</a>
-      <a href="/admin/protestas/feeds">Protestas (feeds RSS)</a>
       <a href="{{ url_for('admin.discussions') }}">Discusiones</a>
       <a href="{{ url_for('admin.donations') }}">Donaciones</a>
+      <a href="{{ url_for('api.protests_debug') }}" target="_blank" rel="noopener noreferrer">Debug Protestas API</a>
     </div>
   </div>
 
   <div class="admin-section">
-    <h2>Ubicaciones reportadas</h2>
+    <div class="admin-toolbar">
+      <h2>Últimas ubicaciones reportadas</h2>
+      <a class="btn-secondary" href="{{ url_for('admin.location_reports') }}">Ver todas</a>
+    </div>
     {% if location_reports and location_reports|length %}
       <div class="table-wrap">
         <table class="admin-table">
@@ -84,9 +120,7 @@
             {% for report in location_reports %}
               <tr>
                 <td>
-                  <a href="{{ url_for('map.report_detail', post_id=report.post.id) }}">
-                    {{ report.post.title }}
-                  </a>
+                  <a href="{{ url_for('map.report_detail', post_id=report.post.id) }}">{{ report.post.title }}</a>
                 </td>
                 <td>{{ report.post.category.name }}</td>
                 <td>{{ report.created_at }}</td>
@@ -98,9 +132,6 @@
             {% endfor %}
           </tbody>
         </table>
-      </div>
-      <div style="margin-top:10px;">
-        <a class="btn-secondary" href="{{ url_for('admin.location_reports') }}">Ver todos</a>
       </div>
     {% else %}
       <div class="muted">No hay ubicaciones reportadas.</div>

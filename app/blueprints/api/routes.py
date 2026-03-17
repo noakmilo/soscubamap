@@ -59,9 +59,13 @@ from app.services.geo_lookup import list_provinces
 from app.services.cuba_locations import PROVINCES
 from app.services.protests import (
     display_source_name as protest_display_source_name,
+    get_fetch_interval_seconds as protest_fetch_interval_seconds,
+    get_fetch_timeout_seconds as protest_fetch_timeout_seconds,
     get_rss_feed_urls as protest_rss_feed_urls,
     get_frontend_refresh_seconds as protest_frontend_refresh_seconds,
     get_min_confidence_to_show as protest_min_confidence_to_show,
+    require_source_url_for_map as protest_require_source_url,
+    allow_unresolved_location_on_map as protest_allow_unresolved_location_on_map,
 )
 
 from app.models.post import Post
@@ -766,6 +770,7 @@ def _build_protest_feature(row):
             "location_precision": row.location_precision,
             "detected_keywords": _safe_keywords_json(row.detected_keywords_json),
             "review_status": row.review_status,
+            "can_admin_delete": _is_admin_user(),
         },
     }
 
@@ -1438,22 +1443,13 @@ def protests_debug():
             "generated_at_utc": serialize_snapshot_time(datetime.utcnow()),
             "config": {
                 "protest_rss_feeds": protest_rss_feed_urls(),
-                "protest_rss_feeds_mode": "json_only",
-                "protest_rss_feeds_json_path": current_app.config.get(
-                    "PROTEST_RSS_FEEDS_JSON_PATH",
-                    "app/static/data/protest_feeds.json",
-                ),
-                "protest_fetch_timeout_seconds": int(
-                    current_app.config.get("PROTEST_FETCH_TIMEOUT_SECONDS", 30)
-                ),
-                "protest_fetch_interval_seconds": int(
-                    current_app.config.get("PROTEST_FETCH_INTERVAL_SECONDS", 300)
-                ),
+                "protest_rss_feeds_mode": "db_first_with_json_fallback",
+                "protest_fetch_timeout_seconds": protest_fetch_timeout_seconds(),
+                "protest_fetch_interval_seconds": protest_fetch_interval_seconds(),
                 "protest_frontend_refresh_seconds": protest_frontend_refresh_seconds(),
                 "protest_min_confidence_to_show": protest_min_confidence_to_show(),
-                "protest_require_source_url": bool(
-                    current_app.config.get("PROTEST_REQUIRE_SOURCE_URL", True)
-                ),
+                "protest_require_source_url": protest_require_source_url(),
+                "protest_allow_unresolved_to_map": protest_allow_unresolved_location_on_map(),
                 "geojson_provinces_path": current_app.config.get("GEOJSON_PROVINCES_PATH"),
                 "geojson_municipalities_path": current_app.config.get("GEOJSON_MUNICIPALITIES_PATH"),
                 "geojson_localities_path": current_app.config.get("GEOJSON_LOCALITIES_PATH"),

@@ -1842,6 +1842,41 @@ function createProtestCircleIcon(feature) {
   });
 }
 
+async function deleteProtestEntry(protestId, options = {}) {
+  const safeId = Number(protestId);
+  if (!Number.isFinite(safeId) || safeId <= 0) return false;
+
+  const buttonEl = options.buttonEl || null;
+  const noteEl = options.noteEl || null;
+  if (buttonEl?.disabled) return false;
+  if (!confirm("Eliminar esta protesta? Esta accion es permanente.")) return false;
+
+  if (buttonEl) buttonEl.disabled = true;
+  if (noteEl) {
+    noteEl.textContent = "Eliminando protesta...";
+    noteEl.classList.remove("is-error");
+  }
+
+  try {
+    const response = await fetch(`/api/protests/${safeId}`, { method: "DELETE" });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result?.ok) {
+      throw new Error(result?.error || "No se pudo eliminar la protesta.");
+    }
+    protestSelectedFeatureId = null;
+    await refreshProtestLayer();
+    return true;
+  } catch (error) {
+    if (noteEl) {
+      noteEl.textContent = error?.message || "No se pudo eliminar la protesta.";
+      noteEl.classList.add("is-error");
+    }
+    return false;
+  } finally {
+    if (buttonEl) buttonEl.disabled = false;
+  }
+}
+
 function protestPopupHtml(feature) {
   const props = feature?.properties || {};
   const title = escapeHtml(props.title || "Evento");
@@ -1860,9 +1895,22 @@ function protestPopupHtml(feature) {
   const published = props.source_published_at_utc
     ? escapeHtml(formatUtcAndCuba(props.source_published_at_utc))
     : "N/D";
+  const protestId = Number(props.id);
+  const canAdminDelete =
+    Boolean(props.can_admin_delete) && Number.isFinite(protestId) && protestId > 0;
   const sourceLinkHtml = sourceUrl
     ? `<a href="${sourceUrl}" target="_blank" rel="noopener noreferrer">Ver publicacion original</a>`
     : "<span>Sin enlace fuente</span>";
+  const adminActionsHtml = canAdminDelete
+    ? `
+      <div class="protest-popup-actions">
+        <button type="button" class="protest-btn protest-btn-danger" data-protest-popup-delete-id="${protestId}">
+          Eliminar protesta
+        </button>
+      </div>
+      <div class="protest-popup-admin-note protest-detail-admin-note" data-protest-popup-admin-note></div>
+    `
+    : "";
   return `
     <div style="color:#111;max-width:280px;">
       <h3 style="margin:0 0 6px;">${title}</h3>
@@ -1871,8 +1919,31 @@ function protestPopupHtml(feature) {
       <div style="font-size:12px;margin-bottom:4px;">Fecha: ${published}</div>
       <div style="font-size:12px;margin-bottom:4px;">Fuente: ${sourceName}</div>
       <div style="font-size:12px;">${sourceLinkHtml}</div>
+      ${adminActionsHtml}
     </div>
   `;
+}
+
+function attachProtestPopupActions(feature, popupElement) {
+  if (!popupElement) return;
+  const props = feature?.properties || {};
+  const protestId = Number(props.id);
+  const canAdminDelete =
+    Boolean(props.can_admin_delete) && Number.isFinite(protestId) && protestId > 0;
+  if (!canAdminDelete) return;
+
+  const deleteBtn = popupElement.querySelector("[data-protest-popup-delete-id]");
+  const adminNote = popupElement.querySelector("[data-protest-popup-admin-note]");
+  if (!deleteBtn) return;
+
+  deleteBtn.addEventListener("click", async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    await deleteProtestEntry(protestId, {
+      buttonEl: deleteBtn,
+      noteEl: adminNote,
+    });
+  });
 }
 
 function renderProtestDetail(feature) {
@@ -1899,7 +1970,8 @@ function renderProtestDetail(feature) {
   const sourceUrl = safeUrl(props.source_url || "");
   const sourceUrlLabel = escapeHtml(props.source_url || "");
   const protestId = Number(props.id);
-  const hasProtestId = Number.isFinite(protestId) && protestId > 0;
+  const canAdminDelete =
+    Boolean(props.can_admin_delete) && Number.isFinite(protestId) && protestId > 0;
   const published = props.source_published_at_utc
     ? escapeHtml(formatUtcAndCuba(props.source_published_at_utc))
     : "N/D";
@@ -1913,7 +1985,7 @@ function renderProtestDetail(feature) {
     .join(", ");
 
   const adminActionsHtml =
-    isAdmin && hasProtestId
+    canAdminDelete
       ? `
         <div class="protest-detail-actions">
           <button type="button" class="protest-btn protest-btn-danger" data-protest-delete-id="${protestId}">
@@ -1939,37 +2011,16 @@ function renderProtestDetail(feature) {
     ${adminActionsHtml}
   `;
 
-  if (!isAdmin || !hasProtestId) return;
+  if (!canAdminDelete) return;
   const deleteBtn = protestDetailPanel.querySelector("[data-protest-delete-id]");
   const adminNote = protestDetailPanel.querySelector("[data-protest-admin-note]");
   if (!deleteBtn) return;
 
   deleteBtn.addEventListener("click", async () => {
-    if (deleteBtn.disabled) return;
-    if (!confirm("Eliminar esta protesta? Esta accion es permanente.")) return;
-
-    deleteBtn.disabled = true;
-    if (adminNote) {
-      adminNote.textContent = "Eliminando protesta...";
-      adminNote.classList.remove("is-error");
-    }
-
-    try {
-      const response = await fetch(`/api/protests/${protestId}`, { method: "DELETE" });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok || !result?.ok) {
-        throw new Error(result?.error || "No se pudo eliminar la protesta.");
-      }
-      protestSelectedFeatureId = null;
-      await refreshProtestLayer();
-    } catch (error) {
-      if (adminNote) {
-        adminNote.textContent = error?.message || "No se pudo eliminar la protesta.";
-        adminNote.classList.add("is-error");
-      }
-    } finally {
-      deleteBtn.disabled = false;
-    }
+    await deleteProtestEntry(protestId, {
+      buttonEl: deleteBtn,
+      noteEl: adminNote,
+    });
   });
 }
 
@@ -2073,6 +2124,11 @@ function renderProtestData(payload) {
     marker.on("click", () => {
       protestSelectedFeatureId = Number(feature?.properties?.id) || null;
       renderProtestDetail(feature);
+    });
+    marker.on("popupopen", (event) => {
+      const popupElement = event?.popup?.getElement?.();
+      if (!popupElement) return;
+      attachProtestPopupActions(feature, popupElement);
     });
     marker.addTo(protestLayerGroup);
     if (isSelected) {

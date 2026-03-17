@@ -22,6 +22,7 @@ from app.models.post_edit_request import PostEditRequest
 from app.models.category import Category
 from app.models.donation_log import DonationLog
 from app.models.protest_event import ProtestEvent
+from app.models.protest_ingestion_run import ProtestIngestionRun
 from app.extensions import db
 from app.models.media import Media
 from app.services.media_upload import media_json_from_post, parse_media_json, get_media_payload
@@ -76,6 +77,15 @@ def dashboard():
         .limit(10)
         .all()
     )
+    latest_protest_run = (
+        ProtestIngestionRun.query.order_by(
+            ProtestIngestionRun.started_at_utc.desc(),
+            ProtestIngestionRun.id.desc(),
+        )
+        .limit(1)
+        .first()
+    )
+    protest_feed_count = len(get_rss_feed_urls())
     return render_template(
         "admin/dashboard.html",
         moderation_enabled=moderation_enabled,
@@ -85,6 +95,8 @@ def dashboard():
         provider_google=MAP_PROVIDER_GOOGLE,
         google_maps_configured=bool((current_app.config.get("GOOGLE_MAPS_API_KEY") or "").strip()),
         location_reports=location_reports,
+        protest_feed_count=protest_feed_count,
+        latest_protest_run=latest_protest_run,
     )
 
 
@@ -266,7 +278,13 @@ def protests_review():
         .all()
     )
 
-    feed_urls = get_rss_feed_urls()
+    feed_urls_from_db = get_protest_feed_urls_from_db()
+    if feed_urls_from_db:
+        feed_urls = feed_urls_from_db
+        feeds_source_label = "base de datos"
+    else:
+        feed_urls = get_rss_feed_urls()
+        feeds_source_label = "archivo JSON (fallback)"
     has_prev = page > 1
     has_next = page * per_page < total
 
@@ -280,6 +298,7 @@ def protests_review():
         has_prev=has_prev,
         has_next=has_next,
         feed_urls=feed_urls,
+        feeds_source_label=feeds_source_label,
     )
 
 
@@ -345,6 +364,33 @@ def protests_feeds_settings():
         feed_urls=feed_urls,
         feed_count=len([item for item in feed_urls if str(item or "").strip()]),
     )
+
+
+@admin_bp.route("/protestas/ingesta-manual", methods=["POST"])
+@login_required
+@role_required("administrador")
+def protests_manual_ingestion():
+    next_url = (request.form.get("next") or "").strip()
+    if not next_url.startswith("/admin"):
+        next_url = url_for("admin.protests_review")
+
+    queue_name = (current_app.config.get("CELERY_PROTEST_QUEUE") or "ingestion").strip() or "ingestion"
+    try:
+        from app.celery_app import PROTEST_INGESTION_TASK, celery
+
+        result = celery.send_task(
+            PROTEST_INGESTION_TASK,
+            kwargs={"feeds": []},
+            queue=queue_name,
+        )
+        flash(
+            f"Ingesta manual enviada a Celery (task_id={result.id}, queue={queue_name}).",
+            "success",
+        )
+    except Exception as exc:
+        flash(f"No se pudo enviar la ingesta manual a Celery: {exc}", "error")
+
+    return redirect(next_url)
 
 
 @admin_bp.route("/protestas/<int:event_id>/visibilidad", methods=["POST"])

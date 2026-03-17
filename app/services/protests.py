@@ -3,6 +3,7 @@ import html
 import json
 import os
 import re
+import time
 import unicodedata
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
@@ -110,6 +111,9 @@ _GAZETTEER_CACHE = {
     "data": None,
 }
 
+_PROTEST_SETTINGS_CACHE_TTL_SECONDS = 15
+_PROTEST_SETTINGS_CACHE = {}
+
 
 def utcnow_naive():
     return datetime.now(timezone.utc).replace(tzinfo=None)
@@ -122,6 +126,32 @@ def _get_env_or_config(key, default=None):
         return current_app.config.get(key, os.getenv(key, default))
     except Exception:
         return os.getenv(key, default)
+
+
+def _get_protest_setting(key, default=None):
+    cache_key = str(key or "").strip()
+    if not cache_key:
+        return default
+
+    now = time.monotonic()
+    cached = _PROTEST_SETTINGS_CACHE.get(cache_key)
+    if cached and now - cached["loaded_at"] < _PROTEST_SETTINGS_CACHE_TTL_SECONDS:
+        return cached["value"]
+
+    env_fallback = _get_env_or_config(cache_key, default)
+    value = env_fallback
+    try:
+        from app.services.protest_settings import get_protest_setting_value
+
+        value = get_protest_setting_value(cache_key, fallback=env_fallback)
+    except Exception:
+        value = env_fallback
+
+    _PROTEST_SETTINGS_CACHE[cache_key] = {
+        "loaded_at": now,
+        "value": value,
+    }
+    return value
 
 
 def _truthy(value):
@@ -197,14 +227,24 @@ def _load_rss_feed_urls_from_json():
     return _feed_urls_from_json_payload(payload)
 
 
+def _load_rss_feed_urls_from_db():
+    try:
+        from app.services.protest_feeds import get_protest_feed_urls_from_db
+
+        return _dedupe_urls(get_protest_feed_urls_from_db())
+    except Exception:
+        return []
+
+
 def get_rss_feed_urls():
-    # JSON-only: lista de feeds gestionada en archivo para evitar
-    # problemas de parseo/sobrescritura en .env.
+    urls_from_db = _load_rss_feed_urls_from_db()
+    if urls_from_db:
+        return urls_from_db
     return _dedupe_urls(_load_rss_feed_urls_from_json())
 
 
 def get_fetch_interval_seconds():
-    raw = _get_env_or_config("PROTEST_FETCH_INTERVAL_SECONDS", "300")
+    raw = _get_protest_setting("PROTEST_FETCH_INTERVAL_SECONDS", "300")
     try:
         return max(60, int(raw))
     except Exception:
@@ -212,15 +252,15 @@ def get_fetch_interval_seconds():
 
 
 def get_fetch_timeout_seconds():
-    raw = _get_env_or_config("PROTEST_FETCH_TIMEOUT_SECONDS", "30")
+    raw = _get_protest_setting("PROTEST_FETCH_TIMEOUT_SECONDS", "20")
     try:
         return max(5, int(raw))
     except Exception:
-        return 30
+        return 20
 
 
 def get_frontend_refresh_seconds():
-    raw = _get_env_or_config("PROTEST_FRONTEND_REFRESH_SECONDS", "300")
+    raw = _get_protest_setting("PROTEST_FRONTEND_REFRESH_SECONDS", "300")
     try:
         return max(30, int(raw))
     except Exception:
@@ -228,25 +268,25 @@ def get_frontend_refresh_seconds():
 
 
 def get_min_confidence_to_show():
-    raw = _get_env_or_config("PROTEST_MIN_CONFIDENCE_TO_SHOW", "35")
+    raw = _get_protest_setting("PROTEST_MIN_CONFIDENCE_TO_SHOW", "10")
     try:
         return max(0.0, min(100.0, float(raw)))
     except Exception:
-        return 35.0
+        return 10.0
 
 
 def require_source_url_for_map():
-    raw = _get_env_or_config("PROTEST_REQUIRE_SOURCE_URL", "1")
+    raw = _get_protest_setting("PROTEST_REQUIRE_SOURCE_URL", "1")
     return _truthy(raw)
 
 
 def allow_unresolved_location_on_map():
-    raw = _get_env_or_config("PROTEST_ALLOW_UNRESOLVED_TO_MAP", "0")
+    raw = _get_protest_setting("PROTEST_ALLOW_UNRESOLVED_TO_MAP", "0")
     return _truthy(raw)
 
 
 def get_max_items_per_feed():
-    raw = _get_env_or_config("PROTEST_MAX_ITEMS_PER_FEED", "120")
+    raw = _get_protest_setting("PROTEST_MAX_ITEMS_PER_FEED", "120")
     try:
         return max(1, int(raw))
     except Exception:
@@ -254,24 +294,24 @@ def get_max_items_per_feed():
 
 
 def get_max_post_age_days():
-    raw = _get_env_or_config("PROTEST_MAX_POST_AGE_DAYS", "30")
+    raw = _get_protest_setting("PROTEST_MAX_POST_AGE_DAYS", "7")
     try:
         return max(1, int(raw))
     except Exception:
-        return 30
+        return 7
 
 
 def get_protest_keyword_sets():
     strong = _csv_env_list(
-        _get_env_or_config("PROTEST_KEYWORDS_STRONG", ""),
+        _get_protest_setting("PROTEST_KEYWORDS_STRONG", ""),
         defaults=DEFAULT_STRONG_KEYWORDS,
     )
     context = _csv_env_list(
-        _get_env_or_config("PROTEST_KEYWORDS_CONTEXT", ""),
+        _get_protest_setting("PROTEST_KEYWORDS_CONTEXT", ""),
         defaults=DEFAULT_CONTEXT_KEYWORDS,
     )
     weak = _csv_env_list(
-        _get_env_or_config("PROTEST_KEYWORDS_WEAK", ""),
+        _get_protest_setting("PROTEST_KEYWORDS_WEAK", ""),
         defaults=DEFAULT_WEAK_KEYWORDS,
     )
     return {
