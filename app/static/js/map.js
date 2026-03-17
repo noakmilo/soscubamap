@@ -1898,6 +1898,8 @@ function renderProtestDetail(feature) {
   const sourceName = escapeHtml(props.source_name || "RSS");
   const sourceUrl = safeUrl(props.source_url || "");
   const sourceUrlLabel = escapeHtml(props.source_url || "");
+  const protestId = Number(props.id);
+  const hasProtestId = Number.isFinite(protestId) && protestId > 0;
   const published = props.source_published_at_utc
     ? escapeHtml(formatUtcAndCuba(props.source_published_at_utc))
     : "N/D";
@@ -1909,6 +1911,18 @@ function renderProtestDetail(feature) {
     .slice(0, 12)
     .map((value) => escapeHtml(value))
     .join(", ");
+
+  const adminActionsHtml =
+    isAdmin && hasProtestId
+      ? `
+        <div class="protest-detail-actions">
+          <button type="button" class="protest-btn protest-btn-danger" data-protest-delete-id="${protestId}">
+            Eliminar protesta
+          </button>
+        </div>
+        <div class="protest-detail-admin-note" data-protest-admin-note></div>
+      `
+      : "";
 
   protestDetailPanel.innerHTML = `
     <div class="protest-detail-title">${title}</div>
@@ -1922,7 +1936,41 @@ function renderProtestDetail(feature) {
         ? `<a class="protest-detail-link" href="${sourceUrl}" target="_blank" rel="noopener noreferrer">${sourceUrlLabel}</a>`
         : '<div class="protest-detail-meta">Sin enlace fuente</div>'
     }
+    ${adminActionsHtml}
   `;
+
+  if (!isAdmin || !hasProtestId) return;
+  const deleteBtn = protestDetailPanel.querySelector("[data-protest-delete-id]");
+  const adminNote = protestDetailPanel.querySelector("[data-protest-admin-note]");
+  if (!deleteBtn) return;
+
+  deleteBtn.addEventListener("click", async () => {
+    if (deleteBtn.disabled) return;
+    if (!confirm("Eliminar esta protesta? Esta accion es permanente.")) return;
+
+    deleteBtn.disabled = true;
+    if (adminNote) {
+      adminNote.textContent = "Eliminando protesta...";
+      adminNote.classList.remove("is-error");
+    }
+
+    try {
+      const response = await fetch(`/api/protests/${protestId}`, { method: "DELETE" });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result?.ok) {
+        throw new Error(result?.error || "No se pudo eliminar la protesta.");
+      }
+      protestSelectedFeatureId = null;
+      await refreshProtestLayer();
+    } catch (error) {
+      if (adminNote) {
+        adminNote.textContent = error?.message || "No se pudo eliminar la protesta.";
+        adminNote.classList.add("is-error");
+      }
+    } finally {
+      deleteBtn.disabled = false;
+    }
+  });
 }
 
 function renderProtestSummary(payload) {

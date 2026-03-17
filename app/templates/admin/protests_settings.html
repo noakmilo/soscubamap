@@ -1,0 +1,42 @@
+{% extends "shared/base.html" %}
+{% block title %} | Configuración Protestas{% endblock %}
+{% block content %}
+<section class="panel">
+  <h1>Configuración de Protestas</h1>
+  <p>Guarda estos valores en base de datos para preparar la migración desde variables de entorno.</p>
+
+  <div class="admin-section">
+    <form method="post" class="form-grid">
+      {% for field in fields %}
+        {% set current_value = values.get(field.key, field.default) %}
+        <label>
+          {{ field.label }}
+          {% if field.kind == "bool01" %}
+            <select name="{{ field.key }}" required>
+              <option value="1" {% if current_value == "1" %}selected{% endif %}>1</option>
+              <option value="0" {% if current_value == "0" %}selected{% endif %}>0</option>
+            </select>
+          {% elif field.kind == "csv" %}
+            <textarea name="{{ field.key }}" rows="3" required>{{ current_value }}</textarea>
+          {% else %}
+            <input type="text" name="{{ field.key }}" value="{{ current_value }}" required />
+          {% endif %}
+          <span class="muted">{{ field.key }} · {{ field.help }}</span>
+        </label>
+      {% endfor %}
+
+      <button type="submit" class="btn-primary">Guardar configuración</button>
+    </form>
+  </div>
+
+  <div class="muted" style="margin-top: 12px;">
+    Nota: en este paso solo se guardan valores en la tabla <code>site_settings</code>. La ingesta y el mapa
+    siguen leyendo <code>.env</code> hasta que hagamos la migración de consumo.
+  </div>
+
+  <div style="margin-top: 12px;">
+    <a class="btn-secondary" href="{{ url_for('admin.dashboard') }}">Volver a Admin</a>
+    <a class="btn-secondary" href="{{ url_for('admin.protests_review', status='hidden') }}">Ir a revisión de protestas</a>
+  </div>
+</section>
+{% endblock %}

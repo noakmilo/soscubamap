@@ -38,6 +38,12 @@ from sqlalchemy import func
 from app.services.markdown_utils import render_markdown
 from app.services.discussion_tags import upsert_tags
 from app.services.protests import get_rss_feed_urls
+from app.services.protest_settings import (
+    get_protest_settings_schema,
+    get_protest_settings_values,
+    save_protest_settings,
+    validate_protest_settings_payload,
+)
 from . import admin_bp
 
 
@@ -269,6 +275,39 @@ def protests_review():
         has_prev=has_prev,
         has_next=has_next,
         feed_urls=feed_urls,
+    )
+
+
+@admin_bp.route("/protestas/configuracion", methods=["GET", "POST"])
+@login_required
+@role_required("administrador")
+def protests_settings():
+    fields = get_protest_settings_schema()
+    values = get_protest_settings_values()
+
+    if request.method == "POST":
+        submitted = {}
+        for field in fields:
+            key = field["key"]
+            submitted[key] = request.form.get(key, "").strip()
+
+        cleaned, errors = validate_protest_settings_payload(submitted)
+        if errors:
+            for key, value in submitted.items():
+                values[key] = value
+            for field in fields:
+                key = field["key"]
+                if key in errors:
+                    flash(f"{field['label']}: {errors[key]}", "error")
+        else:
+            save_protest_settings(cleaned)
+            flash("Configuración de protestas guardada en base de datos.", "success")
+            return redirect(url_for("admin.protests_settings"))
+
+    return render_template(
+        "admin/protests_settings.html",
+        fields=fields,
+        values=values,
     )
 
 

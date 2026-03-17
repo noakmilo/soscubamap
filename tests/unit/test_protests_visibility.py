@@ -116,3 +116,79 @@ def test_protests_geojson_keeps_visible_low_confidence_without_min_conf_filter(a
     filtered_payload = filtered.get_json()
     assert filtered_payload is not None
     assert filtered_payload["features_total"] == 1
+
+
+def test_delete_protest_event_requires_admin(app, client, monkeypatch):
+    now = datetime.utcnow().replace(microsecond=0)
+    event = ProtestEvent(
+        source_feed="https://feed.example/delete.xml",
+        source_name="feed-delete",
+        source_guid="guid-delete",
+        source_url="https://x.com/soscuba/status/delete",
+        source_platform="x",
+        source_published_at_utc=now,
+        published_day_utc=now.date(),
+        raw_title="Evento borrar",
+        raw_description="desc",
+        clean_text="texto",
+        detected_keywords_json=json.dumps({"context": ["represion"]}, ensure_ascii=False),
+        latitude=23.11,
+        longitude=-82.36,
+        confidence_score=10.0,
+        event_type="related_unrest",
+        review_status="auto",
+        visible_on_map=True,
+        dedupe_hash="c" * 64,
+        transparency_note="Fuente enlazada al post original.",
+    )
+    with app.app_context():
+        db.session.add(event)
+        db.session.commit()
+        event_id = event.id
+
+    monkeypatch.setattr("app.blueprints.api.routes._is_admin_user", lambda: False)
+    response = client.delete(f"/api/protests/{event_id}")
+    assert response.status_code == 403
+
+    with app.app_context():
+        assert ProtestEvent.query.get(event_id) is not None
+
+
+def test_delete_protest_event_as_admin(app, client, monkeypatch):
+    now = datetime.utcnow().replace(microsecond=0)
+    event = ProtestEvent(
+        source_feed="https://feed.example/delete-admin.xml",
+        source_name="feed-delete-admin",
+        source_guid="guid-delete-admin",
+        source_url="https://x.com/soscuba/status/delete-admin",
+        source_platform="x",
+        source_published_at_utc=now,
+        published_day_utc=now.date(),
+        raw_title="Evento borrar admin",
+        raw_description="desc",
+        clean_text="texto",
+        detected_keywords_json=json.dumps({"strong": ["protesta"]}, ensure_ascii=False),
+        latitude=23.11,
+        longitude=-82.36,
+        confidence_score=60.0,
+        event_type="confirmed_protest",
+        review_status="auto",
+        visible_on_map=True,
+        dedupe_hash="d" * 64,
+        transparency_note="Fuente enlazada al post original.",
+    )
+    with app.app_context():
+        db.session.add(event)
+        db.session.commit()
+        event_id = event.id
+
+    monkeypatch.setattr("app.blueprints.api.routes._is_admin_user", lambda: True)
+    response = client.delete(f"/api/protests/{event_id}")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload is not None
+    assert payload.get("ok") is True
+    assert int(payload.get("id")) == event_id
+
+    with app.app_context():
+        assert ProtestEvent.query.get(event_id) is None

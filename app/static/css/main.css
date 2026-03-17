@@ -1002,6 +1002,35 @@ h3 {
   word-break: break-all;
 }
 
+.protest-detail-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.protest-btn-danger {
+  border-color: rgba(255, 138, 138, 0.7);
+  background: rgba(198, 40, 40, 0.25);
+  color: #ffd5d5;
+}
+
+.protest-btn-danger:hover {
+  border-color: rgba(255, 172, 172, 0.9);
+}
+
+.protest-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.protest-detail-admin-note {
+  color: #ffd7c7;
+  font-size: 11px;
+}
+
+.protest-detail-admin-note.is-error {
+  color: #ff9a9a;
+}
+
 .protest-source-credit {
   color: #ffb998;
   font-size: 11px;

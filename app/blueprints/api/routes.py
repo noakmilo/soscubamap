@@ -1469,6 +1469,21 @@ def protests_debug():
     )
 
 
+@api_bp.route("/protests/<int:event_id>", methods=["DELETE"])
+@limiter.limit("20/minute; 120/day")
+def delete_protest_event(event_id):
+    if not _is_admin_user():
+        return jsonify({"ok": False, "error": "No autorizado."}), 403
+
+    event = ProtestEvent.query.get(event_id)
+    if not event:
+        return jsonify({"ok": False, "error": "Evento no encontrado."}), 404
+
+    db.session.delete(event)
+    db.session.commit()
+    return jsonify({"ok": True, "id": event_id})
+
+
 @api_bp.route("/push/subscribe", methods=["POST"])
 @limiter.limit("5/minute; 60/day")
 def push_subscribe():
