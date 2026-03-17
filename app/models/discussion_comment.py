@@ -7,8 +7,12 @@ class DiscussionComment(db.Model):
     __tablename__ = "discussion_comments"
 
     id = db.Column(db.Integer, primary_key=True)
-    post_id = db.Column(db.Integer, db.ForeignKey("discussion_posts.id"), nullable=False)
-    parent_id = db.Column(db.Integer, db.ForeignKey("discussion_comments.id", ondelete="CASCADE"))
+    post_id = db.Column(
+        db.Integer, db.ForeignKey("discussion_posts.id"), nullable=False
+    )
+    parent_id = db.Column(
+        db.Integer, db.ForeignKey("discussion_comments.id", ondelete="CASCADE")
+    )
     body = db.Column(db.Text, nullable=False)
     body_html = db.Column(db.Text, nullable=False)
     author_label = db.Column(db.String(80), nullable=False)

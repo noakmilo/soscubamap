@@ -12,10 +12,14 @@ class VoteRecord(db.Model):
     voter_hash = db.Column(db.String(64), nullable=False, index=True)
     value = db.Column(db.SmallInteger, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     __table_args__ = (
-        db.UniqueConstraint("target_type", "target_id", "voter_hash", name="uq_vote_record"),
+        db.UniqueConstraint(
+            "target_type", "target_id", "voter_hash", name="uq_vote_record"
+        ),
     )
 
     def __repr__(self) -> str:

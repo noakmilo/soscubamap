@@ -1,8 +1,32 @@
-from flask import render_template, redirect, url_for, request, flash, current_app
-from flask_login import login_required
+import json
+from datetime import datetime
+from decimal import Decimal
 
+from flask import current_app, flash, redirect, render_template, request, url_for
+from flask_babel import gettext as _
+from flask_babel import lazy_gettext as _l
+from flask_login import current_user, login_required
+from sqlalchemy import func
+
+from app.extensions import db
+from app.models.category import Category
+from app.models.discussion_comment import DiscussionComment
+from app.models.discussion_post import DiscussionPost
+from app.models.discussion_tag import DiscussionTag
+from app.models.donation_log import DonationLog
+from app.models.location_report import LocationReport
+from app.models.media import Media
+from app.models.post import Post
+from app.models.post_edit_request import PostEditRequest
+from app.models.post_revision import PostRevision
+from app.models.protest_event import ProtestEvent
 from app.services.authz import role_required
-from app.services.settings import get_setting, set_setting
+from app.services.category_rules import is_other_type_allowed
+from app.services.category_sort import sort_categories_for_forms
+from app.services.content_quality import validate_description, validate_title
+from app.services.discussion_tags import upsert_tags
+from app.services.geo_lookup import list_provinces, lookup_location, municipalities_map
+from app.services.input_safety import has_malicious_input
 from app.services.map_providers import (
     MAP_PROVIDER_GOOGLE,
     MAP_PROVIDER_LEAFLET,
@@ -12,30 +36,15 @@ from app.services.map_providers import (
     set_map_provider_forms,
     set_map_provider_main,
 )
-from app.models.post import Post
-from app.models.discussion_post import DiscussionPost
-from app.models.discussion_comment import DiscussionComment
-from app.models.discussion_tag import DiscussionTag
-from app.models.location_report import LocationReport
-from app.models.post_revision import PostRevision
-from app.models.post_edit_request import PostEditRequest
-from app.models.category import Category
-from app.models.donation_log import DonationLog
-from app.extensions import db
-from app.models.media import Media
-from app.services.media_upload import media_json_from_post, parse_media_json, get_media_payload
-from app.services.input_safety import has_malicious_input
-from app.services.content_quality import validate_title, validate_description
-from app.services.category_rules import is_other_type_allowed
-from app.services.category_sort import sort_categories_for_forms
-from app.services.geo_lookup import lookup_location, list_provinces, municipalities_map
-from flask_login import current_user
-import json
-from datetime import datetime
-from decimal import Decimal
-from sqlalchemy import func
 from app.services.markdown_utils import render_markdown
-from app.services.discussion_tags import upsert_tags
+from app.services.media_upload import (
+    get_media_payload,
+    media_json_from_post,
+    parse_media_json,
+)
+from app.services.protests import get_rss_feed_urls
+from app.services.settings import get_setting, set_setting
+
 from . import admin_bp
 
 
@@ -59,9 +68,7 @@ def dashboard():
     map_provider_main = get_map_provider_main()
     map_provider_forms = get_map_provider_forms()
     location_reports = (
-        LocationReport.query.order_by(LocationReport.created_at.desc())
-        .limit(10)
-        .all()
+        LocationReport.query.order_by(LocationReport.created_at.desc()).limit(10).all()
     )
     return render_template(
         "admin/dashboard.html",
@@ -70,7 +77,9 @@ def dashboard():
         map_provider_forms=map_provider_forms,
         provider_leaflet=MAP_PROVIDER_LEAFLET,
         provider_google=MAP_PROVIDER_GOOGLE,
-        google_maps_configured=bool((current_app.config.get("GOOGLE_MAPS_API_KEY") or "").strip()),
+        google_maps_configured=bool(
+            (current_app.config.get("GOOGLE_MAPS_API_KEY") or "").strip()
+        ),
         location_reports=location_reports,
     )
 
@@ -81,7 +90,7 @@ def dashboard():
 def toggle_moderation():
     enabled = request.form.get("moderation_enabled") == "on"
     set_setting("moderation_enabled", "true" if enabled else "false")
-    flash("Moderación actualizada.", "success")
+    flash(_("Moderación actualizada."), "success")
     return redirect(url_for("admin.dashboard"))
 
 
@@ -150,13 +159,13 @@ def donations():
 
         errors = []
         if not amount:
-            errors.append("Monto obligatorio.")
+            errors.append(_("Monto obligatorio."))
         if not method:
-            errors.append("Vía obligatoria.")
+            errors.append(_("Vía obligatoria."))
         if not donated_at:
-            errors.append("Fecha obligatoria.")
+            errors.append(_("Fecha obligatoria."))
         if not destination:
-            errors.append("Destino obligatorio.")
+            errors.append(_("Destino obligatorio."))
 
         if errors:
             for msg in errors:
@@ -173,10 +182,10 @@ def donations():
                     )
                 )
                 db.session.commit()
-                flash("Donación registrada.", "success")
+                flash(_("Donación registrada."), "success")
                 return redirect(url_for("admin.donations"))
             except Exception:
-                flash("Fecha inválida. Usa formato YYYY-MM-DD.", "error")
+                flash(_("Fecha inválida. Usa formato YYYY-MM-DD."), "error")
 
     logs = DonationLog.query.order_by(DonationLog.donated_at.desc()).all()
     return render_template("admin/donations.html", donation_logs=logs)
@@ -194,7 +203,7 @@ def edit_donation(log_id):
         destination = request.form.get("destination", "").strip()
 
         if not amount or not method or not donated_at or not destination:
-            flash("Completa todos los campos.", "error")
+            flash(_("Completa todos los campos."), "error")
             return redirect(url_for("admin.edit_donation", log_id=log.id))
 
         try:
@@ -203,7 +212,7 @@ def edit_donation(log_id):
             log.donated_at = datetime.strptime(donated_at, "%Y-%m-%d").date()
             log.destination = destination
             db.session.commit()
-            flash("Donación actualizada.", "success")
+            flash(_("Donación actualizada."), "success")
             return redirect(url_for("admin.donations"))
         except Exception:
             flash("Fecha inválida. Usa formato YYYY-MM-DD.", "error")
@@ -218,8 +227,83 @@ def delete_donation(log_id):
     log = DonationLog.query.get_or_404(log_id)
     db.session.delete(log)
     db.session.commit()
-    flash("Donación eliminada.", "success")
+    flash(_("Donación eliminada."), "success")
     return redirect(url_for("admin.donations"))
+
+
+@admin_bp.route("/protestas")
+@login_required
+@role_required("administrador")
+def protests_review():
+    status = (request.args.get("status") or "hidden").strip().lower()
+    if status not in {"hidden", "visible", "all"}:
+        status = "hidden"
+
+    try:
+        page = max(1, int(request.args.get("page", "1")))
+    except Exception:
+        page = 1
+
+    per_page = 50
+    base_query = ProtestEvent.query
+    if status == "hidden":
+        base_query = base_query.filter(ProtestEvent.visible_on_map.is_(False))
+    elif status == "visible":
+        base_query = base_query.filter(ProtestEvent.visible_on_map.is_(True))
+
+    total = base_query.count()
+    items = (
+        base_query.order_by(
+            ProtestEvent.source_published_at_utc.desc(),
+            ProtestEvent.id.desc(),
+        )
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
+
+    feed_urls = get_rss_feed_urls()
+    has_prev = page > 1
+    has_next = page * per_page < total
+
+    return render_template(
+        "admin/protests.html",
+        items=items,
+        status=status,
+        page=page,
+        per_page=per_page,
+        total=total,
+        has_prev=has_prev,
+        has_next=has_next,
+        feed_urls=feed_urls,
+    )
+
+
+@admin_bp.route("/protestas/<int:event_id>/visibilidad", methods=["POST"])
+@login_required
+@role_required("administrador")
+def protests_set_visibility(event_id):
+    event = ProtestEvent.query.get_or_404(event_id)
+    action = (request.form.get("action") or "").strip().lower()
+    next_url = (request.form.get("next") or "").strip()
+    if not next_url.startswith("/admin"):
+        next_url = url_for("admin.protests_review")
+
+    if action == "approve":
+        event.visible_on_map = True
+        event.review_status = "approved_manual"
+        flash("Evento de protesta aprobado manualmente y publicado en mapa.", "success")
+    elif action == "hide":
+        event.visible_on_map = False
+        event.review_status = "hidden_manual"
+        flash("Evento de protesta ocultado manualmente.", "success")
+    else:
+        flash("Acción inválida.", "error")
+        return redirect(next_url)
+
+    event.updated_at = datetime.utcnow()
+    db.session.commit()
+    return redirect(next_url)
 
 
 @admin_bp.route("/discusiones/<int:post_id>/editar", methods=["GET", "POST"])
@@ -244,7 +328,7 @@ def edit_discussion(post_id):
         new_tags = [t.strip() for t in new_tags.split(",") if t.strip()]
 
         if not title or not body:
-            flash("Título y contenido son obligatorios.", "error")
+            flash(_("Título y contenido son obligatorios."), "error")
             return redirect(url_for("admin.edit_discussion", post_id=post.id))
 
         post.title = title
@@ -253,7 +337,7 @@ def edit_discussion(post_id):
         post.links_json = json.dumps(links_list) if links_list else None
         post.tags = upsert_tags(selected_tags + new_tags)
         db.session.commit()
-        flash("Discusión actualizada.", "success")
+        flash(_("Discusión actualizada."), "success")
         return redirect(url_for("admin.discussions"))
 
     images = parse_media_json(post.images_json)
@@ -274,7 +358,7 @@ def delete_discussion(post_id):
     post = DiscussionPost.query.get_or_404(post_id)
     db.session.delete(post)
     db.session.commit()
-    flash("Discusión eliminada.", "success")
+    flash(_("Discusión eliminada."), "success")
     return redirect(url_for("admin.discussions"))
 
 
@@ -285,7 +369,7 @@ def delete_discussion_comment(comment_id):
     comment = DiscussionComment.query.get_or_404(comment_id)
     db.session.delete(comment)
     db.session.commit()
-    flash("Comentario eliminado.", "success")
+    flash(_("Comentario eliminado."), "success")
     return redirect(request.referrer or url_for("admin.discussions"))
 
 
@@ -295,14 +379,16 @@ def delete_discussion_comment(comment_id):
 def update_report_status(post_id):
     status = request.form.get("status")
     if status not in {"approved", "hidden", "deleted", "rejected", "pending"}:
-        flash("Estado inválido.", "error")
+        flash(_("Estado inválido."), "error")
         return redirect(url_for("admin.reports"))
 
     post = Post.query.get_or_404(post_id)
     post.status = status
     db.session.commit()
-    flash("Reporte actualizado.", "success")
-    return redirect(url_for("admin.reports", status=request.args.get("status", "approved")))
+    flash(_("Reporte actualizado."), "success")
+    return redirect(
+        url_for("admin.reports", status=request.args.get("status", "approved"))
+    )
 
 
 @admin_bp.route("/reportes/bulk-delete", methods=["POST"])
@@ -312,20 +398,20 @@ def bulk_delete_reports():
     ids = request.form.getlist("selected_ids")
     status = request.args.get("status", "approved")
     if not ids:
-        flash("Selecciona al menos un reporte.", "error")
+        flash(_("Selecciona al menos un reporte."), "error")
         return redirect(url_for("admin.reports", status=status))
 
     try:
         id_list = [int(i) for i in ids]
     except Exception:
-        flash("Selección inválida.", "error")
+        flash(_("Selección inválida."), "error")
         return redirect(url_for("admin.reports", status=status))
 
     posts = Post.query.filter(Post.id.in_(id_list)).all()
     for post in posts:
         post.status = "deleted"
     db.session.commit()
-    flash(f"Reportes eliminados: {len(posts)}.", "success")
+    flash(_("%(count)s reporte(s) eliminado(s).", count=len(posts)), "success")
     return redirect(url_for("admin.reports", status=status))
 
 
@@ -334,7 +420,9 @@ def bulk_delete_reports():
 @role_required("administrador")
 def edit_report(post_id):
     post = Post.query.get_or_404(post_id)
-    categories = sort_categories_for_forms(Category.query.order_by(Category.id.asc()).all())
+    categories = sort_categories_for_forms(
+        Category.query.order_by(Category.id.asc()).all()
+    )
     links = []
     if post.links_json:
         try:
@@ -378,7 +466,9 @@ def edit_report(post_id):
             ]
             + links_list
         ):
-            errors["form"] = "Se detectó contenido sospechoso. Revisa y vuelve a intentar."
+            errors["form"] = (
+                "Se detectó contenido sospechoso. Revisa y vuelve a intentar."
+            )
 
         if not form_data["title"]:
             errors["title"] = "El título es obligatorio."
@@ -399,7 +489,9 @@ def edit_report(post_id):
                 errors["title"] = msg_title
         if form_data["description"] and "description" not in errors:
             if len(form_data["description"]) < 50:
-                errors["description"] = "La descripción debe tener al menos 50 caracteres."
+                errors["description"] = (
+                    "La descripción debe tener al menos 50 caracteres."
+                )
             else:
                 ok_desc, msg_desc = validate_description(form_data["description"])
                 if not ok_desc:
@@ -438,10 +530,18 @@ def edit_report(post_id):
         movement_at = None
         if slug == "residencia-represor":
             if not form_data["repressor_name"]:
-                errors["repressor_name"] = "Debes indicar el nombre o apodo del represor."
+                errors["repressor_name"] = (
+                    "Debes indicar el nombre o apodo del represor."
+                )
             if existing_media_count < 1:
                 errors["images"] = "Debes subir al menos una imagen del represor."
-        if slug in {"accion-represiva", "accion-represiva-del-gobierno", "movimiento-tropas", "movimiento-militar", "desconexion-internet"}:
+        if slug in {
+            "accion-represiva",
+            "accion-represiva-del-gobierno",
+            "movimiento-tropas",
+            "movimiento-militar",
+            "desconexion-internet",
+        }:
             if not form_data["movement_date"]:
                 errors["movement_date"] = "Debes indicar la fecha del evento."
             if not form_data["movement_time"]:
@@ -455,7 +555,9 @@ def edit_report(post_id):
                     errors["movement_date"] = "Fecha u hora inválida."
         if slug == "otros":
             if not form_data["other_type"]:
-                errors["other_type"] = "Debes especificar el tipo en la categoría Otros."
+                errors["other_type"] = (
+                    "Debes especificar el tipo en la categoría Otros."
+                )
             elif not is_other_type_allowed(form_data["other_type"]):
                 errors["other_type"] = (
                     "El tipo en “Otros” no puede referirse a represores. Usa la categoría correspondiente."
@@ -474,7 +576,9 @@ def edit_report(post_id):
                 provinces=list_provinces(),
                 municipalities_map=municipalities_map(),
                 map_provider_forms=get_map_provider_forms(),
-                google_maps_api_key=(current_app.config.get("GOOGLE_MAPS_API_KEY") or "").strip(),
+                google_maps_api_key=(
+                    current_app.config.get("GOOGLE_MAPS_API_KEY") or ""
+                ).strip(),
             )
 
         moderation_enabled = get_setting("moderation_enabled", "true") == "true"
@@ -486,7 +590,13 @@ def edit_report(post_id):
             else:
                 editor_label = current_user.email
 
-        if moderation_enabled and slug not in {"accion-represiva", "accion-represiva-del-gobierno", "movimiento-tropas", "movimiento-militar", "desconexion-internet"}:
+        if moderation_enabled and slug not in {
+            "accion-represiva",
+            "accion-represiva-del-gobierno",
+            "movimiento-tropas",
+            "movimiento-militar",
+            "desconexion-internet",
+        }:
             edit_req = PostEditRequest(
                 post_id=post.id,
                 editor_id=current_user.id if current_user.is_authenticated else None,
@@ -508,7 +618,7 @@ def edit_report(post_id):
             )
             db.session.add(edit_req)
             db.session.commit()
-            flash("Edición enviada a moderación.", "success")
+            flash(_("Edición enviada a moderación."), "success")
             return redirect(url_for("admin.edit_report", post_id=post.id))
 
         # Guardar revisión previa
@@ -549,7 +659,7 @@ def edit_report(post_id):
         post.links_json = json.dumps(links_list) if links_list else None
         db.session.commit()
 
-        flash("Reporte actualizado.", "success")
+        flash(_("Reporte actualizado."), "success")
         return redirect(url_for("admin.edit_report", post_id=post.id))
 
     return render_template(
@@ -561,21 +671,25 @@ def edit_report(post_id):
         provinces=list_provinces(),
         municipalities_map=municipalities_map(),
         map_provider_forms=get_map_provider_forms(),
-        google_maps_api_key=(current_app.config.get("GOOGLE_MAPS_API_KEY") or "").strip(),
+        google_maps_api_key=(
+            current_app.config.get("GOOGLE_MAPS_API_KEY") or ""
+        ).strip(),
         form_data=None,
         errors={},
         form_links=links,
     )
 
 
-@admin_bp.route("/reportes/<int:post_id>/revisiones/<int:revision_id>/restaurar", methods=["POST"])
+@admin_bp.route(
+    "/reportes/<int:post_id>/revisiones/<int:revision_id>/restaurar", methods=["POST"]
+)
 @login_required
 @role_required("administrador")
 def restore_revision(post_id, revision_id):
     post = Post.query.get_or_404(post_id)
     revision = PostRevision.query.get_or_404(revision_id)
     if revision.post_id != post.id:
-        flash("Revisión inválida.", "error")
+        flash(_("Revisión inválida."), "error")
         return redirect(url_for("map.post_history", post_id=post.id))
 
     # Guardar snapshot actual antes de restaurar
@@ -625,5 +739,5 @@ def restore_revision(post_id, revision_id):
             )
     db.session.commit()
 
-    flash("Reporte restaurado a una versión anterior.", "success")
+    flash(_("Reporte restaurado a una versión anterior."), "success")
     return redirect(url_for("map.post_history", post_id=post.id))

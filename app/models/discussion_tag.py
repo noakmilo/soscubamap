@@ -2,11 +2,20 @@ from datetime import datetime
 
 from app.extensions import db
 
-
 discussion_post_tags = db.Table(
     "discussion_post_tags",
-    db.Column("post_id", db.Integer, db.ForeignKey("discussion_posts.id", ondelete="CASCADE"), primary_key=True),
-    db.Column("tag_id", db.Integer, db.ForeignKey("discussion_tags.id", ondelete="CASCADE"), primary_key=True),
+    db.Column(
+        "post_id",
+        db.Integer,
+        db.ForeignKey("discussion_posts.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    db.Column(
+        "tag_id",
+        db.Integer,
+        db.ForeignKey("discussion_tags.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
 )
 
 

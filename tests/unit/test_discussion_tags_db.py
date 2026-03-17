@@ -1,6 +1,7 @@
 import pytest
-from app.services.discussion_tags import upsert_tags, normalize_tag
+
 from app.extensions import db
+from app.services.discussion_tags import normalize_tag, upsert_tags
 
 
 class TestUpsertTags:
@@ -18,6 +19,7 @@ class TestUpsertTags:
             assert len(tags) == 2
             # First tag reused, not duplicated
             from app.models.discussion_tag import DiscussionTag
+
             count = DiscussionTag.query.filter_by(slug="protesta").count()
             assert count == 1
 

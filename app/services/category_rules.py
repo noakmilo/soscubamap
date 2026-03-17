@@ -1,6 +1,5 @@
 import re
 
-
 _OTHER_TYPE_BLOCKLIST = re.compile(
     r"\b("
     r"represor(?:es)?|"

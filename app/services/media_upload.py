@@ -1,12 +1,11 @@
-import os
 import json
-from typing import List, Tuple, Dict, Any
+import os
+from typing import Any, Dict, List, Tuple
 
 import cloudinary
 import cloudinary.uploader
-from werkzeug.utils import secure_filename
-
 from flask import current_app
+from werkzeug.utils import secure_filename
 
 
 def _cloudinary_config():
@@ -56,7 +55,10 @@ def validate_files(files) -> Tuple[bool, str]:
         size = file.stream.tell()
         file.stream.seek(0)
         if size > max_bytes:
-            return False, f"Cada imagen debe ser <= {current_app.config.get('IMAGE_MAX_MB', 2)}MB."
+            return (
+                False,
+                f"Cada imagen debe ser <= {current_app.config.get('IMAGE_MAX_MB', 2)}MB.",
+            )
 
     return True, ""
 
@@ -64,7 +66,7 @@ def validate_files(files) -> Tuple[bool, str]:
 def upload_files(files) -> List[str]:
     _cloudinary_config()
     urls = []
-    for file in (files or []):
+    for file in files or []:
         if not file or not (file.filename or "").strip():
             continue
         filename = secure_filename(file.filename or "imagen")
@@ -83,7 +85,7 @@ def upload_files(files) -> List[str]:
 
 def get_media_payload(post) -> List[Dict[str, Any]]:
     items = []
-    for media in (post.media or []):
+    for media in post.media or []:
         if not media.file_url:
             continue
         items.append(

@@ -1,6 +1,6 @@
 {% extends "shared/base.html" %}
-{% block title %} | Nueva discusión{% endblock %}
-{% block meta_description %}Abre una nueva discusión en #SOSCuba Map y comparte ideas con la comunidad.{% endblock %}
+{% block title %} | {{ _("Nueva discusión") }}{% endblock %}
+{% block meta_description %}{{ _("Abre una nueva discusión en #SOSCuba Map y comparte ideas con la comunidad.") }}{% endblock %}
 {% block head_extra %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -8,17 +8,17 @@
 {% endblock %}
 {% block content %}
 <section class="panel discussion-page">
-  <h1>Nueva discusión</h1>
-  <p class="muted">Comparte ideas, propuestas y tutoriales para la comunidad.</p>
+  <h1>{{ _("Nueva discusión") }}</h1>
+  <p class="muted">{{ _("Comparte ideas, propuestas y tutoriales para la comunidad.") }}</p>
 
   <form class="discussion-form" method="post" enctype="multipart/form-data">
     <label>
-      Nick
+      {{ _("Nick") }}
       <input type="text" name="nickname" value="{{ nick }}" maxlength="80" />
     </label>
     <label>
-      Título
-      <input type="text" name="title" required placeholder="Título de la discusión" />
+      {{ _("Título") }}
+      <input type="text" name="title" required placeholder="{{ _('Título de la discusión') }}" />
     </label>
     <div class="editor-grid">
       <div class="editor-column">
@@ -28,15 +28,15 @@
           <button type="button" class="editor-btn" data-md="underline"><span style="text-decoration: underline;">U</span></button>
           <button type="button" class="editor-btn" data-md="link">Link</button>
         </div>
-        <textarea id="discussionBody" name="body" rows="12" required placeholder="Escribe en markdown..."></textarea>
+        <textarea id="discussionBody" name="body" rows="12" required placeholder="{{ _('Escribe en markdown...') }}"></textarea>
       </div>
       <div class="editor-preview" id="discussionPreview"></div>
     </div>
 
     <div class="links-group">
       <div class="links-header">
-        <span>Enlaces de interés</span>
-        <button type="button" class="btn-secondary" id="addDiscussionLink">+ Agregar</button>
+        <span>{{ _("Enlaces de interés") }}</span>
+        <button type="button" class="btn-secondary" id="addDiscussionLink">{{ _("+ Agregar") }}</button>
       </div>
       <div id="discussionLinks" class="links-list">
         <input type="url" name="links[]" placeholder="https://ejemplo.com/fuente" />
@@ -44,7 +44,7 @@
     </div>
 
     <div class="tag-picker">
-      <div class="tag-picker-title">Etiquetas</div>
+      <div class="tag-picker-title">{{ _("Etiquetas") }}</div>
       <div class="tag-options" id="tagOptions">
         {% for tag in tags %}
           <button type="button" class="tag-chip" data-tag="{{ tag.name }}">{{ tag.name }}</button>
@@ -52,13 +52,13 @@
       </div>
       <div id="selectedTags"></div>
       <label>
-        Agregar nuevas (separadas por comas)
-        <input type="text" name="new_tags" placeholder="ej: reporte, denuncia" />
+        {{ _("Agregar nuevas (separadas por comas)") }}
+        <input type="text" name="new_tags" placeholder="{{ _('ej: reporte, denuncia') }}" />
       </label>
     </div>
 
     <label>
-      Imágenes (máx {{ config.IMAGE_MAX_PER_SUBMIT }}, {{ config.IMAGE_MAX_MB }}MB c/u)
+      {{ _("Imágenes (máx %(max)s, %(mb)sMB c/u)", max=config.IMAGE_MAX_PER_SUBMIT, mb=config.IMAGE_MAX_MB) }}
       <input
         type="file"
         name="images"
@@ -78,7 +78,7 @@
       </div>
     {% endif %}
 
-    <button type="submit" class="btn-primary">Publicar discusión</button>
+    <button type="submit" class="btn-primary">{{ _("Publicar discusión") }}</button>
   </form>
 </section>
 

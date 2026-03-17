@@ -1,11 +1,14 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
+
 from app.services.authz import role_required
 
 
 class TestRoleRequired:
     def test_unauthenticated_aborts_401(self, app):
         with app.app_context():
+
             @role_required("admin")
             def protected():
                 return "ok"
@@ -19,6 +22,7 @@ class TestRoleRequired:
 
     def test_wrong_role_aborts_403(self, app):
         with app.app_context():
+
             @role_required("admin")
             def protected():
                 return "ok"
@@ -34,6 +38,7 @@ class TestRoleRequired:
 
     def test_correct_role_passes(self, app):
         with app.app_context():
+
             @role_required("admin")
             def protected():
                 return "ok"

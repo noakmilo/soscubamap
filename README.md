@@ -36,7 +36,7 @@ Windows (PowerShell):
 ### 2. Instalar dependencias y configurar
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 cp .env.example .env
 # Editar .env con tus valores (ver docs/ENV.md para referencia completa)
 ```
@@ -58,7 +58,7 @@ python -m scripts.seed_categories
 
 Editar `.env`:
 
-```
+```env
 ADMIN_EMAIL=admin@soscuba.local
 ADMIN_PASSWORD=tu_password_seguro
 ```
@@ -111,6 +111,10 @@ pytest tests/unit/ -v --cov=app/services --cov-report=term-missing
 
 Para más detalles sobre el entorno de desarrollo, convenciones de código y estructura del proyecto, ver la [Guía de contribución](docs/CONTRIBUTING.md).
 
+## Traducciones
+
+Las traducciones se gestionan a través de [Crowdin](https://crowdin.com/project/soscubamap). Para contribuir como traductor o añadir soporte para un nuevo idioma, ver la [Guía de traducciones](CONTRIBUTING_TRANSLATIONS.md).
+
 ## Documentación
 
 - [Referencia de variables de entorno](docs/ENV.md)
@@ -118,6 +122,7 @@ Para más detalles sobre el entorno de desarrollo, convenciones de código y est
 - [Arquitectura del sistema](docs/ARCHITECTURE.md)
 - [Runbook de despliegue y operaciones](docs/RUNBOOK.md)
 - [Guía de contribución](docs/CONTRIBUTING.md)
+- [Guía de traducciones](CONTRIBUTING_TRANSLATIONS.md)
 
 ## Proveedor de mapas por vista
 

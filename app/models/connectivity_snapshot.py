@@ -13,7 +13,9 @@ class ConnectivitySnapshot(db.Model):
         index=True,
     )
     observed_at_utc = db.Column(db.DateTime, nullable=False, index=True)
-    fetched_at_utc = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    fetched_at_utc = db.Column(
+        db.DateTime, nullable=False, default=datetime.utcnow, index=True
+    )
     traffic_value = db.Column(db.Float, nullable=False)
     baseline_value = db.Column(db.Float)
     score = db.Column(db.Float, nullable=False)
@@ -23,7 +25,9 @@ class ConnectivitySnapshot(db.Model):
     method = db.Column(db.String(64), nullable=False, default="national_replication_v1")
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
-    ingestion_run = db.relationship("ConnectivityIngestionRun", back_populates="snapshots")
+    ingestion_run = db.relationship(
+        "ConnectivityIngestionRun", back_populates="snapshots"
+    )
     provinces = db.relationship(
         "ConnectivityProvinceStatus",
         back_populates="snapshot",

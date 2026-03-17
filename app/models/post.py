@@ -1,8 +1,8 @@
 from datetime import datetime
+
 from sqlalchemy import Enum
 
 from app.extensions import db
-
 
 post_status_enum = Enum(
     "pending",
@@ -36,14 +36,18 @@ class Post(db.Model):
     is_anonymous = db.Column(db.Boolean, default=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
     author_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     category_id = db.Column(db.Integer, db.ForeignKey("categories.id"), nullable=False)
 
     author = db.relationship("User", back_populates="posts")
     category = db.relationship("Category", back_populates="posts")
-    media = db.relationship("Media", back_populates="post", cascade="all, delete-orphan")
+    media = db.relationship(
+        "Media", back_populates="post", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<Post {self.id} {self.title}>"

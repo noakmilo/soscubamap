@@ -11,4 +11,3 @@ class ChatMessage(db.Model):
     author_label = db.Column(db.String(80), nullable=False)
     body = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
-

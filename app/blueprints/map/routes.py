@@ -18,6 +18,8 @@ from flask import (
     session,
     url_for,
 )
+from flask_babel import gettext as _
+from flask_babel import lazy_gettext as _l
 from flask_login import current_user
 from sqlalchemy.orm import selectinload
 
@@ -44,6 +46,7 @@ from app.services.geo_lookup import (
     municipalities_map,
 )
 from app.services.input_safety import has_malicious_input
+from app.services.map_providers import get_map_provider_forms, get_map_provider_main
 from app.services.media_upload import (
     get_media_payload,
     media_json_from_post,
@@ -54,7 +57,6 @@ from app.services.media_upload import (
 from app.services.push_notifications import push_enabled, send_alert_notification
 from app.services.recaptcha import recaptcha_enabled, verify_recaptcha
 from app.services.vote_identity import get_voter_hash
-from app.services.map_providers import get_map_provider_forms, get_map_provider_main
 
 from . import map_bp
 
@@ -483,7 +485,9 @@ def new_post():
 
         if lat is not None and lng is not None and not is_within_cuba_bounds(lat, lng):
             errors["latitude"] = "La ubicación debe estar dentro del territorio cubano."
-            errors["longitude"] = "La ubicación debe estar dentro del territorio cubano."
+            errors["longitude"] = (
+                "La ubicación debe estar dentro del territorio cubano."
+            )
 
         if lat is not None and lng is not None:
             province, municipality = _resolve_geo_location(
@@ -525,18 +529,18 @@ def new_post():
             lat = Decimal(form_data["latitude"])
             lng = Decimal(form_data["longitude"])
         except Exception:
-            flash("Latitud/longitud inválidas.", "error")
+            flash(_("Latitud/longitud inválidas."), "error")
             return redirect(url_for("map.new_post"))
 
         if not is_within_cuba_bounds(lat, lng):
-            flash("La ubicación debe estar dentro del territorio cubano.", "error")
+            flash(_("La ubicación debe estar dentro del territorio cubano."), "error")
             return redirect(url_for("map.new_post"))
 
         province, municipality = _resolve_geo_location(
             lat, lng, form_data["province"], form_data["municipality"]
         )
         if not province or not municipality:
-            flash("Provincia y municipio son obligatorios.", "error")
+            flash(_("Provincia y municipio son obligatorios."), "error")
             return redirect(url_for("map.new_post"))
 
         author_id = None
@@ -616,9 +620,9 @@ def new_post():
             return render_template("map/report_success.html", payload=payload)
 
         if post.status == "pending":
-            flash("Reporte enviado a moderación.", "success")
+            flash(_("Reporte enviado a moderación."), "success")
         else:
-            flash("Reporte publicado.", "success")
+            flash(_("Reporte publicado."), "success")
         return redirect(url_for("map.dashboard"))
 
     preset_lat = request.args.get("lat", "")
@@ -681,10 +685,11 @@ def report_location(post_id):
         message = request.form.get("message", "").strip()
         if has_malicious_input([message]):
             flash(
-                "Se detectó contenido sospechoso. Revisa y vuelve a intentar.", "error"
+                _("Se detectó contenido sospechoso. Revisa y vuelve a intentar."),
+                "error",
             )
         elif not message:
-            flash("Describe por qué la ubicación es incorrecta.", "error")
+            flash(_("Describe por qué la ubicación es incorrecta."), "error")
         else:
             db.session.add(LocationReport(post_id=post.id, message=message))
             db.session.commit()
@@ -912,14 +917,14 @@ def edit_report_public(post_id):
             lat = Decimal(form_data["latitude"])
             lng = Decimal(form_data["longitude"])
         except Exception:
-            flash("Latitud/longitud inválidas.", "error")
+            flash(_("Latitud/longitud inválidas."), "error")
             return redirect(url_for("map.edit_report_public", post_id=post.id))
 
         province, municipality = _resolve_geo_location(
             lat, lng, form_data["province"], form_data["municipality"]
         )
         if not province or not municipality:
-            flash("Provincia y municipio son obligatorios.", "error")
+            flash(_("Provincia y municipio son obligatorios."), "error")
             return redirect(url_for("map.edit_report_public", post_id=post.id))
 
         moderation_setting = SiteSetting.query.filter_by(
@@ -938,7 +943,7 @@ def edit_report_public(post_id):
         if images:
             media_urls = upload_files(images)
             if not media_urls:
-                flash("No se pudo subir la imagen.", "error")
+                flash(_("No se pudo subir la imagen."), "error")
                 return redirect(url_for("map.edit_report_public", post_id=post.id))
             captions = _clean_captions(image_captions, len(media_urls))
             media_items = [
@@ -977,7 +982,7 @@ def edit_report_public(post_id):
             payload = {"status": "pending"}
             if request.args.get("modal") == "1":
                 return render_template("map/edit_success.html", payload=payload)
-            flash("Edición enviada a moderación.", "success")
+            flash(_("Edición enviada a moderación."), "success")
             return redirect(url_for("map.dashboard"))
 
         # Sin moderación: aplicar directo y guardar revisión
@@ -1030,7 +1035,7 @@ def edit_report_public(post_id):
         payload = {"status": "approved"}
         if request.args.get("modal") == "1":
             return render_template("map/edit_success.html", payload=payload)
-        flash("Edición aplicada.", "success")
+        flash(_("Edición aplicada."), "success")
         return redirect(url_for("map.dashboard"))
 
     moderation_setting = SiteSetting.query.filter_by(key="moderation_enabled").first()

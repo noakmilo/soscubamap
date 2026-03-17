@@ -117,6 +117,32 @@ h3 {
   color: var(--accent);
 }
 
+.lang-switcher {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.9;
+}
+
+.lang-switcher-select {
+  min-width: 118px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(9, 14, 18, 0.8);
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+}
+
+.lang-switcher-select:hover,
+.lang-switcher-select:focus {
+  color: var(--accent);
+  border-color: var(--accent);
+  outline: none;
+}
+
 .content {
   padding: 40px 48px 80px;
 }

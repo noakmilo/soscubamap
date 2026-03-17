@@ -1,6 +1,5 @@
 import re
 
-
 _RE_SIGLA_NUM = re.compile(r"^[A-Z]{2,5}[-\s]?\d{1,6}$", re.IGNORECASE)
 _RE_ACRONYM = re.compile(r"^[A-Z]{3,5}$")
 _RE_WORD = re.compile(r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]{2,}")
@@ -48,7 +47,10 @@ def validate_title(title: str) -> tuple[bool, str]:
 
     words = _RE_WORD.findall(value)
     if len(words) < 2:
-        return False, "El título debe tener al menos 2 palabras o una sigla con número (ej: UM 2104)."
+        return (
+            False,
+            "El título debe tener al menos 2 palabras o una sigla con número (ej: UM 2104).",
+        )
 
     if len(value) < 6:
         return False, "El título es demasiado corto."

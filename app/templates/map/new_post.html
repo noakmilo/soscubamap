@@ -1,6 +1,6 @@
 {% extends "shared/base.html" %}
-{% block title %} | Nuevo reporte{% endblock %}
-{% block meta_description %}Envía un reporte anónimo sobre acciones represivas, centros penitenciarios o sedes oficiales en Cuba. Tu información ayuda a documentar y visibilizar.{% endblock %}
+{% block title %} | {{ _("Nuevo reporte") }}{% endblock %}
+{% block meta_description %}{{ _("Envía un reporte anónimo sobre acciones represivas, centros penitenciarios o sedes oficiales en Cuba. Tu información ayuda a documentar y visibilizar.") }}{% endblock %}
 {% block content %}
 <section class="panel">
   {% set use_form = form_data is not none %}
@@ -20,14 +20,14 @@
 {% set is_urgent = ns.selected_slug in ['accion-represiva','movimiento-tropas','desconexion-internet'] or ('accion represiva' in selected_name) or ('movimiento' in selected_name) or ('desconexion' in selected_name) or ('desconexión' in selected_name) %}
   {% set is_residencia = ns.selected_slug == 'residencia-represor' or ('residencia' in selected_name) %}
   {% set is_otros = ns.selected_slug == 'otros' or ('otros' in selected_name) %}
-  <h1>Nuevo reporte</h1>
-  <p>Todos los reportes se publican como anónimos. No necesitas cuenta para enviar. Los moderadores revisarán la información.</p>
+  <h1>{{ _("Nuevo reporte") }}</h1>
+  <p>{{ _("Todos los reportes se publican como anónimos. No necesitas cuenta para enviar. Los moderadores revisarán la información.") }}</p>
   {% if errors.get("form") %}
     <div class="flash error">{{ errors.get("form") }}</div>
   {% endif %}
 
   <div class="draw-wrap">
-    <div class="draw-title">Dibuja el área del reporte (opcional)</div>
+    <div class="draw-title">{{ _("Dibuja el área del reporte (opcional)") }}</div>
     <div
       id="drawMap"
       class="draw-map"
@@ -37,21 +37,21 @@
       data-map-provider="{{ map_provider_forms }}"
       data-allow-zoom="1"
     ></div>
-    <div class="draw-help">Usa el ícono de polígono para dibujar. Puedes borrar y volver a dibujar.</div>
+    <div class="draw-help">{{ _("Usa el ícono de polígono para dibujar. Puedes borrar y volver a dibujar.") }}</div>
   </div>
 
   <form class="form-grid" method="post" enctype="multipart/form-data">
     <label>
-      Título
-      <input type="text" name="title" id="titleInput" placeholder="Ej: Detención arbitraria" value="{{ fd.title if use_form else '' }}" class="{{ 'field-error' if errors.get('title') else '' }}" />
+      {{ _("Título") }}
+      <input type="text" name="title" id="titleInput" placeholder="{{ _('Ej: Detención arbitraria') }}" value="{{ fd.title if use_form else '' }}" class="{{ 'field-error' if errors.get('title') else '' }}" />
       {% if errors.get("title") %}
         <div class="field-error-msg">{{ errors.get("title") }}</div>
       {% endif %}
     </label>
     <label>
-      Categoría
+      {{ _("Categoría") }}
       <select name="category_id" id="categorySelect" required class="{{ 'field-error' if errors.get('category_id') else '' }}">
-        <option value="" disabled {% if not use_form or not fd.category_id %}selected{% endif %}>Elige categoría</option>
+        <option value="" disabled {% if not use_form or not fd.category_id %}selected{% endif %}>{{ _("Elige categoría") }}</option>
         {% for cat in categories %}
           <option value="{{ cat.id }}" data-slug="{{ cat.slug }}" {% if use_form and fd.category_id == (cat.id|string) %}selected{% endif %}>{{ cat.name }}</option>
         {% endfor %}
@@ -62,12 +62,11 @@
     </label>
     <div id="residenciaFields" class="category-fields {% if not is_residencia %}is-hidden{% endif %}">
       <div class="category-alert">
-        Para “Residencia de represor” debes indicar el nombre o apodo del represor y subir al menos una imagen.
-        Esto es obligatorio para evitar abuso de la app.
+        {{ _('Para "Residencia de represor" debes indicar el nombre o apodo del represor y subir al menos una imagen. Esto es obligatorio para evitar abuso de la app.') }}
       </div>
       <label>
-        Nombre o apodo del represor
-        <input type="text" name="repressor_name" id="repressorNameInput" placeholder="Ej: Apodo o nombre" value="{{ fd.repressor_name if use_form else '' }}" class="{{ 'field-error' if errors.get('repressor_name') else '' }}" />
+        {{ _("Nombre o apodo del represor") }}
+        <input type="text" name="repressor_name" id="repressorNameInput" placeholder="{{ _('Ej: Apodo o nombre') }}" value="{{ fd.repressor_name if use_form else '' }}" class="{{ 'field-error' if errors.get('repressor_name') else '' }}" />
         {% if errors.get("repressor_name") %}
           <div class="field-error-msg">{{ errors.get("repressor_name") }}</div>
         {% endif %}
@@ -75,11 +74,11 @@
     </div>
     <div id="otrosFields" class="category-fields {% if not is_otros %}is-hidden{% endif %}">
       <div class="category-alert">
-        Para “Otros” debes especificar el tipo del reporte.
+        {{ _('Para "Otros" debes especificar el tipo del reporte.') }}
       </div>
       <label>
-        Tipo (Otros)
-        <input type="text" name="other_type" id="otherTypeInput" placeholder="Ej: Centro de vigilancia, evento, etc." value="{{ fd.other_type if use_form else '' }}" class="{{ 'field-error' if errors.get('other_type') else '' }}" />
+        {{ _("Tipo (Otros)") }}
+        <input type="text" name="other_type" id="otherTypeInput" placeholder="{{ _('Ej: Centro de vigilancia, evento, etc.') }}" value="{{ fd.other_type if use_form else '' }}" class="{{ 'field-error' if errors.get('other_type') else '' }}" />
         {% if errors.get("other_type") %}
           <div class="field-error-msg">{{ errors.get("other_type") }}</div>
         {% endif %}
@@ -87,19 +86,18 @@
     </div>
     <div id="movimientoFields" class="category-fields {% if not is_urgent and not errors.get('movement_date') and not errors.get('movement_time') %}is-hidden{% endif %}">
       <div class="category-alert">
-        Para “Acción represiva del gobierno”, “Movimiento de tropas” y “Reporte de Desconexión de Internet” debes indicar fecha y hora del evento y aportar
-        detalles precisos (tipo de tropas, armamento observado o motivo de la movilización).
+        {{ _('Para "Acción represiva del gobierno", "Movimiento de tropas" y "Reporte de Desconexión de Internet" debes indicar fecha y hora del evento y aportar detalles precisos (tipo de tropas, armamento observado o motivo de la movilización).') }}
       </div>
       <div class="two-col">
         <label>
-          Fecha del evento
+          {{ _("Fecha del evento") }}
           <input type="date" name="movement_date" id="movementDateInput" value="{{ fd.movement_date if use_form else '' }}" {% if is_urgent %}required{% endif %} class="{{ 'field-error' if errors.get('movement_date') else '' }}" />
           {% if errors.get("movement_date") %}
             <div class="field-error-msg">{{ errors.get("movement_date") }}</div>
           {% endif %}
         </label>
         <label>
-          Hora del evento
+          {{ _("Hora del evento") }}
           <input type="time" name="movement_time" id="movementTimeInput" value="{{ fd.movement_time if use_form else '' }}" {% if is_urgent %}required{% endif %} class="{{ 'field-error' if errors.get('movement_time') else '' }}" />
           {% if errors.get("movement_time") %}
             <div class="field-error-msg">{{ errors.get("movement_time") }}</div>
@@ -108,22 +106,22 @@
       </div>
     </div>
     <label>
-      Descripción
-      <textarea name="description" id="descriptionInput" rows="6" required minlength="50" placeholder="Incluye detalles que ayuden a identificar el lugar, fechas, contexto y referencias visibles." class="{{ 'field-error' if errors.get('description') else '' }}">{{ fd.description if use_form else '' }}</textarea>
+      {{ _("Descripción") }}
+      <textarea name="description" id="descriptionInput" rows="6" required minlength="50" placeholder="{{ _('Incluye detalles que ayuden a identificar el lugar, fechas, contexto y referencias visibles.') }}" class="{{ 'field-error' if errors.get('description') else '' }}">{{ fd.description if use_form else '' }}</textarea>
       {% if errors.get("description") %}
         <div class="field-error-msg">{{ errors.get("description") }}</div>
       {% endif %}
     </label>
     <div class="two-col">
       <label>
-        Latitud
+        {{ _("Latitud") }}
         <input type="text" name="latitude" value="{{ fd.latitude if use_form else preset_lat }}" class="{{ 'field-error' if errors.get('latitude') else '' }}" />
         {% if errors.get("latitude") %}
           <div class="field-error-msg">{{ errors.get("latitude") }}</div>
         {% endif %}
       </label>
       <label>
-        Longitud
+        {{ _("Longitud") }}
         <input type="text" name="longitude" value="{{ fd.longitude if use_form else preset_lng }}" class="{{ 'field-error' if errors.get('longitude') else '' }}" />
         {% if errors.get("longitude") %}
           <div class="field-error-msg">{{ errors.get("longitude") }}</div>
@@ -131,7 +129,7 @@
       </label>
     </div>
     <label>
-      Dirección
+      {{ _("Dirección") }}
       <input type="text" name="address" value="{{ fd.address if use_form else '' }}" class="{{ 'field-error' if errors.get('address') else '' }}" />
       {% if errors.get("address") %}
         <div class="field-error-msg">{{ errors.get("address") }}</div>
@@ -139,9 +137,9 @@
     </label>
     <div class="two-col">
       <label>
-        Provincia
+        {{ _("Provincia") }}
         <select name="province" id="provinceSelect" required class="{{ 'field-error' if errors.get('province') else '' }}" data-selected="{{ default_province }}">
-          <option value="" disabled {% if not default_province %}selected{% endif %}>Elige provincia</option>
+          <option value="" disabled {% if not default_province %}selected{% endif %}>{{ _("Elige provincia") }}</option>
           {% for prov in provinces %}
             <option value="{{ prov }}" {% if default_province == prov %}selected{% endif %}>{{ prov }}</option>
           {% endfor %}
@@ -151,9 +149,9 @@
         {% endif %}
       </label>
       <label>
-        Municipio
+        {{ _("Municipio") }}
         <select name="municipality" id="municipalitySelect" data-selected="{{ default_municipality }}" required class="{{ 'field-error' if errors.get('municipality') else '' }}">
-          <option value="" disabled selected>Elige municipio</option>
+          <option value="" disabled selected>{{ _("Elige municipio") }}</option>
         </select>
         {% if errors.get("municipality") %}
           <div class="field-error-msg">{{ errors.get("municipality") }}</div>
@@ -161,11 +159,11 @@
       </label>
     </div>
     <label>
-      Imagen (URL)
+      {{ _("Imagen (URL)") }}
       <input type="text" name="image_url" />
     </label>
     <label>
-      Imágenes (máx {{ config.IMAGE_MAX_PER_SUBMIT }}, {{ config.IMAGE_MAX_MB }}MB c/u)
+      {{ _("Imágenes (máx %(max)s, %(mb)sMB c/u)", max=config.IMAGE_MAX_PER_SUBMIT, mb=config.IMAGE_MAX_MB) }}
       <input
         type="file"
         name="images"
@@ -184,8 +182,8 @@
     <div class="image-previews" id="imagePreviewList"></div>
     <div class="links-group">
       <div class="links-header">
-        <span>Enlaces de interés</span>
-        <button type="button" class="btn-secondary" id="addLinkBtn">+ Agregar</button>
+        <span>{{ _("Enlaces de interés") }}</span>
+        <button type="button" class="btn-secondary" id="addLinkBtn">{{ _("+ Agregar") }}</button>
       </div>
       <div id="linksList" class="links-list">
         {% if use_form %}
@@ -209,14 +207,14 @@
         <div class="field-error-msg">{{ errors.get("recaptcha") }}</div>
       {% endif %}
     {% endif %}
-    {% set submit_label = "Publicar reporte" if (not moderation_enabled or is_urgent) else "Enviar a moderación" %}
+    {% set submit_label = _("Publicar reporte") if (not moderation_enabled or is_urgent) else _("Enviar a moderación") %}
     <button
       type="submit"
       class="btn-primary"
       id="submitReportBtn"
       data-moderation-enabled="{{ 1 if moderation_enabled else 0 }}"
-      data-moderation-label="Enviar a moderación"
-      data-publish-label="Publicar reporte"
+      data-moderation-label="{{ _('Enviar a moderación') }}"
+      data-publish-label="{{ _('Publicar reporte') }}"
     >
       {{ submit_label }}
     </button>

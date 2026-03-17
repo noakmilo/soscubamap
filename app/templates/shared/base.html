@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="es">
+<html lang="{{ g.locale }}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <title>{{ config.APP_NAME }}{% block title %}{% endblock %}</title>
-    <meta name="description" content="{% block meta_description %}Mapa colaborativo para documentar acciones represivas y lugares clave en Cuba. Reportes anónimos, verificación comunitaria y visualización en tiempo real.{% endblock %}">
+    <meta name="description" content="{% block meta_description %}{{ _("Mapa colaborativo para documentar acciones represivas y lugares clave en Cuba. Reportes anónimos, verificación comunitaria y visualización en tiempo real.") }}{% endblock %}">
     <meta name="theme-color" content="#0b0f12" />
     <meta name="application-name" content="{{ config.APP_NAME }}" />
     <meta name="apple-mobile-web-app-title" content="{{ config.APP_NAME }}" />
@@ -15,6 +15,8 @@
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/favico.png') }}">
     <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}?v={{ config.ASSET_VERSION }}" />
+    <script src="{{ url_for('static', filename='js/i18n/runtime.js') }}?v={{ config.ASSET_VERSION }}"></script>
+    <script src="{{ url_for('frontend_i18n_js', lang=g.locale) }}?v={{ config.ASSET_VERSION }}"></script>
     {% block head_extra %}{% endblock %}
     <link
       rel="stylesheet"
@@ -32,34 +34,47 @@
         <span class="beta-badge">beta</span>
       </a>
       <nav class="nav-links">
-        <a href="{{ url_for('map.dashboard') }}">Mapa</a>
-        <a href="{{ url_for('discussions.index') }}">Discusiones</a>
+        <a href="{{ url_for('map.dashboard') }}">{{ _("Mapa") }}</a>
+        <a href="{{ url_for('discussions.index') }}">{{ _("Discusiones") }}</a>
         {% if current_user.is_authenticated %}
-          <button class="btn-secondary" type="button" data-open-report data-url="{{ url_for('map.new_post') }}">Nuevo reporte</button>
-          <a href="{{ url_for('map.reports') }}">Reportes</a>
-          <a href="{{ url_for('map.export_data') }}">Exportar</a>
-          <a href="{{ url_for('map.analytics') }}">Analíticas</a>
-          <a href="{{ url_for('map.about') }}">Acerca de</a>
-          <a class="nav-donate" href="{{ url_for('map.donate') }}">Donar</a>
+          <button class="btn-secondary" type="button" data-open-report data-url="{{ url_for('map.new_post') }}">{{ _("Nuevo reporte") }}</button>
+          <a href="{{ url_for('map.reports') }}">{{ _("Reportes") }}</a>
+          <a href="{{ url_for('map.export_data') }}">{{ _("Exportar") }}</a>
+          <a href="{{ url_for('map.analytics') }}">{{ _("Analíticas") }}</a>
+          <a href="{{ url_for('map.about') }}">{{ _("Acerca de") }}</a>
+          <a class="nav-donate" href="{{ url_for('map.donate') }}">{{ _("Donar") }}</a>
           <a class="nav-sos" href="{{ url_for('panic.panic_page') }}">🚨 SOS</a>
           {% if current_user.has_role('moderador') or current_user.has_role('administrador') %}
-            <a href="{{ url_for('moderation.dashboard') }}">Moderación</a>
+            <a href="{{ url_for('moderation.dashboard') }}">{{ _("Moderación") }}</a>
           {% endif %}
           {% if current_user.has_role('administrador') %}
-            <a href="{{ url_for('admin.dashboard') }}">Admin</a>
+            <a href="{{ url_for('admin.dashboard') }}">{{ _("Admin") }}</a>
           {% endif %}
-          <a href="{{ url_for('auth.logout') }}">Salir</a>
+          <a href="{{ url_for('auth.logout') }}">{{ _("Salir") }}</a>
         {% else %}
-          <a href="{{ url_for('map.reports') }}">Reportes</a>
-          <a href="{{ url_for('map.export_data') }}">Exportar</a>
-          <a href="{{ url_for('map.analytics') }}">Analíticas</a>
-          <a href="{{ url_for('map.about') }}">Acerca de</a>
-          <a class="nav-donate" href="{{ url_for('map.donate') }}">Donar</a>
-          <a href="{{ url_for('auth.login') }}">Login</a>
-          <a href="{{ url_for('auth.register') }}">Registro</a>
+          <a href="{{ url_for('map.reports') }}">{{ _("Reportes") }}</a>
+          <a href="{{ url_for('map.export_data') }}">{{ _("Exportar") }}</a>
+          <a href="{{ url_for('map.analytics') }}">{{ _("Analíticas") }}</a>
+          <a href="{{ url_for('map.about') }}">{{ _("Acerca de") }}</a>
+          <a class="nav-donate" href="{{ url_for('map.donate') }}">{{ _("Donar") }}</a>
+          <a href="{{ url_for('auth.login') }}">{{ _("Login") }}</a>
+          <a href="{{ url_for('auth.register') }}">{{ _("Registro") }}</a>
           <a class="nav-sos" href="{{ url_for('panic.panic_page') }}">🚨 SOS</a>
-          <button class="btn-cta" type="button" data-open-report data-url="{{ url_for('map.new_post') }}">Hacer reporte</button>
+          <button class="btn-cta" type="button" data-open-report data-url="{{ url_for('map.new_post') }}">{{ _("Hacer reporte") }}</button>
         {% endif %}
+        <div class="lang-switcher">
+          <select
+            class="lang-switcher-select"
+            aria-label="Language"
+            onchange="if (this.value) { window.location.href = this.value; }"
+          >
+            {% for language in g.language_choices %}
+              <option value="{{ url_for('set_language', lang=language.code) }}" {{ 'selected' if language.code == g.locale else '' }}>
+                {{ language.label }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
       </nav>
     </header>
     {% endif %}
@@ -84,7 +99,7 @@
 
     {% if not request.args.get('modal') %}
     <footer class="site-footer">
-      <div>Plataforma colaborativa y anónima.</div>
+      <div>{{ _("Plataforma colaborativa y anónima.") }}</div>
       <a class="footer-link" href="{{ url_for('map.api_docs') }}">API</a>
       <a class="footer-link" href="https://github.com/noakmilo/soscubamap" target="_blank" rel="noopener">
         <i class="fa-brands fa-github"></i> Repo
@@ -95,7 +110,7 @@
     <div id="reportModal" class="modal-overlay" aria-hidden="true">
       <div class="modal">
         <button class="modal-close" type="button" data-close-report>&times;</button>
-        <iframe id="reportModalFrame" title="Nuevo reporte" class="modal-frame"></iframe>
+        <iframe id="reportModalFrame" title="{{ _('Nuevo reporte') }}" class="modal-frame"></iframe>
       </div>
     </div>
 

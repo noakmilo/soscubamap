@@ -1,3 +1,5 @@
+var t = window.t;
+
 function wrapSelection(textarea, before, after) {
   const start = textarea.selectionStart || 0;
   const end = textarea.selectionEnd || 0;
@@ -41,7 +43,7 @@ function setupMarkdownEditor() {
       if (action === "italic") wrapSelection(textarea, "*", "*");
       if (action === "underline") wrapSelection(textarea, "<u>", "</u>");
       if (action === "link") {
-        const url = window.prompt("URL del enlace");
+        const url = window.prompt(t("placeholder_link_url"));
         if (!url) return;
         wrapSelection(textarea, "[", `](${url})`);
       }
@@ -58,7 +60,7 @@ function setupLinks() {
     const input = document.createElement("input");
     input.type = "url";
     input.name = "links[]";
-    input.placeholder = "https://ejemplo.com/fuente";
+    input.placeholder = t("placeholder_example_url");
     list.appendChild(input);
   });
 }
@@ -126,9 +128,9 @@ function setupImageUploads() {
         const url = URL.createObjectURL(file);
         return `
           <div class="image-preview-card">
-            <img src="${url}" alt="Vista previa ${idx + 1}" />
+            <img src="${url}" alt="${t("alt_image_preview", { idx: idx + 1 })}" />
             <label class="image-caption">
-              Descripción corta (opcional)
+              ${t("label_image_caption_optional")}
               <input type="text" name="image_captions[]" maxlength="255" placeholder="${file.name}" />
             </label>
           </div>
@@ -140,7 +142,7 @@ function setupImageUploads() {
   input.addEventListener("change", () => {
     if (!input.files) return;
     if (input.files.length > maxFiles) {
-      showError(`Máximo ${maxFiles} imágenes por envío.`);
+      showError(t("error_max_images_exceeded", { maxFiles }));
       input.value = "";
       renderPreviews();
       return;
@@ -149,13 +151,13 @@ function setupImageUploads() {
       const name = file.name || "";
       const ext = name.includes(".") ? name.split(".").pop().toLowerCase() : "";
       if (!allowedExt.includes(ext)) {
-        showError(`Formato no permitido: ${ext || "desconocido"}.`);
+        showError(t("error_invalid_file_format", { ext: ext || "desconocido" }));
         input.value = "";
         renderPreviews();
         return;
       }
       if (file.size > maxBytes) {
-        showError(`Cada imagen debe ser <= ${maxMb}MB.`);
+        showError(t("error_image_too_large", { maxMb }));
         input.value = "";
         renderPreviews();
         return;
@@ -204,7 +206,7 @@ function setupLoadingButtons() {
       if (!submit) return;
       submit.disabled = true;
       submit.dataset.loading = "true";
-      submit.textContent = "Publicando...";
+      submit.textContent = t("button_publishing");
     });
   }
   const commentForm = document.querySelector(".comment-form");
@@ -214,7 +216,7 @@ function setupLoadingButtons() {
       if (!submit) return;
       submit.disabled = true;
       submit.dataset.loading = "true";
-      submit.textContent = "Enviando...";
+      submit.textContent = t("button_sending");
     });
   }
 }
@@ -250,9 +252,9 @@ function setupCommentRecaptcha() {
       if (!token) {
         event.preventDefault();
         if (status) {
-          status.textContent = "Completa el reCAPTCHA antes de enviar.";
+          status.textContent = t("error_recaptcha_required");
         } else {
-          alert("Completa el reCAPTCHA antes de enviar.");
+          alert(t("error_recaptcha_required"));
         }
         return;
       }

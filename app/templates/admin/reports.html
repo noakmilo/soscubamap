@@ -1,8 +1,8 @@
 {% extends "shared/base.html" %}
-{% block title %} | Reportes{% endblock %}
+{% block title %} | {{ _("Reportes") }}{% endblock %}
 {% block content %}
 <section class="panel">
-  <h1>Reportes - {{ status }}</h1>
+  <h1>{{ _("Reportes") }} - {{ status }}</h1>
 
   <div class="pending-list">
     {% if posts %}
@@ -10,10 +10,10 @@
         <div class="bulk-header">
           <label class="bulk-select">
             <input type="checkbox" id="selectAllReports" />
-            Seleccionar todo
+            {{ _("Seleccionar todo") }}
           </label>
-          <button class="btn-secondary" type="submit" onclick="return confirm('¿Eliminar los reportes seleccionados?');">
-            Eliminar seleccionados
+          <button class="btn-secondary" type="submit" onclick="return confirm('{{ _('¿Eliminar los reportes seleccionados?') }}');">
+            {{ _("Eliminar seleccionados") }}
           </button>
         </div>
       </form>
@@ -35,21 +35,21 @@
             <div class="status-form">
               <form method="post" action="{{ url_for('admin.update_report_status', post_id=post.id, status=status) }}">
                 <select name="status">
-                  <option value="approved" {% if post.status == 'approved' %}selected{% endif %}>Activo</option>
-                  <option value="hidden" {% if post.status == 'hidden' %}selected{% endif %}>Oculto</option>
-                  <option value="pending" {% if post.status == 'pending' %}selected{% endif %}>Pendiente</option>
-                  <option value="rejected" {% if post.status == 'rejected' %}selected{% endif %}>Rechazado</option>
-                  <option value="deleted" {% if post.status == 'deleted' %}selected{% endif %}>Eliminado</option>
+                  <option value="approved" {% if post.status == 'approved' %}selected{% endif %}>{{ _("Activo") }}</option>
+                  <option value="hidden" {% if post.status == 'hidden' %}selected{% endif %}>{{ _("Oculto") }}</option>
+                  <option value="pending" {% if post.status == 'pending' %}selected{% endif %}>{{ _("Pendiente") }}</option>
+                  <option value="rejected" {% if post.status == 'rejected' %}selected{% endif %}>{{ _("Rechazado") }}</option>
+                  <option value="deleted" {% if post.status == 'deleted' %}selected{% endif %}>{{ _("Eliminado") }}</option>
                 </select>
-                <button class="btn-primary" type="submit">Actualizar</button>
+                <button class="btn-primary" type="submit">{{ _("Actualizar") }}</button>
               </form>
             </div>
-            <a class="btn-secondary" href="{{ url_for('admin.edit_report', post_id=post.id) }}">Editar</a>
+            <a class="btn-secondary" href="{{ url_for('admin.edit_report', post_id=post.id) }}">{{ _("Editar") }}</a>
           </div>
         </div>
       {% endfor %}
     {% else %}
-      <div class="muted">No hay reportes para este estado.</div>
+      <div class="muted">{{ _("No hay reportes para este estado.") }}</div>
     {% endif %}
   </div>
 </section>

@@ -1,15 +1,19 @@
 import json
-from flask import render_template, redirect, url_for, flash, request
+
+from flask import flash, redirect, render_template, request, url_for
+from flask_babel import gettext as _
+from flask_babel import lazy_gettext as _l
 from flask_login import login_required
 
 from app.extensions import db
-from app.models.post import Post
 from app.models.category import Category
-from app.models.post_revision import PostRevision
-from app.models.post_edit_request import PostEditRequest
 from app.models.media import Media
-from app.services.media_upload import media_json_from_post, parse_media_json
+from app.models.post import Post
+from app.models.post_edit_request import PostEditRequest
+from app.models.post_revision import PostRevision
 from app.services.authz import role_required
+from app.services.media_upload import media_json_from_post, parse_media_json
+
 from . import moderation_bp
 
 
@@ -17,9 +21,17 @@ from . import moderation_bp
 @login_required
 @role_required("moderador", "administrador")
 def dashboard():
-    pending = Post.query.filter_by(status="pending").order_by(Post.created_at.desc()).all()
-    pending_edits = PostEditRequest.query.filter_by(status="pending").order_by(PostEditRequest.created_at.desc()).all()
-    return render_template("moderation/dashboard.html", pending=pending, pending_edits=pending_edits)
+    pending = (
+        Post.query.filter_by(status="pending").order_by(Post.created_at.desc()).all()
+    )
+    pending_edits = (
+        PostEditRequest.query.filter_by(status="pending")
+        .order_by(PostEditRequest.created_at.desc())
+        .all()
+    )
+    return render_template(
+        "moderation/dashboard.html", pending=pending, pending_edits=pending_edits
+    )
 
 
 @moderation_bp.route("/aprobar/<int:post_id>", methods=["POST"])
@@ -29,7 +41,7 @@ def approve(post_id):
     post = Post.query.get_or_404(post_id)
     post.status = "approved"
     db.session.commit()
-    flash("Reporte aprobado.", "success")
+    flash(_("Reporte aprobado."), "success")
     if request.args.get("modal") == "1":
         return render_template("map/edit_success.html", payload={"status": "approved"})
     return redirect(url_for("moderation.dashboard"))
@@ -42,7 +54,7 @@ def reject(post_id):
     post = Post.query.get_or_404(post_id)
     post.status = "rejected"
     db.session.commit()
-    flash("Reporte rechazado.", "success")
+    flash(_("Reporte rechazado."), "success")
     if request.args.get("modal") == "1":
         return render_template("map/edit_success.html", payload={"status": "rejected"})
     return redirect(url_for("moderation.dashboard"))
@@ -105,7 +117,7 @@ def approve_edit(edit_id):
 
     edit.status = "approved"
     db.session.commit()
-    flash("Edición aprobada.", "success")
+    flash(_("Edición aprobada."), "success")
     if request.args.get("modal") == "1":
         return render_template("map/edit_success.html", payload={"status": "approved"})
     return redirect(url_for("moderation.dashboard"))
@@ -118,14 +130,14 @@ def reject_edit(edit_id):
     edit = PostEditRequest.query.get_or_404(edit_id)
     rejection_reason = request.form.get("rejection_reason", "").strip()
     if not rejection_reason:
-        flash("Debes indicar un motivo de rechazo.", "error")
+        flash(_("Debes indicar un motivo de rechazo."), "error")
         if request.args.get("modal") == "1":
             return redirect(url_for("moderation.edit_detail", edit_id=edit.id, modal=1))
         return redirect(url_for("moderation.edit_detail", edit_id=edit.id))
     edit.rejection_reason = rejection_reason
     edit.status = "rejected"
     db.session.commit()
-    flash("Edición rechazada.", "success")
+    flash(_("Edición rechazada."), "success")
     if request.args.get("modal") == "1":
         return render_template("map/edit_success.html", payload={"status": "rejected"})
     return redirect(url_for("moderation.dashboard"))

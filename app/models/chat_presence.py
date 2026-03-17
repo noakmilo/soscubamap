@@ -10,4 +10,3 @@ class ChatPresence(db.Model):
     session_id = db.Column(db.String(64), unique=True, nullable=False, index=True)
     nickname = db.Column(db.String(80), nullable=False)
     last_seen = db.Column(db.DateTime, default=datetime.utcnow, index=True)
-

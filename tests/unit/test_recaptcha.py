@@ -1,6 +1,8 @@
 import json
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
+
 from app.services.recaptcha import recaptcha_enabled, verify_recaptcha
 
 

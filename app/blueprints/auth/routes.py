@@ -1,9 +1,12 @@
-from flask import render_template, redirect, url_for, request, flash, current_app
-from flask_login import login_user, logout_user, login_required
+from flask import current_app, flash, redirect, render_template, request, url_for
+from flask_babel import gettext as _
+from flask_babel import lazy_gettext as _l
+from flask_login import login_required, login_user, logout_user
 
 from app.extensions import db
-from app.models.user import User
 from app.models.role import Role
+from app.models.user import User
+
 from . import auth_bp
 
 
@@ -24,15 +27,15 @@ def register():
 
         admin_email = current_app.config.get("ADMIN_EMAIL", "").strip().lower()
         if admin_email and email == admin_email:
-            flash("Ese email está reservado.", "error")
+            flash(_("Ese email está reservado."), "error")
             return redirect(url_for("auth.register"))
 
         if not email or not password:
-            flash("Email y contraseña son obligatorios.", "error")
+            flash(_("Email y contraseña son obligatorios."), "error")
             return redirect(url_for("auth.register"))
 
         if User.query.filter_by(email=email).first():
-            flash("Ese email ya está registrado.", "error")
+            flash(_("Ese email ya está registrado."), "error")
             return redirect(url_for("auth.register"))
 
         user = User(email=email)
@@ -61,7 +64,7 @@ def login():
         admin_password = current_app.config.get("ADMIN_PASSWORD", "")
         if admin_email and admin_password and email == admin_email:
             if password != admin_password:
-                flash("Credenciales inválidas.", "error")
+                flash(_("Credenciales inválidas."), "error")
                 return redirect(url_for("auth.login"))
 
             if not user:
@@ -88,7 +91,7 @@ def login():
             db.session.commit()
 
         if not user or not user.check_password(password):
-            flash("Credenciales inválidas.", "error")
+            flash(_("Credenciales inválidas."), "error")
             return redirect(url_for("auth.login"))
 
         login_user(user)

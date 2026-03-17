@@ -1,19 +1,19 @@
 {% extends "shared/base.html" %}
-{% block title %} | Mapa{% endblock %}
-{% block meta_description %}Mapa represivo de Cuba con reportes anónimos y verificados. Explora acciones represivas, sedes oficiales y centros clave en un mapa interactivo.{% endblock %}
+{% block title %} | {{ _("Mapa") }}{% endblock %}
+{% block meta_description %}{{ _("Mapa represivo de Cuba con reportes anónimos y verificados. Explora acciones represivas, sedes oficiales y centros clave en un mapa interactivo.") }}{% endblock %}
 {% block content %}
 <section class="hero">
   <div>
-    <h1>Mapa Represivo de Cuba</h1>
-    <p>Documenta y visibiliza acciones y lugares de represión. Los reportes aparecen como anónimos.</p>
+    <h1>{{ _("Mapa Represivo de Cuba") }}</h1>
+    <p>{{ _("Documenta y visibiliza acciones y lugares de represión. Los reportes aparecen como anónimos.") }}</p>
   </div>
   <div class="status">
     <div class="stat">
-      <span class="label">Categorías</span>
+      <span class="label">{{ _("Categorías") }}</span>
       <span class="value">{{ categories|length }}</span>
     </div>
     <div class="stat">
-      <span class="label">Reportes activos</span>
+      <span class="label">{{ _("Reportes activos") }}</span>
       <span class="value">{{ posts|length }}</span>
     </div>
   </div>
@@ -21,34 +21,34 @@
 
 <section class="filters collapsed">
   <div class="filter-header">
-    <div class="filter-title">Filtros</div>
-    <button type="button" class="btn-secondary" id="filtersToggle" aria-expanded="false">Mostrar filtros</button>
+    <div class="filter-title">{{ _("Filtros") }}</div>
+    <button type="button" class="btn-secondary" id="filtersToggle" aria-expanded="false">{{ _("Mostrar filtros") }}</button>
   </div>
   <div class="filter-controls">
     <div class="filter-group">
-      <div class="filter-label">Categorías</div>
+      <div class="filter-label">{{ _("Categorías") }}</div>
       <div class="filter-checkboxes" id="categoryFilter">
         {% for cat in categories %}
           <label class="checkbox-item">
             <input type="checkbox" class="category-checkbox" value="{{ cat.id }}" checked />
-            <span>{{ cat.name }}</span>
+            <span>{{ _(cat.name) }}</span>
           </label>
         {% endfor %}
       </div>
     </div>
     <label>
-      Provincia
+      {{ _("Provincia") }}
       <select id="provinceFilter">
-        <option value="">Todas</option>
+        <option value="">{{ _("Todas") }}</option>
         {% for prov in provinces %}
           <option value="{{ prov }}">{{ prov }}</option>
         {% endfor %}
       </select>
     </label>
     <label>
-      Municipio
+      {{ _("Municipio") }}
       <select id="municipalityFilter">
-        <option value="">Todos</option>
+        <option value="">{{ _("Todos") }}</option>
       </select>
     </label>
   </div>
@@ -56,16 +56,16 @@
 
 {% if categories|length == 0 %}
   <section class="panel notice">
-    <strong>No hay categorías cargadas.</strong>
-    <div>Ejecuta: <code>python -m scripts.seed_categories</code></div>
+    <strong>{{ _("No hay categorías cargadas.") }}</strong>
+    <div>{{ _("Ejecuta:") }} <code>python -m scripts.seed_categories</code></div>
   </section>
 {% endif %}
 
 <section class="alert-console">
   <div class="console-header">
     <div>
-      <div class="console-title">Movimientos, desconexiones y acciones represivas</div>
-      <div class="console-status">En vivo</div>
+      <div class="console-title">{{ _("Movimientos, desconexiones y acciones represivas") }}</div>
+      <div class="console-status">{{ _("En vivo") }}</div>
     </div>
     <div class="console-actions">
       <button
@@ -75,20 +75,20 @@
         data-enabled="{{ 1 if push_alerts_enabled else 0 }}"
         data-vapid-key="{{ vapid_public_key }}"
       >
-        Activar alertas
+        {{ _("Activar alertas") }}
       </button>
-      <div id="alertPushStatus" class="console-note">Solo para movimiento, desconexiones y acción represiva.</div>
+      <div id="alertPushStatus" class="console-note">{{ _("Solo para movimiento, desconexiones y acción represiva.") }}</div>
     </div>
   </div>
   <div id="alertFeed" class="console-body">
-    <div class="console-empty">Sin movimientos, desconexiones o acciones recientes.</div>
+    <div class="console-empty">{{ _("Sin movimientos, desconexiones o acciones recientes.") }}</div>
   </div>
 </section>
 
 <section class="map-search-wrap">
-  <div class="map-search-label">Buscar dirección (Cuba)</div>
+  <div class="map-search-label">{{ _("Buscar dirección (Cuba)") }}</div>
   <div class="map-search-bar">
-    <input id="mapSearch" type="text" placeholder="Ej: Sector PNR" />
+    <input id="mapSearch" type="text" placeholder="{{ _('Ej: Sector PNR') }}" />
   </div>
 </section>
 
@@ -105,124 +105,16 @@
   >
     <div class="map-placeholder">
       <div class="map-title">OpenStreetMap</div>
-      <div class="map-subtitle">Cargando mapa base.</div>
+      <div class="map-subtitle">{{ _("Cargando mapa base.") }}</div>
     </div>
-    <div class="map-hint" id="mapHint">Haz click en el mapa para crear un reporte</div>
-  </div>
-  <div id="connectivityLegendOverlay" class="connectivity-legend-overlay" hidden>
-    <div class="connectivity-legend-title">Conectividad</div>
-    <div class="connectivity-window-switch" role="group" aria-label="Ventana de conectividad">
-      <button type="button" class="connectivity-window-btn is-active" data-connectivity-window-hours="24" aria-pressed="true">24h</button>
-      <button type="button" class="connectivity-window-btn" data-connectivity-window-hours="6" aria-pressed="false">6h</button>
-      <button type="button" class="connectivity-window-btn" data-connectivity-window-hours="2" aria-pressed="false">2h</button>
-    </div>
-    <div class="connectivity-legend-item">
-      <span class="dot dot-normal"></span>
-      <span>Normal</span>
-    </div>
-    <div class="connectivity-legend-item">
-      <span class="dot dot-degraded"></span>
-      <span>Degradación leve</span>
-    </div>
-    <div class="connectivity-legend-item">
-      <span class="dot dot-severe"></span>
-      <span>Problemas severos</span>
-    </div>
-    <div class="connectivity-legend-item">
-      <span class="dot dot-critical"></span>
-      <span>Apagón o conectividad crítica</span>
-    </div>
-    <div class="connectivity-updated" id="connectivityUpdatedLabel"></div>
-    <div class="connectivity-traffic-panel" id="connectivityTrafficPanel">
-      <div class="connectivity-traffic-title">Peticiones HTTP (ventana activa)</div>
-      <div class="connectivity-traffic-kpi" id="connectivityTrafficValue">N/D</div>
-      <div class="connectivity-traffic-meta">
-        <span id="connectivityTrafficDelta">Variacion vs control: N/D</span>
-        <span id="connectivityTrafficDrop">Caida maxima: N/D</span>
-      </div>
-      <svg
-        id="connectivitySparkline"
-        class="connectivity-sparkline"
-        viewBox="0 0 280 56"
-        preserveAspectRatio="none"
-        aria-label="Tendencia de peticiones HTTP en ventana activa"
-      >
-        <path id="connectivitySparkPrev" class="spark-prev" d=""></path>
-        <path id="connectivitySparkMain" class="spark-main" d=""></path>
-      </svg>
-      <div class="connectivity-traffic-note" id="connectivityTrafficNote"></div>
-    </div>
-    <div class="connectivity-province-panel" id="connectivityProvincePanel">
-      <div class="connectivity-province-head">
-        <div class="connectivity-province-title" id="connectivityProvinceTitle">Selecciona una provincia</div>
-      </div>
-      <div class="connectivity-province-status" id="connectivityProvinceStatus">
-        Haz clic en una provincia para ver detalle horario.
-      </div>
-      <div class="connectivity-province-range" id="connectivityProvinceRange"></div>
-      <svg
-        id="connectivityProvinceChart"
-        class="connectivity-province-chart"
-        viewBox="0 0 280 86"
-        preserveAspectRatio="none"
-        aria-label="Serie horaria de conectividad en provincia"
-      >
-        <path id="connectivityProvinceChartPrev" class="spark-prev" d=""></path>
-        <path id="connectivityProvinceChartMain" class="spark-main" d=""></path>
-      </svg>
-      <div class="connectivity-province-log" id="connectivityProvinceLog">
-        <div class="connectivity-province-log-empty">Sin provincia seleccionada.</div>
-      </div>
-    </div>
-    {% if current_user.is_authenticated and current_user.has_role('administrador') %}
-      <div class="connectivity-source-credit">Hecho con tecnología de Cloudflare Radar</div>
-    {% endif %}
-  </div>
-  <div id="protestOverlay" class="protest-overlay" hidden>
-    <div class="protest-title">Protestas</div>
-    <div class="protest-subtitle">Eventos detectados en publicaciones RSS con enlace a fuente original.</div>
-    <div class="protest-timeline-wrap">
-      <label for="protestTimelineSlider" class="protest-control-label">Linea de tiempo (UTC)</label>
-      <input id="protestTimelineSlider" type="range" min="0" max="0" step="1" value="0" />
-      <div id="protestTimelineLabel" class="protest-timeline-label">Sin datos historicos.</div>
-    </div>
-    <div class="protest-date-controls">
-      <label>
-        Dia UTC
-        <input id="protestDayInput" type="date" />
-      </label>
-      <button type="button" id="protestApplyDayBtn" class="protest-btn">Ver dia</button>
-    </div>
-    <div class="protest-range-controls">
-      <label>
-        Inicio UTC
-        <input id="protestStartInput" type="date" />
-      </label>
-      <label>
-        Fin UTC
-        <input id="protestEndInput" type="date" />
-      </label>
-      <button type="button" id="protestApplyRangeBtn" class="protest-btn">Ver rango</button>
-      <button type="button" id="protestResetRangeBtn" class="protest-btn protest-btn-muted">Hoy</button>
-    </div>
-    <div class="protest-legend">
-      <div class="protest-legend-item"><span class="dot dot-confirmed"></span><span>Confirmada</span></div>
-      <div class="protest-legend-item"><span class="dot dot-probable"></span><span>Probable</span></div>
-      <div class="protest-legend-item"><span class="dot dot-related"></span><span>Relacionada</span></div>
-      <div class="protest-legend-item"><span class="dot dot-unresolved"></span><span>Ubicacion aproximada</span></div>
-    </div>
-    <div id="protestSummary" class="protest-summary">Sin datos de protestas para la vista activa.</div>
-    <div id="protestDetailPanel" class="protest-detail-panel">
-      <div class="protest-detail-empty">Haz clic en un evento para ver detalles y enlace original.</div>
-    </div>
-    <div class="protest-source-credit">Cada evento mostrado enlaza su publicacion original para trazabilidad.</div>
+    <div class="map-hint">{{ _("Haz click en el mapa para crear un reporte") }}</div>
   </div>
 </section>
 
 <section class="legend" id="reportLegendSection">
   {% set alert_slugs = ["accion-represiva", "movimiento-tropas", "desconexion-internet"] %}
   <div class="legend-header">
-    <div class="legend-title">Leyenda de íconos</div>
+    <div class="legend-title">{{ _("Leyenda de íconos") }}</div>
   </div>
   <div class="legend-grid">
     {% for cat in categories %}
@@ -230,7 +122,7 @@
         <span class="legend-icon">
           <i class="fa-solid fa-location-dot"></i>
         </span>
-        <span class="legend-label">{{ cat.name }}</span>
+        <span class="legend-label">{{ _(cat.name) }}</span>
         <span class="legend-count" id="legend-count-{{ cat.id }}">0</span>
       </div>
     {% endfor %}
@@ -239,21 +131,21 @@
 
 <section class="live-console">
   <div class="console-header">
-    <div class="console-title">Aportaciones recientes</div>
-    <div class="console-status">En vivo</div>
+    <div class="console-title">{{ _("Aportaciones recientes") }}</div>
+    <div class="console-status">{{ _("En vivo") }}</div>
   </div>
   <div id="recentFeed" class="console-body">
-    <div class="console-empty">Sin aportaciones visibles aún.</div>
+    <div class="console-empty">{{ _("Sin aportaciones visibles aún.") }}</div>
   </div>
 </section>
 
 <section class="categories">
-  <h2>Categorías</h2>
+  <h2>{{ _("Categorías") }}</h2>
   <div class="category-grid">
     {% for cat in categories %}
       <div class="category-card">
-        <div class="category-name">{{ cat.name }}</div>
-        <div class="category-desc">{{ cat.description }}</div>
+        <div class="category-name">{{ _(cat.name) }}</div>
+        <div class="category-desc">{{ _(cat.description) }}</div>
       </div>
     {% endfor %}
   </div>
@@ -263,7 +155,7 @@
   <div class="image-modal-backdrop" data-close-map-image></div>
   <div class="image-modal-content">
     <button class="image-modal-close" type="button" data-close-map-image>&times;</button>
-    <img id="mapImageModalImg" src="" alt="Imagen ampliada" />
+    <img id="mapImageModalImg" src="" alt="{{ _('Imagen ampliada') }}" />
     <div class="image-modal-caption" id="mapImageModalCaption"></div>
   </div>
 </div>

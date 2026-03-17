@@ -1,3 +1,5 @@
+var t = window.t;
+
 let drawMap;
 let drawnItems;
 let currentLayer;
@@ -306,10 +308,9 @@ function setupCategoryRequirements() {
       if (!isInsideCubaBounds(lat, lng)) {
         e.preventDefault();
         if (status) {
-          status.textContent =
-            "La ubicación debe estar dentro del territorio cubano.";
+          status.textContent = t("error_location_outside_cuba");
         } else {
-          alert("La ubicación debe estar dentro del territorio cubano.");
+          alert(t("error_location_outside_cuba"));
         }
         if (latInput) latInput.focus();
         return;
@@ -321,7 +322,7 @@ function setupCategoryRequirements() {
         if (!hasFiles) {
           e.preventDefault();
           if (status) {
-            status.textContent = "Debes subir al menos una imagen del represor.";
+            status.textContent = t("error_image_required_for_residence");
           }
         }
       }
@@ -331,8 +332,7 @@ function setupCategoryRequirements() {
           e.preventDefault();
           if (otherInput) otherInput.focus();
           if (status) {
-            status.textContent =
-              "El tipo en Otros no puede referirse a represores. Usa la categoria correspondiente.";
+            status.textContent = t("error_otros_cannot_be_represor");
           }
         }
       }
@@ -342,7 +342,7 @@ function setupCategoryRequirements() {
         if (!hasDate || !hasTime) {
           e.preventDefault();
           if (status) {
-            status.textContent = "Debes indicar fecha y hora del evento.";
+            status.textContent = t("error_date_time_required");
           }
         }
       }
@@ -361,7 +361,7 @@ function setupLinks() {
     const input = document.createElement("input");
     input.type = "url";
     input.name = "links[]";
-    input.placeholder = "https://ejemplo.com/fuente";
+    input.placeholder = t("placeholder_example_url");
     list.appendChild(input);
   });
 }
@@ -604,7 +604,7 @@ function setupProvinceMunicipality() {
       items = Array.from(new Set(items)).sort();
     }
     munSelect.innerHTML =
-      `<option value="" disabled ${selected ? "" : "selected"}>Elige municipio</option>` +
+      `<option value="" disabled ${selected ? "" : "selected"}>${t("label_choose_municipality")}</option>` +
       items.map((m) => `<option value="${m}" ${m === selected ? "selected" : ""}>${m}</option>`).join("");
   };
 
@@ -710,9 +710,9 @@ function setupImageValidation() {
         const url = URL.createObjectURL(file);
         return `
           <div class="image-preview-card">
-            <img src="${url}" alt="Vista previa ${idx + 1}" />
+            <img src="${url}" alt="${t("alt_image_preview", { idx: idx + 1 })}" />
             <label class="image-caption">
-              Descripcion corta (imagen ${idx + 1})
+              ${t("label_image_caption_numbered", { idx: idx + 1 })}
               <input type="text" name="image_captions[]" maxlength="255" placeholder="${file.name}" />
             </label>
           </div>
@@ -724,7 +724,7 @@ function setupImageValidation() {
   input.addEventListener("change", () => {
     if (!input.files) return;
     if (input.files.length > maxFiles) {
-      showError(`Maximo ${maxFiles} imagenes por envio.`);
+      showError(t("error_max_images_exceeded", { maxFiles }));
       input.value = "";
       renderPreviews();
       return;
@@ -734,13 +734,13 @@ function setupImageValidation() {
       const name = file.name || "";
       const ext = name.includes(".") ? name.split(".").pop().toLowerCase() : "";
       if (!allowedExt.includes(ext)) {
-        showError(`Formato no permitido: ${ext || "desconocido"}.`);
+        showError(t("error_invalid_file_format", { ext: ext || "desconocido" }));
         input.value = "";
         renderPreviews();
         return;
       }
       if (file.size > maxBytes) {
-        showError(`Cada imagen debe ser <= ${maxMb}MB.`);
+        showError(t("error_image_too_large", { maxMb }));
         input.value = "";
         renderPreviews();
         return;
@@ -797,7 +797,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (event.defaultPrevented) return;
       submit.disabled = true;
       submit.dataset.loading = "true";
-      submit.textContent = "Enviando...";
+      submit.textContent = t("button_sending");
     });
   }
 });

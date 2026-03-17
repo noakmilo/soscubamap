@@ -11,7 +11,9 @@ class ProtestEvent(db.Model):
     source_name = db.Column(db.String(255), nullable=False, default="", index=True)
     source_guid = db.Column(db.String(1000), index=True)
     source_url = db.Column(db.String(2000), nullable=False, default="", index=True)
-    source_platform = db.Column(db.String(64), nullable=False, default="web", index=True)
+    source_platform = db.Column(
+        db.String(64), nullable=False, default="web", index=True
+    )
     source_author = db.Column(db.String(255))
     source_published_at_utc = db.Column(db.DateTime, nullable=False, index=True)
     published_day_utc = db.Column(db.Date, nullable=False, index=True)
@@ -33,7 +35,9 @@ class ProtestEvent(db.Model):
     location_precision = db.Column(db.String(64), nullable=False, default="unresolved")
 
     confidence_score = db.Column(db.Float, nullable=False, default=0.0, index=True)
-    event_type = db.Column(db.String(32), nullable=False, default="context_only", index=True)
+    event_type = db.Column(
+        db.String(32), nullable=False, default="context_only", index=True
+    )
     review_status = db.Column(db.String(32), nullable=False, default="auto", index=True)
     visible_on_map = db.Column(db.Boolean, nullable=False, default=False, index=True)
 
@@ -41,7 +45,9 @@ class ProtestEvent(db.Model):
     related_group_hash = db.Column(db.String(64))
     transparency_note = db.Column(db.String(255), nullable=False, default="")
 
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    created_at = db.Column(
+        db.DateTime, nullable=False, default=datetime.utcnow, index=True
+    )
     updated_at = db.Column(
         db.DateTime,
         nullable=False,

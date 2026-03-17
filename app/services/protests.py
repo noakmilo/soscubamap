@@ -301,7 +301,9 @@ def parse_rss_items(xml_text, source_feed):
         link = canonicalize_source_url(_child_text(item, "link"))
         guid = (_child_text(item, "guid") or "").strip()
         pub_date = parse_rss_datetime(_child_text(item, "pubDate"))
-        merged_text = " ".join(part for part in [title, clean_description] if part).strip()
+        merged_text = " ".join(
+            part for part in [title, clean_description] if part
+        ).strip()
         if not merged_text:
             continue
         items.append(
@@ -325,82 +327,6 @@ def extract_source_name(feed_url):
     if host.startswith("www."):
         host = host[4:]
     return host or "rss"
-
-
-def _source_name_overrides():
-    raw = str(_get_env_or_config("PROTEST_SOURCE_NAME_OVERRIDES_JSON", "") or "").strip()
-    if not raw:
-        return {}
-    try:
-        payload = json.loads(raw)
-    except Exception:
-        return {}
-    if not isinstance(payload, dict):
-        return {}
-
-    overrides = {}
-    for raw_key, raw_name in payload.items():
-        name = str(raw_name or "").strip()
-        key = str(raw_key or "").strip()
-        if not name or not key:
-            continue
-        canonical_key = canonicalize_source_url(key) or key
-        overrides[canonical_key] = name
-    return overrides
-
-
-def _extract_handle_from_source_url(source_url):
-    parsed = urlparse(str(source_url or "").strip())
-    host = (parsed.netloc or "").lower()
-    if host.startswith("www."):
-        host = host[4:]
-    if host not in {"x.com", "twitter.com"}:
-        return ""
-
-    segments = [segment for segment in parsed.path.split("/") if segment]
-    if not segments:
-        return ""
-    first = segments[0].strip()
-    if first.startswith("@"):
-        first = first[1:]
-    if first.lower() in {
-        "i",
-        "intent",
-        "search",
-        "hashtag",
-        "home",
-        "explore",
-        "messages",
-        "notifications",
-        "compose",
-        "settings",
-    }:
-        return ""
-    if not re.match(r"^[A-Za-z0-9_]{1,30}$", first):
-        return ""
-    return f"@{first}"
-
-
-def display_source_name(source_feed="", source_url="", fallback_name=""):
-    overrides = _source_name_overrides()
-    feed_key = canonicalize_source_url(source_feed) or str(source_feed or "").strip()
-    source_key = canonicalize_source_url(source_url) or str(source_url or "").strip()
-
-    if feed_key and feed_key in overrides:
-        return overrides[feed_key]
-    if source_key and source_key in overrides:
-        return overrides[source_key]
-
-    handle = _extract_handle_from_source_url(source_url)
-    if handle:
-        return handle
-
-    fallback = str(fallback_name or "").strip()
-    if fallback:
-        return fallback
-    if source_url:
-        return extract_source_name(source_url)
-    return extract_source_name(source_feed)
 
 
 def extract_source_platform(source_url):
@@ -632,7 +558,9 @@ def _build_gazetteer():
         province_lat, province_lng = province_centroids.get(province_norm, (None, None))
         for municipality_name in mun_list:
             mun_norm = _normalize_text(municipality_name)
-            lat, lng = municipality_centroids.get((mun_norm, province_norm), (None, None))
+            lat, lng = municipality_centroids.get(
+                (mun_norm, province_norm), (None, None)
+            )
             if lat is None or lng is None:
                 lat, lng = province_lat, province_lng
             _add_entry(
@@ -660,7 +588,9 @@ def _build_gazetteer():
         province_norm = _normalize_text(province_name)
         municipality_norm = _normalize_text(municipality_name)
         if (lat is None or lng is None) and municipality_name:
-            lat, lng = municipality_centroids.get((municipality_norm, province_norm), (None, None))
+            lat, lng = municipality_centroids.get(
+                (municipality_norm, province_norm), (None, None)
+            )
         if (lat is None or lng is None) and province_name:
             lat, lng = province_centroids.get(province_norm, (None, None))
         _add_entry(
@@ -749,6 +679,22 @@ def _candidate_specificity(entry):
     return 0
 
 
+def _term_positions(normalized_text, term):
+    if not normalized_text or not term:
+        return []
+    pattern = rf"(?<!\w){re.escape(term)}(?!\w)"
+    return [match.start() for match in re.finditer(pattern, normalized_text)]
+
+
+def _first_sentence_end(normalized_text):
+    if not normalized_text:
+        return -1
+    match = re.search(r"[.!?;]", normalized_text)
+    if not match:
+        return -1
+    return match.start()
+
+
 def resolve_place(clean_text):
     normalized = _normalize_text(clean_text)
     if not normalized:
@@ -785,6 +731,7 @@ def resolve_place(clean_text):
     all_idx = gazetteer.get("all") or {}
     terms_sorted = gazetteer.get("terms_sorted") or []
     province_terms = gazetteer.get("province_terms") or set()
+    first_sentence_end = _first_sentence_end(normalized)
 
     context_provinces = set()
     for term in terms_sorted:
@@ -797,8 +744,10 @@ def resolve_place(clean_text):
     for term in terms_sorted:
         if term in GENERIC_PLACE_TERMS:
             continue
-        if not re.search(rf"(?<!\w){re.escape(term)}(?!\w)", normalized):
+        positions = _term_positions(normalized, term)
+        if not positions:
             continue
+        first_pos = positions[0]
         for entry in all_idx.get(term, []):
             province_norm = _normalize_text(entry.get("province"))
             score = _candidate_specificity(entry) + len(term) / 12.0
@@ -806,6 +755,13 @@ def resolve_place(clean_text):
                 score += 8.0
             if "," in normalized and term in normalized:
                 score += 1.0
+            # Prioriza menciones tempranas y de la primera frase.
+            score += max(0.0, 14.0 - (float(first_pos) / 16.0))
+            if first_sentence_end >= 0 and first_pos <= first_sentence_end:
+                score += 8.0
+            sentence_penalty = normalized[:first_pos].count(".") * 2.5
+            if sentence_penalty > 0:
+                score -= min(8.0, sentence_penalty)
             candidates.append((score, term, entry))
 
     if not candidates:
@@ -854,13 +810,23 @@ def resolve_place(clean_text):
     feature_type = best_entry.get("type")
     precision = "unresolved"
     if feature_type == "locality":
-        precision = "exact_locality" if lat is not None and lng is not None else "approx_locality"
+        precision = (
+            "exact_locality"
+            if lat is not None and lng is not None
+            else "approx_locality"
+        )
     elif feature_type == "municipality":
         precision = (
-            "exact_municipality" if lat is not None and lng is not None else "approx_municipality"
+            "exact_municipality"
+            if lat is not None and lng is not None
+            else "approx_municipality"
         )
     elif feature_type == "province":
-        precision = "exact_province" if lat is not None and lng is not None else "approx_province"
+        precision = (
+            "exact_province"
+            if lat is not None and lng is not None
+            else "approx_province"
+        )
 
     return {
         "resolved": lat is not None and lng is not None,
@@ -888,7 +854,9 @@ def classify_event(clean_text, keyword_hits, place_result):
         score += 16
     if strong_count and context_count:
         score += 8
-    if "cacerolas" in (keyword_hits.get("strong") or []) and "libertad" in _normalize_text(clean_text):
+    if "cacerolas" in (
+        keyword_hits.get("strong") or []
+    ) and "libertad" in _normalize_text(clean_text):
         score += 6
     if not has_location:
         score -= 10
@@ -933,11 +901,17 @@ def should_show_on_map(event_payload):
         return False
 
     event_type = event_payload.get("event_type")
-    if event_type not in {"confirmed_protest", "probable_protest", "related_unrest", "unresolved_location"}:
+    if event_type not in {
+        "confirmed_protest",
+        "probable_protest",
+        "related_unrest",
+        "unresolved_location",
+    }:
         return False
 
     has_coords = (
-        event_payload.get("latitude") is not None and event_payload.get("longitude") is not None
+        event_payload.get("latitude") is not None
+        and event_payload.get("longitude") is not None
     )
     if not has_coords and not allow_unresolved:
         return False
@@ -949,7 +923,9 @@ def build_event_payload(item):
     clean_text = str(item.get("clean_text") or "").strip()
     keyword_hits = detect_keywords(clean_text)
     place_result = resolve_place(clean_text)
-    confidence_score, event_type = classify_event(clean_text, keyword_hits, place_result)
+    confidence_score, event_type = classify_event(
+        clean_text, keyword_hits, place_result
+    )
 
     source_url = canonicalize_source_url(item.get("link"))
     published_at = item.get("published_at_utc")

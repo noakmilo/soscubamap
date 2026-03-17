@@ -10,6 +10,8 @@ import secrets
 from decimal import Decimal
 
 from flask import current_app, jsonify, request
+from flask_babel import gettext as _
+from flask_babel import lazy_gettext as _l
 
 from app.extensions import db, limiter
 from app.models.category import Category
@@ -31,16 +33,16 @@ def panic_report():
         lat = Decimal(str(data["latitude"]))
         lng = Decimal(str(data["longitude"]))
     except (KeyError, Exception):
-        return jsonify({"ok": False, "error": "Coordenadas inválidas."}), 400
+        return jsonify({"ok": False, "error": _("Coordenadas inválidas.")}), 400
 
     if not (-90 <= float(lat) <= 90 and -180 <= float(lng) <= 180):
-        return jsonify({"ok": False, "error": "Coordenadas fuera de rango."}), 400
+        return jsonify({"ok": False, "error": _("Coordenadas fuera de rango.")}), 400
 
     category = Category.query.filter_by(slug="accion-represiva").first()
     if not category:
         category = Category.query.first()
     if not category:
-        return jsonify({"ok": False, "error": "Sin categorías configuradas."}), 500
+        return jsonify({"ok": False, "error": _("Sin categorías configuradas.")}), 500
 
     province, municipality = None, None
     try:

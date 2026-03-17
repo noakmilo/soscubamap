@@ -1,0 +1,15 @@
+project_id_env: CROWDIN_PROJECT_ID
+api_token_env: CROWDIN_PERSONAL_TOKEN
+base_path: .
+preserve_hierarchy: true
+
+files:
+  - source: /translations/messages.pot
+    translation: /translations/%two_letters_code%/LC_MESSAGES/messages.po
+    excluded_target_languages:
+      - es
+
+  - source: /translations/frontend/es.json
+    translation: /translations/frontend/%two_letters_code%.json
+    excluded_target_languages:
+      - es

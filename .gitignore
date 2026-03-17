@@ -5,5 +5,4 @@ __pycache__/
 instance/
 .mypy_cache/
 .pytest_cache/
-.idea/
-/.coverage
+translations/**/LC_MESSAGES/*.mo

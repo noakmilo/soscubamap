@@ -1,6 +1,6 @@
 {% extends "shared/base.html" %}
-{% block title %} | Reporte{% endblock %}
-{% block meta_description %}Detalle del reporte en #SOSCuba Map. Verifica, comenta y colabora con ediciones transparentes.{% endblock %}
+{% block title %} | {{ _("Reporte") }}{% endblock %}
+{% block meta_description %}{{ _("Detalle del reporte en #SOSCuba Map. Verifica, comenta y colabora con ediciones transparentes.") }}{% endblock %}
 {% block content %}
 <section class="panel">
   <div class="report-card" data-post-id="{{ post.id }}" data-is-admin="{{ 1 if current_user.is_authenticated and current_user.has_role('administrador') else 0 }}">
@@ -8,24 +8,24 @@
       <h1>{{ post.title }}</h1>
       <div class="muted">{{ post.category.name }}</div>
       {% if post.category.slug == 'residencia-represor' and post.repressor_name %}
-        <div class="muted">Represor: {{ post.repressor_name }}</div>
+        <div class="muted">{{ _("Represor:") }} {{ post.repressor_name }}</div>
       {% endif %}
       {% if post.category.slug == 'otros' and post.other_type %}
-        <div class="muted">Tipo: {{ post.other_type }}</div>
+        <div class="muted">{{ _("Tipo:") }} {{ post.other_type }}</div>
       {% endif %}
       {% if post.movement_at %}
-        <div class="muted">Movimiento reportado: {{ post.movement_at.strftime('%Y-%m-%d %H:%M') }}</div>
+        <div class="muted">{{ _("Movimiento reportado:") }} {{ post.movement_at.strftime('%Y-%m-%d %H:%M') }}</div>
       {% endif %}
       <div class="muted">{{ anon_label }}</div>
       <div class="muted">{{ post.created_at }}</div>
-      {% if post.address %}<div class="muted">Dirección: {{ post.address }}</div>{% endif %}
+      {% if post.address %}<div class="muted">{{ _("Dirección:") }} {{ post.address }}</div>{% endif %}
       {% if post.province or post.municipality %}
-        <div class="muted">Provincia: {{ post.province or 'N/D' }} · Municipio: {{ post.municipality or 'N/D' }}</div>
+        <div class="muted">{{ _("Provincia:") }} {{ post.province or _('N/D') }} · {{ _("Municipio:") }} {{ post.municipality or _('N/D') }}</div>
       {% endif %}
       <p>{{ post.description }}</p>
 
       {% if links and links|length %}
-        <div class="muted">Enlaces de interés</div>
+        <div class="muted">{{ _("Enlaces de interés") }}</div>
         <ul>
           {% for link in links %}
             <li><a href="{{ link }}" target="_blank" rel="noopener">{{ link }}</a></li>
@@ -37,38 +37,38 @@
     <div class="report-actions">
       {% if current_user.is_authenticated and (current_user.has_role('moderador') or current_user.has_role('administrador')) and post.status == 'pending' %}
         <form method="post" action="{{ url_for('moderation.approve', post_id=post.id, modal=1 if request.args.get('modal') else None) }}">
-          <button class="btn-primary" type="submit">Aprobar</button>
+          <button class="btn-primary" type="submit">{{ _("Aprobar") }}</button>
         </form>
         <form method="post" action="{{ url_for('moderation.reject', post_id=post.id, modal=1 if request.args.get('modal') else None) }}">
-          <button class="btn-secondary" type="submit">Rechazar</button>
+          <button class="btn-secondary" type="submit">{{ _("Rechazar") }}</button>
         </form>
       {% endif %}
       <button class="btn-primary{% if verified_by_me %} is-verified{% endif %}" id="verifyBtn" data-verified="{{ 1 if verified_by_me else 0 }}" {% if verified_by_me %}disabled{% endif %}>
-        {% if verified_by_me %}Verificado{% else %}Verificar{% endif %}
+        {% if verified_by_me %}{{ _("Verificado") }}{% else %}{{ _("Verificar") }}{% endif %}
       </button>
       <span class="verify-count" id="verifyCount">{{ post.verify_count or 0 }}</span>
-      <button class="btn-secondary" id="copyLinkBtn">Copiar enlace</button>
-      <a class="btn-secondary" href="{{ url_for('map.post_history', post_id=post.id) }}">Historial</a>
+      <button class="btn-secondary" id="copyLinkBtn">{{ _("Copiar enlace") }}</button>
+      <a class="btn-secondary" href="{{ url_for('map.post_history', post_id=post.id) }}">{{ _("Historial") }}</a>
       {% if not edit_locked %}
-        <a class="btn-secondary" href="{{ url_for('map.edit_report_public', post_id=post.id) }}">Editar</a>
+        <a class="btn-secondary" href="{{ url_for('map.edit_report_public', post_id=post.id) }}">{{ _("Editar") }}</a>
       {% else %}
         <span class="muted">
-          Edición bloqueada: el reporte tiene 10+ verificaciones. Puedes comentar notas y reportar ubicación si hay datos erróneos.
+          {{ _("Edición bloqueada: el reporte tiene 10+ verificaciones. Puedes comentar notas y reportar ubicación si hay datos erróneos.") }}
         </span>
       {% endif %}
-      <a class="btn-secondary" href="{{ url_for('map.report_location', post_id=post.id) }}">Reportar ubicación</a>
-      <a class="btn-primary" href="{{ url_for('map.dashboard', lat=post.latitude, lng=post.longitude) }}">Ver en el mapa</a>
+      <a class="btn-secondary" href="{{ url_for('map.report_location', post_id=post.id) }}">{{ _("Reportar ubicación") }}</a>
+      <a class="btn-primary" href="{{ url_for('map.dashboard', lat=post.latitude, lng=post.longitude) }}">{{ _("Ver en el mapa") }}</a>
       {% if current_user.is_authenticated and current_user.has_role('administrador') %}
-        <button class="btn-secondary" id="hideReportBtn">Ocultar</button>
-        <button class="btn-secondary" id="deleteReportBtn">Eliminar</button>
+        <button class="btn-secondary" id="hideReportBtn">{{ _("Ocultar") }}</button>
+        <button class="btn-secondary" id="deleteReportBtn">{{ _("Eliminar") }}</button>
       {% endif %}
     </div>
 
     <div class="media-section">
       <div class="media-header">
-        <div class="media-title">Imágenes</div>
+        <div class="media-title">{{ _("Imágenes") }}</div>
         {% if moderation_enabled %}
-          <div class="media-note">Las imágenes nuevas pueden requerir moderación.</div>
+          <div class="media-note">{{ _("Las imágenes nuevas pueden requerir moderación.") }}</div>
         {% endif %}
       </div>
       <div class="media-grid" id="mediaGrid">
@@ -80,16 +80,16 @@
               data-image="{{ item.url }}"
               data-caption="{{ item.caption }}"
             >
-              <img src="{{ item.url }}" alt="Imagen del reporte" />
+              <img src="{{ item.url }}" alt="{{ _('Imagen del reporte') }}" />
             </button>
           {% endfor %}
         {% else %}
-          <div class="muted">Aún no hay imágenes para este reporte.</div>
+          <div class="muted">{{ _("Aún no hay imágenes para este reporte.") }}</div>
         {% endif %}
       </div>
       <form id="mediaUploadForm" class="media-form" data-post-id="{{ post.id }}">
         <label>
-          Subir imágenes (máx {{ config.IMAGE_MAX_PER_SUBMIT }}, {{ config.IMAGE_MAX_MB }}MB c/u)
+          {{ _("Subir imágenes (máx %(max)s, %(mb)sMB c/u)", max=config.IMAGE_MAX_PER_SUBMIT, mb=config.IMAGE_MAX_MB) }}
           <input
             type="file"
             name="images"
@@ -102,7 +102,7 @@
           />
         </label>
         <div class="image-previews" id="detailImagePreviewList"></div>
-        <button type="submit" class="btn-primary">Subir imágenes</button>
+        <button type="submit" class="btn-primary">{{ _("Subir imágenes") }}</button>
         <div class="media-status" id="mediaStatus"></div>
       </form>
     </div>
@@ -119,13 +119,13 @@
     <div class="comments" data-post-id="{{ post.id }}">
       <div class="comment-list" id="comment-list-{{ post.id }}"></div>
       <form class="comment-form" data-post-id="{{ post.id }}">
-        <textarea name="comment" rows="4" required placeholder="Escribe un comentario..."></textarea>
+        <textarea name="comment" rows="4" required placeholder="{{ _('Escribe un comentario...') }}"></textarea>
         {% if recaptcha_site_key %}
           <div class="recaptcha-wrap">
             <div class="g-recaptcha" id="reportCommentRecaptcha" data-sitekey="{{ recaptcha_site_key }}"></div>
           </div>
         {% endif %}
-        <button class="btn-secondary" type="submit">Enviar comentario</button>
+        <button class="btn-secondary" type="submit">{{ _("Enviar comentario") }}</button>
         <div class="field-error-msg" id="commentStatus"></div>
       </form>
     </div>
@@ -136,7 +136,7 @@
   <div class="image-modal-backdrop" data-close-image></div>
   <div class="image-modal-content">
     <button class="image-modal-close" type="button" data-close-image>&times;</button>
-    <img id="imageModalImg" src="" alt="Imagen ampliada" />
+    <img id="imageModalImg" src="" alt="{{ _('Imagen ampliada') }}" />
     <div class="image-modal-caption" id="imageModalCaption"></div>
   </div>
 </div>

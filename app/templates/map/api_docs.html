@@ -1,39 +1,38 @@
 {% extends "shared/base.html" %}
 
-{% block title %} · API{% endblock %}
+{% block title %} · {{ _("API") }}{% endblock %}
 
 {% block content %}
 <section class="api-docs">
   <div class="api-hero">
-    <h1>API · Documentación</h1>
+    <h1>{{ _("API · Documentación") }}</h1>
     <p>
-      Esta API es de solo lectura y sirve para consumir los reportes públicos del mapa.
-      Si necesitas acceso de escritura, escríbenos a
+      {{ _("Esta API es de solo lectura y sirve para consumir los reportes públicos del mapa. Si necesitas acceso de escritura, escríbenos a") }}
       <a href="mailto:soscubamap@proton.me">soscubamap@proton.me</a>.
     </p>
     <div class="api-callout">
-      Base URL: <code>{{ base_url }}/api/v1</code>
+      {{ _("Base URL:") }} <code>{{ base_url }}/api/v1</code>
     </div>
   </div>
 
   <div class="api-section">
-    <h2>Autenticación</h2>
-    <p>No se requiere autenticación para lectura pública.</p>
+    <h2>{{ _("Autenticación") }}</h2>
+    <p>{{ _("No se requiere autenticación para lectura pública.") }}</p>
   </div>
 
   <div class="api-section">
-    <h2>Endpoint principal</h2>
+    <h2>{{ _("Endpoint principal") }}</h2>
     <div class="api-endpoint">
       <div class="api-method">GET</div>
       <div class="api-path">/api/v1/reports</div>
     </div>
-    <p>Lista paginada de reportes aprobados.</p>
+    <p>{{ _("Lista paginada de reportes aprobados.") }}</p>
     <div class="api-params">
-      <div><code>page</code> (opcional) · número de página. Default: 1.</div>
-      <div><code>per_page</code> (opcional) · items por página. Default: 50 (máx. 100).</div>
-      <div><code>category_id</code> (opcional) · filtra por categoría.</div>
-      <div><code>province</code> (opcional) · filtra por provincia.</div>
-      <div><code>municipality</code> (opcional) · filtra por municipio.</div>
+      <div><code>page</code> {{ _("(opcional) · número de página. Default: 1.") }}</div>
+      <div><code>per_page</code> {{ _("(opcional) · items por página. Default: 50 (máx. 100).") }}</div>
+      <div><code>category_id</code> {{ _("(opcional) · filtra por categoría.") }}</div>
+      <div><code>province</code> {{ _("(opcional) · filtra por provincia.") }}</div>
+      <div><code>municipality</code> {{ _("(opcional) · filtra por municipio.") }}</div>
     </div>
     <pre><code class="language-json">GET {{ base_url }}/api/v1/reports?per_page=25&amp;province=La%20Habana
 
@@ -73,29 +72,29 @@
   </div>
 
   <div class="api-section">
-    <h2>Detalle de reporte</h2>
+    <h2>{{ _("Detalle de reporte") }}</h2>
     <div class="api-endpoint">
       <div class="api-method">GET</div>
       <div class="api-path">/api/v1/reports/&lt;id&gt;</div>
     </div>
-    <p>Devuelve un reporte específico por su ID.</p>
+    <p>{{ _("Devuelve un reporte específico por su ID.") }}</p>
     <pre><code class="language-json">GET {{ base_url }}/api/v1/reports/123</code></pre>
   </div>
 
   <div class="api-section">
-    <h2>Categorías</h2>
+    <h2>{{ _("Categorías") }}</h2>
     <div class="api-endpoint">
       <div class="api-method">GET</div>
       <div class="api-path">/api/v1/categories</div>
     </div>
-    <p>Lista de categorías disponibles.</p>
+    <p>{{ _("Lista de categorías disponibles.") }}</p>
   </div>
 
   <div class="api-section">
-    <h2>Notas</h2>
+    <h2>{{ _("Notas") }}</h2>
     <ul class="api-notes">
-      <li>Solo se exponen reportes con estado <code>approved</code>.</li>
-      <li>Si necesitas endpoints de escritura, contáctanos en <code>soscubamap@proton.me</code>.</li>
+      <li>{{ _("Solo se exponen reportes con estado") }} <code>approved</code>.</li>
+      <li>{{ _("Si necesitas endpoints de escritura, contáctanos en") }} <code>soscubamap@proton.me</code>.</li>
     </ul>
   </div>
 </section>
