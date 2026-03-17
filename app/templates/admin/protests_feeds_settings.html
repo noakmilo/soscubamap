@@ -1,0 +1,94 @@
+{% extends "shared/base.html" %}
+{% block title %} | Feeds Protestas{% endblock %}
+{% block content %}
+<section class="panel">
+  <h1>Feeds RSS de Protestas</h1>
+  <p>Administra URLs de feeds en base de datos. Puedes agregar tantos como necesites.</p>
+
+  <div class="admin-section">
+    <form method="post" class="form-grid">
+      <div>
+        <div class="muted" style="margin-bottom: 8px;">Total cargados en el formulario: {{ feed_count }}</div>
+        <div id="protestFeedsInputs" style="display:grid; gap:8px;">
+          {% for feed_url in feed_urls %}
+            <div class="feed-input-row" style="display:flex; gap:8px; align-items:center;">
+              <input
+                type="url"
+                name="feed_urls"
+                value="{{ feed_url }}"
+                placeholder="https://ejemplo.com/feed.xml"
+                style="flex:1;"
+              />
+              <button type="button" class="btn-secondary" data-remove-feed>Quitar</button>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button type="button" class="btn-secondary" id="addFeedInputBtn">Agregar más</button>
+        <button type="submit" class="btn-primary">Guardar feeds</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="muted" style="margin-top: 12px;">
+    Nota: en este paso solo guardamos los feeds en BD. La ingesta seguirá usando el JSON hasta hacer la migración de consumo.
+  </div>
+
+  <div style="margin-top: 12px;">
+    <a class="btn-secondary" href="{{ url_for('admin.dashboard') }}">Volver a Admin</a>
+    <a class="btn-secondary" href="{{ url_for('admin.protests_settings') }}">Configurar parámetros de protestas</a>
+  </div>
+</section>
+
+<template id="protestFeedInputTemplate">
+  <div class="feed-input-row" style="display:flex; gap:8px; align-items:center;">
+    <input
+      type="url"
+      name="feed_urls"
+      value=""
+      placeholder="https://ejemplo.com/feed.xml"
+      style="flex:1;"
+    />
+    <button type="button" class="btn-secondary" data-remove-feed>Quitar</button>
+  </div>
+</template>
+
+<script>
+  (function () {
+    const list = document.getElementById("protestFeedsInputs");
+    const addBtn = document.getElementById("addFeedInputBtn");
+    const template = document.getElementById("protestFeedInputTemplate");
+    if (!list || !addBtn || !template) return;
+
+    const MIN_ROWS = 3;
+
+    const ensureMinimumRows = () => {
+      while (list.querySelectorAll(".feed-input-row").length < MIN_ROWS) {
+        const node = template.content.firstElementChild.cloneNode(true);
+        list.appendChild(node);
+      }
+    };
+
+    addBtn.addEventListener("click", () => {
+      const node = template.content.firstElementChild.cloneNode(true);
+      list.appendChild(node);
+      const input = node.querySelector('input[name="feed_urls"]');
+      if (input) input.focus();
+    });
+
+    list.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (!target.matches("[data-remove-feed]")) return;
+      const row = target.closest(".feed-input-row");
+      if (!row) return;
+      row.remove();
+      ensureMinimumRows();
+    });
+
+    ensureMinimumRows();
+  })();
+</script>
+{% endblock %}

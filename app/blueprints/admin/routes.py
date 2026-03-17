@@ -44,6 +44,11 @@ from app.services.protest_settings import (
     save_protest_settings,
     validate_protest_settings_payload,
 )
+from app.services.protest_feeds import (
+    get_protest_feed_urls_from_db,
+    save_protest_feed_urls,
+    validate_protest_feed_urls,
+)
 from . import admin_bp
 
 
@@ -308,6 +313,37 @@ def protests_settings():
         "admin/protests_settings.html",
         fields=fields,
         values=values,
+    )
+
+
+@admin_bp.route("/protestas/feeds", methods=["GET", "POST"])
+@login_required
+@role_required("administrador")
+def protests_feeds_settings():
+    existing_urls = get_protest_feed_urls_from_db()
+    feed_urls = list(existing_urls)
+    while len(feed_urls) < 3:
+        feed_urls.append("")
+
+    if request.method == "POST":
+        submitted_urls = request.form.getlist("feed_urls")
+        cleaned, errors = validate_protest_feed_urls(submitted_urls)
+
+        if errors:
+            feed_urls = list(submitted_urls)
+            while len(feed_urls) < 3:
+                feed_urls.append("")
+            for message in errors:
+                flash(message, "error")
+        else:
+            save_protest_feed_urls(cleaned)
+            flash("Feeds de protestas guardados en base de datos.", "success")
+            return redirect(url_for("admin.protests_feeds_settings"))
+
+    return render_template(
+        "admin/protests_feeds_settings.html",
+        feed_urls=feed_urls,
+        feed_count=len([item for item in feed_urls if str(item or "").strip()]),
     )
 
 
