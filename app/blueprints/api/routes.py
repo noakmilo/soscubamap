@@ -1227,10 +1227,12 @@ def protests_geojson():
 
     min_conf_raw = (request.args.get("min_confidence") or "").strip()
     min_conf_default = protest_min_confidence_to_show()
+    confidence_filter_applied = bool(min_conf_raw)
     try:
         min_confidence = max(0.0, min(100.0, float(min_conf_raw))) if min_conf_raw else min_conf_default
     except Exception:
         min_confidence = min_conf_default
+        confidence_filter_applied = False
 
     include_hidden = _is_admin_user() and _truthy_param(request.args.get("include_hidden"))
 
@@ -1241,12 +1243,13 @@ def protests_geojson():
         ProtestEvent.source_url.isnot(None),
         ProtestEvent.source_url != "",
     )
-    base_query = base_query.filter(
-        or_(
-            ProtestEvent.review_status == "approved_manual",
-            ProtestEvent.confidence_score >= min_confidence,
+    if confidence_filter_applied:
+        base_query = base_query.filter(
+            or_(
+                ProtestEvent.review_status == "approved_manual",
+                ProtestEvent.confidence_score >= min_confidence,
+            )
         )
-    )
 
     if province:
         base_query = base_query.filter(ProtestEvent.matched_province == province)
@@ -1329,6 +1332,7 @@ def protests_geojson():
         "filters": {
             "mode": mode,
             "min_confidence": min_confidence,
+            "min_confidence_applied": confidence_filter_applied,
             "province": province or None,
             "municipality": municipality or None,
             "source": source_name or None,

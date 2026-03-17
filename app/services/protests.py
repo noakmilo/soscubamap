@@ -11,7 +11,11 @@ from xml.etree import ElementTree
 
 import bleach
 
-from app.services.cuba_locations import MUNICIPALITIES, PROVINCES
+from app.services.cuba_locations import (
+    MUNICIPALITIES,
+    PROVINCES,
+    PROVINCE_CENTER_FALLBACKS,
+)
 
 DEFAULT_STRONG_KEYWORDS = [
     "protesta",
@@ -512,6 +516,20 @@ def _geometry_centroid(geometry):
     return (min(lats) + max(lats)) / 2.0, (min(lons) + max(lons)) / 2.0
 
 
+def _province_center_fallback(province_name):
+    key = str(province_name or "").strip()
+    if not key:
+        return None, None
+    center = PROVINCE_CENTER_FALLBACKS.get(key)
+    if not center:
+        return None, None
+    try:
+        lat, lng = center
+        return float(lat), float(lng)
+    except Exception:
+        return None, None
+
+
 def _resolve_path(raw_path):
     text = str(raw_path or "").strip()
     if not text:
@@ -620,6 +638,8 @@ def _build_gazetteer():
         if not name:
             continue
         lat, lng = _geometry_centroid(feature.get("geometry"))
+        if lat is None or lng is None:
+            lat, lng = _province_center_fallback(name)
         province_name = name
         key = _normalize_text(province_name)
         if not key:
@@ -641,6 +661,10 @@ def _build_gazetteer():
     for province_name in PROVINCES:
         key = _normalize_text(province_name)
         lat, lng = province_centroids.get(key, (None, None))
+        if lat is None or lng is None:
+            lat, lng = _province_center_fallback(province_name)
+        if lat is not None and lng is not None:
+            province_centroids[key] = (lat, lng)
         _add_entry(
             provinces_idx,
             {
@@ -665,6 +689,10 @@ def _build_gazetteer():
         if not province_name:
             province_name = None
         lat, lng = _geometry_centroid(feature.get("geometry"))
+        if (lat is None or lng is None) and province_norm:
+            lat, lng = province_centroids.get(province_norm, (None, None))
+        if (lat is None or lng is None) and province_name:
+            lat, lng = _province_center_fallback(province_name)
         key = _normalize_text(name)
         if key:
             municipality_centroids[(key, province_norm)] = (lat, lng)
@@ -988,6 +1016,42 @@ def classify_event(clean_text, keyword_hits, place_result):
     return score, event_type
 
 
+def _normalize_keyword_hits(raw_keyword_hits):
+    payload = raw_keyword_hits
+    if isinstance(payload, str):
+        text = payload.strip()
+        if not text:
+            return {}
+        try:
+            payload = json.loads(text)
+        except Exception:
+            return {}
+    if not isinstance(payload, dict):
+        return {}
+
+    normalized = {}
+    for key in ("strong", "context", "weak"):
+        values = payload.get(key)
+        cleaned = []
+        if isinstance(values, (list, tuple, set)):
+            for value in values:
+                token = _normalize_text(value)
+                if token:
+                    cleaned.append(token)
+        elif isinstance(values, str):
+            token = _normalize_text(values)
+            if token:
+                cleaned.append(token)
+        if cleaned:
+            normalized[key] = cleaned
+    return normalized
+
+
+def _has_keyword_hits(raw_keyword_hits):
+    keyword_hits = _normalize_keyword_hits(raw_keyword_hits)
+    return any(keyword_hits.get(key) for key in ("strong", "context", "weak"))
+
+
 def build_dedupe_hash(clean_text, source_url, published_at_utc, place_result):
     day_key = ""
     if isinstance(published_at_utc, datetime):
@@ -999,21 +1063,27 @@ def build_dedupe_hash(clean_text, source_url, published_at_utc, place_result):
     return hashlib.sha256(seed.encode("utf-8")).hexdigest()
 
 
-def should_show_on_map(event_payload):
+def should_show_on_map(event_payload, keyword_hits=None):
     min_conf = get_min_confidence_to_show()
     require_source = require_source_url_for_map()
     allow_unresolved = allow_unresolved_location_on_map()
+    has_keyword_hits = _has_keyword_hits(keyword_hits)
+    if not has_keyword_hits:
+        has_keyword_hits = _has_keyword_hits((event_payload or {}).get("detected_keywords_json"))
 
     source_url = event_payload.get("source_url") or ""
     if require_source and not source_url:
         return False
 
     score = float(event_payload.get("confidence_score") or 0.0)
-    if score < min_conf:
+    if score < min_conf and not has_keyword_hits:
         return False
 
     event_type = event_payload.get("event_type")
-    if event_type not in {"confirmed_protest", "probable_protest", "related_unrest", "unresolved_location"}:
+    if (
+        event_type not in {"confirmed_protest", "probable_protest", "related_unrest", "unresolved_location"}
+        and not has_keyword_hits
+    ):
         return False
 
     has_coords = (
@@ -1074,7 +1144,7 @@ def build_event_payload(item):
         "dedupe_hash": dedupe_hash,
         "transparency_note": "Fuente enlazada al post original.",
     }
-    payload["visible_on_map"] = should_show_on_map(payload)
+    payload["visible_on_map"] = should_show_on_map(payload, keyword_hits=keyword_hits)
     return payload
 
 

@@ -36,6 +36,26 @@ PROVINCE_RADAR_GEOIDS = {
     "Isla de la Juventud": 3556608,
 }
 
+PROVINCE_CENTER_FALLBACKS = {
+    # Coordenadas aproximadas del centro provincial para fallback de georreferenciacion.
+    "Pinar del Río": (22.4178, -83.6980),
+    "Artemisa": (22.8136, -82.7594),
+    "La Habana": (23.1136, -82.3666),
+    "Mayabeque": (22.8948, -82.1566),
+    "Matanzas": (23.0361, -81.5775),
+    "Cienfuegos": (22.1456, -80.4364),
+    "Villa Clara": (22.4069, -79.9647),
+    "Sancti Spíritus": (21.9317, -79.4422),
+    "Ciego de Ávila": (21.8406, -78.7603),
+    "Camagüey": (21.3808, -77.9169),
+    "Las Tunas": (20.9647, -76.9531),
+    "Holguín": (20.8872, -76.2631),
+    "Granma": (20.3736, -76.6436),
+    "Santiago de Cuba": (20.0217, -75.8294),
+    "Guantánamo": (20.1457, -75.2092),
+    "Isla de la Juventud": (21.7510, -82.8558),
+}
+
 MUNICIPALITIES = {
     "Pinar del Río": [
         "Pinar del Río",
