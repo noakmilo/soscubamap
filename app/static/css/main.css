@@ -529,12 +529,21 @@ h3 {
   font-weight: 700;
 }
 
+.connectivity-region-subtitle {
+  color: #9ec4b8;
+  font-size: 10px;
+}
+
 .connectivity-region-chart {
   width: 100%;
-  height: 160px;
+  height: 176px;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(214, 251, 231, 0.12);
+}
+
+.connectivity-region-chart .plot-bg {
+  fill: rgba(255, 255, 255, 0.01);
 }
 
 .connectivity-region-chart .grid-line {
@@ -543,11 +552,46 @@ h3 {
   shape-rendering: crispEdges;
 }
 
+.connectivity-region-chart .x-grid-line {
+  stroke-dasharray: 2 2;
+}
+
+.connectivity-region-chart .axis-line {
+  stroke: rgba(214, 251, 231, 0.26);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.connectivity-region-chart .axis-label {
+  fill: #a9d8c8;
+  font-size: 8.5px;
+  font-weight: 500;
+}
+
+.connectivity-region-chart .axis-title {
+  fill: #c6ebdd;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
 .connectivity-region-chart .region-series {
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.8;
+  opacity: 0.45;
+  transition: opacity 120ms ease, stroke-width 120ms ease;
+}
+
+.connectivity-region-chart .region-series.is-dim {
+  opacity: 0.12;
+}
+
+.connectivity-region-chart .region-series.is-highlight {
+  opacity: 1;
+  stroke-width: 2.7;
 }
 
 .connectivity-region-note {
@@ -565,16 +609,31 @@ h3 {
 }
 
 .connectivity-region-legend-item {
+  appearance: none;
+  width: 100%;
   border: 1px solid rgba(214, 251, 231, 0.15);
   border-radius: 8px;
   padding: 6px 8px;
   background: rgba(255, 255, 255, 0.02);
   display: grid;
-  grid-template-columns: 12px 1fr auto auto;
+  grid-template-columns: 12px 1fr auto auto auto;
   gap: 6px;
   align-items: center;
   font-size: 10px;
   color: #d6fbe7;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.connectivity-region-legend-item:hover {
+  border-color: rgba(110, 231, 183, 0.5);
+  background: rgba(110, 231, 183, 0.06);
+}
+
+.connectivity-region-legend-item.is-active {
+  border-color: rgba(110, 231, 183, 0.8);
+  background: rgba(110, 231, 183, 0.14);
 }
 
 .connectivity-region-legend-empty {
@@ -603,6 +662,24 @@ h3 {
 .connectivity-region-change {
   color: #b7ddd0;
   font-variant-numeric: tabular-nums;
+}
+
+.connectivity-region-trend {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.connectivity-region-trend.is-up {
+  color: #4ade80;
+}
+
+.connectivity-region-trend.is-down {
+  color: #fb7185;
+}
+
+.connectivity-region-trend.is-stable {
+  color: #facc15;
 }
 
 .connectivity-traffic-panel {

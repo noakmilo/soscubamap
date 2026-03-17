@@ -35,6 +35,7 @@ let connectivityRegionPanel;
 let connectivityRegionChart;
 let connectivityRegionLegend;
 let connectivityRegionNote;
+let connectivityRegionFocused = "";
 let protestLayerGroup;
 let protestRefreshTimer;
 let protestRefreshSeconds = 300;
@@ -549,6 +550,32 @@ function formatPercentValue(value) {
   return `${sign}${numeric.toFixed(1)}%`;
 }
 
+function formatConnectivityMiniUtcLabel(tsMs) {
+  const numeric = Number(tsMs);
+  if (!Number.isFinite(numeric)) return "";
+  const parsed = new Date(numeric);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const day = String(parsed.getUTCDate()).padStart(2, "0");
+  const month = String(parsed.getUTCMonth() + 1).padStart(2, "0");
+  const hour = String(parsed.getUTCHours()).padStart(2, "0");
+  const minute = String(parsed.getUTCMinutes()).padStart(2, "0");
+  return `${day}/${month} ${hour}:${minute}`;
+}
+
+function getConnectivityRegionTrendMeta(changePct) {
+  const numeric = Number(changePct);
+  if (!Number.isFinite(numeric)) {
+    return { label: "Sin cambio", cssClass: "is-stable" };
+  }
+  if (numeric <= -5) {
+    return { label: "Bajando", cssClass: "is-down" };
+  }
+  if (numeric >= 5) {
+    return { label: "Subiendo", cssClass: "is-up" };
+  }
+  return { label: "Estable", cssClass: "is-stable" };
+}
+
 function buildSparklinePath(values, minValue, maxValue, width = 280, height = 56, pad = 4) {
   if (!Array.isArray(values) || values.length < 2) return "";
   const valid = values.filter((value) => Number.isFinite(Number(value))).map((value) => Number(value));
@@ -670,8 +697,12 @@ function renderConnectivityRegionChart(payload) {
     return;
   }
 
-  const regionSeries = getConnectivityRegionSeries(payload);
+  const regionSeries = getConnectivityRegionSeries(payload).map((item) => ({
+    ...item,
+    key: normalizeProvinceName(item.name),
+  }));
   if (!payload || !regionSeries.length) {
+    connectivityRegionFocused = "";
     connectivityRegionChart.innerHTML = "";
     connectivityRegionNote.textContent = "Sin serie regional disponible para la ventana activa.";
     connectivityRegionLegend.innerHTML =
@@ -683,6 +714,7 @@ function renderConnectivityRegionChart(payload) {
   const allTimestamps = allPoints.map((point) => Number(point.ts_ms)).filter(Number.isFinite);
   const allValues = allPoints.map((point) => Number(point.value)).filter(Number.isFinite);
   if (!allTimestamps.length || !allValues.length) {
+    connectivityRegionFocused = "";
     connectivityRegionChart.innerHTML = "";
     connectivityRegionNote.textContent = "No hay puntos validos para dibujar la serie regional.";
     connectivityRegionLegend.innerHTML =
@@ -690,9 +722,21 @@ function renderConnectivityRegionChart(payload) {
     return;
   }
 
+  if (
+    connectivityRegionFocused &&
+    !regionSeries.some((item) => item.key === connectivityRegionFocused)
+  ) {
+    connectivityRegionFocused = "";
+  }
+
   const chartWidth = 280;
-  const chartHeight = 160;
-  const chartPad = 8;
+  const chartHeight = 176;
+  const marginLeft = 40;
+  const marginRight = 8;
+  const marginTop = 14;
+  const marginBottom = 28;
+  const plotWidth = Math.max(chartWidth - marginLeft - marginRight, 1);
+  const plotHeight = Math.max(chartHeight - marginTop - marginBottom, 1);
   const minTsMs = Math.min(...allTimestamps);
   const maxTsMs = Math.max(...allTimestamps);
   let minValue = Math.min(...allValues);
@@ -701,19 +745,44 @@ function renderConnectivityRegionChart(payload) {
     minValue -= 0.5;
     maxValue += 0.5;
   }
+  const valueSpan = Math.max(maxValue - minValue, 1e-9);
+  const tsSpan = Math.max(maxTsMs - minTsMs, 1);
 
-  const innerHeight = Math.max(chartHeight - chartPad * 2, 1);
-  const guideLines = [0.25, 0.5, 0.75]
+  const yTickRatios = [0, 0.33, 0.66, 1];
+  const yGuides = yTickRatios
     .map((ratio) => {
-      const y = chartHeight - chartPad - ratio * innerHeight;
-      return `<line class="grid-line" x1="${chartPad}" y1="${y.toFixed(
+      const y = ratio * plotHeight;
+      return `<line class="grid-line" x1="0" y1="${y.toFixed(2)}" x2="${plotWidth.toFixed(
         2
-      )}" x2="${(chartWidth - chartPad).toFixed(2)}" y2="${y.toFixed(2)}"></line>`;
+      )}" y2="${y.toFixed(2)}"></line>`;
     })
     .join("");
 
+  const xTicks = [
+    { ts: minTsMs, label: formatConnectivityMiniUtcLabel(minTsMs), anchor: "start" },
+    {
+      ts: minTsMs + tsSpan / 2,
+      label: formatConnectivityMiniUtcLabel(minTsMs + tsSpan / 2),
+      anchor: "middle",
+    },
+    { ts: maxTsMs, label: formatConnectivityMiniUtcLabel(maxTsMs), anchor: "end" },
+  ];
+
+  const xGuides = xTicks
+    .map((tick) => {
+      const x = ((tick.ts - minTsMs) / tsSpan) * plotWidth;
+      return `<line class="grid-line x-grid-line" x1="${x.toFixed(2)}" y1="0" x2="${x.toFixed(
+        2
+      )}" y2="${plotHeight.toFixed(2)}"></line>`;
+    })
+    .join("");
+
+  const hasFocus = !!connectivityRegionFocused;
   const seriesMarkup = regionSeries
     .map((item) => {
+      const isFocused = hasFocus && item.key === connectivityRegionFocused;
+      const isDimmed = hasFocus && item.key !== connectivityRegionFocused;
+      const stateClass = isFocused ? " is-highlight" : isDimmed ? " is-dim" : "";
       const color = getConnectivityRegionColor(item.name);
       const path = buildTimeseriesPath(
         item.series,
@@ -721,40 +790,118 @@ function renderConnectivityRegionChart(payload) {
         maxTsMs,
         minValue,
         maxValue,
-        chartWidth,
-        chartHeight,
-        chartPad
+        plotWidth,
+        plotHeight,
+        0
       );
       if (!path) return "";
-      return `<path class="region-series" d="${path}" style="stroke:${color};"></path>`;
+      return `<path class="region-series${stateClass}" d="${path}" style="stroke:${color};"></path>`;
     })
     .join("");
 
-  connectivityRegionChart.innerHTML = `${guideLines}${seriesMarkup}`;
+  const yLabels = yTickRatios
+    .map((ratio) => {
+      const y = marginTop + ratio * plotHeight;
+      const value = maxValue - ratio * valueSpan;
+      return `<text class="axis-label y-label" x="${marginLeft - 4}" y="${y.toFixed(
+        2
+      )}" text-anchor="end" dominant-baseline="middle">${escapeHtml(
+        formatMetricValue(value)
+      )}</text>`;
+    })
+    .join("");
 
-  const startLabel = formatUtcAndCuba(new Date(minTsMs).toISOString());
-  const endLabel = formatUtcAndCuba(new Date(maxTsMs).toISOString());
+  const xLabels = xTicks
+    .map((tick) => {
+      const x = marginLeft + ((tick.ts - minTsMs) / tsSpan) * plotWidth;
+      return `<text class="axis-label x-label" x="${x.toFixed(2)}" y="${(
+        chartHeight - 6
+      ).toFixed(2)}" text-anchor="${tick.anchor}" dominant-baseline="middle">${escapeHtml(
+        tick.label
+      )}</text>`;
+    })
+    .join("");
+
+  connectivityRegionChart.innerHTML = `
+    <text class="axis-title" x="${marginLeft}" y="10" text-anchor="start">Volumen HTTP</text>
+    <text class="axis-title" x="${chartWidth - 2}" y="${chartHeight - 20}" text-anchor="end">Hora UTC</text>
+    <g transform="translate(${marginLeft}, ${marginTop})">
+      <rect class="plot-bg" x="0" y="0" width="${plotWidth}" height="${plotHeight}" rx="4" ry="4"></rect>
+      ${yGuides}
+      ${xGuides}
+      ${seriesMarkup}
+      <line class="axis-line" x1="0" y1="0" x2="0" y2="${plotHeight}"></line>
+      <line class="axis-line" x1="0" y1="${plotHeight}" x2="${plotWidth}" y2="${plotHeight}"></line>
+    </g>
+    ${yLabels}
+    ${xLabels}
+  `;
+
+  const startLabel = formatConnectivityMiniUtcLabel(minTsMs);
+  const endLabel = formatConnectivityMiniUtcLabel(maxTsMs);
   const windowHours = Number(payload?.window?.hours);
-  const windowLabel = [2, 6, 24].includes(windowHours) ? `${windowHours}h` : "ventana activa";
-  connectivityRegionNote.textContent = `${regionSeries.length} regiones con datos · ${windowLabel} · ${startLabel} -> ${endLabel}`;
+  const windowLabel = [2, 6, 24].includes(windowHours) ? `${windowHours}h` : "ventana";
+  const improvingCount = regionSeries.filter(
+    (item) => Number.isFinite(Number(item.change_pct)) && Number(item.change_pct) >= 5
+  ).length;
+  const worseningCount = regionSeries.filter(
+    (item) => Number.isFinite(Number(item.change_pct)) && Number(item.change_pct) <= -5
+  ).length;
+  const stableCount = Math.max(regionSeries.length - improvingCount - worseningCount, 0);
+  const focusedRegion = regionSeries.find((item) => item.key === connectivityRegionFocused);
+  if (focusedRegion) {
+    const trendMeta = getConnectivityRegionTrendMeta(focusedRegion.change_pct);
+    connectivityRegionNote.textContent = `${focusedRegion.name}: ${
+      trendMeta.label
+    } (${formatPercentValue(focusedRegion.change_pct)}) · Ultimo volumen ${formatMetricValue(
+      focusedRegion.latest_value
+    )} · UTC ${startLabel} -> ${endLabel}.`;
+  } else {
+    connectivityRegionNote.textContent = `${regionSeries.length} regiones · Ventana ${windowLabel} · UTC ${startLabel} -> ${endLabel} · Suben ${improvingCount}, bajan ${worseningCount}, estables ${stableCount}.`;
+  }
 
-  connectivityRegionLegend.innerHTML = regionSeries
+  const legendItems = [...regionSeries].sort((a, b) => {
+    const aChange = Number.isFinite(Number(a.change_pct)) ? Number(a.change_pct) : 0;
+    const bChange = Number.isFinite(Number(b.change_pct)) ? Number(b.change_pct) : 0;
+    return aChange - bChange;
+  });
+
+  connectivityRegionLegend.innerHTML = legendItems
     .map((item) => {
+      const isActive = connectivityRegionFocused === item.key;
       const color = getConnectivityRegionColor(item.name);
       const latestValueText = formatMetricValue(item.latest_value);
       const changeText = Number.isFinite(Number(item.change_pct))
         ? formatPercentValue(item.change_pct)
         : "N/D";
+      const trendMeta = getConnectivityRegionTrendMeta(item.change_pct);
       return `
-        <div class="connectivity-region-legend-item">
+        <button
+          type="button"
+          class="connectivity-region-legend-item${isActive ? " is-active" : ""}"
+          data-region-key="${escapeHtml(item.key)}"
+          aria-pressed="${isActive ? "true" : "false"}"
+        >
           <span class="connectivity-region-swatch" style="background:${color};"></span>
           <span class="connectivity-region-name">${escapeHtml(item.name)}</span>
           <span class="connectivity-region-value">${escapeHtml(latestValueText)}</span>
           <span class="connectivity-region-change">${escapeHtml(changeText)}</span>
-        </div>
+          <span class="connectivity-region-trend ${trendMeta.cssClass}">${trendMeta.label}</span>
+        </button>
       `;
     })
     .join("");
+
+  const legendButtons = Array.from(
+    connectivityRegionLegend.querySelectorAll(".connectivity-region-legend-item[data-region-key]")
+  );
+  legendButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const key = String(button.getAttribute("data-region-key") || "").trim();
+      connectivityRegionFocused = connectivityRegionFocused === key ? "" : key;
+      renderConnectivityRegionChart(connectivityLastPayload);
+    });
+  });
 }
 
 function getSelectedCategoryIds() {
@@ -1221,6 +1368,7 @@ function onConnectivityFeature(feature, layer) {
 
   layer.on("click", () => {
     selectedConnectivityProvince = province;
+    connectivityRegionFocused = normalizeProvinceName(province);
     if (connectivityGeoLayer?.setStyle) {
       connectivityGeoLayer.setStyle(styleForConnectivityFeature);
     }
@@ -1588,6 +1736,7 @@ function disableConnectivityMode() {
   connectivityLastRenderKey = null;
   connectivityLastPayload = null;
   selectedConnectivityProvince = "";
+  connectivityRegionFocused = "";
   setConnectivityLegendVisible(false);
   setReportLegendVisible(true);
   setMapHintVisible(true);
