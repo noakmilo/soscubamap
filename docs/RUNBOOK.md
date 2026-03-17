@@ -115,13 +115,88 @@ sudo systemctl enable soscuba
 sudo systemctl start soscuba
 ```
 
+### Ingesta de protestas con Celery (cada 5 minutos)
+
+Instalar Redis (broker de Celery):
+
+```bash
+sudo apt-get update
+sudo apt-get install -y redis-server
+sudo systemctl enable redis-server
+sudo systemctl start redis-server
+```
+
+En `.env` (usuario `soscuba`):
+
+```bash
+CELERY_BROKER_URL=redis://localhost:6379/1
+CELERY_RESULT_BACKEND=redis://localhost:6379/1
+CELERY_PROTEST_INGESTION_ENABLED=1
+CELERY_PROTEST_QUEUE=ingestion
+PROTEST_FETCH_INTERVAL_SECONDS=300
+```
+
+Crear `/etc/systemd/system/soscuba-celery-worker.service`:
+
+```ini
+[Unit]
+Description=SOSCuba Celery Worker
+After=network.target postgresql.service redis-server.service
+
+[Service]
+User=soscuba
+WorkingDirectory=/home/soscuba/soscubamap
+EnvironmentFile=/home/soscuba/soscubamap/.env
+ExecStart=/home/soscuba/soscubamap/.venv/bin/celery -A app.celery_app.celery worker --loglevel=INFO --concurrency=1 --queues=ingestion --hostname=soscuba-worker@%%h
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Crear `/etc/systemd/system/soscuba-celery-beat.service`:
+
+```ini
+[Unit]
+Description=SOSCuba Celery Beat
+After=network.target postgresql.service redis-server.service
+
+[Service]
+User=soscuba
+WorkingDirectory=/home/soscuba/soscubamap
+EnvironmentFile=/home/soscuba/soscubamap/.env
+ExecStart=/home/soscuba/soscubamap/.venv/bin/celery -A app.celery_app.celery beat --loglevel=INFO --schedule=/home/soscuba/soscubamap/.celerybeat-schedule
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Activar servicios:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable soscuba-celery-worker soscuba-celery-beat
+sudo systemctl start soscuba-celery-worker soscuba-celery-beat
+```
+
+Prueba manual de task (opcional):
+
+```bash
+cd /home/soscuba/soscubamap
+source .venv/bin/activate
+celery -A app.celery_app.celery call app.tasks.protests.ingest_protests_feeds
+```
+
 ### Actualizar (script incluido)
 
 ```bash
 sudo bash deploy.sh
 ```
 
-El script `deploy.sh` hace: `git pull` → `flask db upgrade` → `systemctl restart soscuba`.
+El script `deploy.sh` hace: `git pull` → `flask db upgrade` → `systemctl restart soscuba` (y también reinicia `soscuba-celery-worker`/`soscuba-celery-beat` si existen).
 
 ## Migraciones
 
@@ -161,6 +236,8 @@ flask --app run.py db history
 | `python -m scripts.seed_discussion_tags` | Crear tags de discusión                     |
 | `python -m scripts.backfill_locations` | Rellenar provincia/municipio en posts existentes |
 | `python -m scripts.reverse_geocode_posts` | Geocodificación inversa de posts           |
+| `python -m scripts.fetch_protests` | Ingesta manual de feeds RSS de protestas |
+| `python -m scripts.fetch_connectivity --single-call` | Ingesta manual de conectividad (Cloudflare Radar) |
 
 ## Self-hosted maps
 
@@ -184,6 +261,8 @@ curl http://localhost:8000/api/health
 
 ```bash
 sudo journalctl -u soscuba -f
+sudo journalctl -u soscuba-celery-worker -f
+sudo journalctl -u soscuba-celery-beat -f
 ```
 
 ### Logs (Docker)

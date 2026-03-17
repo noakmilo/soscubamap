@@ -106,8 +106,9 @@ Layer de eventos de protesta inferidos automáticamente desde fuentes RSS.
 
 | Variable                          | Descripción                                                          | Default |
 |-----------------------------------|----------------------------------------------------------------------|---------|
-| `PROTEST_RSS_FEEDS`               | URLs de feeds RSS separadas por comas.                               | (vacío — layer deshabilitado) |
+| `PROTEST_RSS_FEEDS_JSON_PATH`     | Ruta al JSON de feeds RSS para la capa de protestas.                 | `app/static/data/protest_feeds.json` |
 | `PROTEST_FETCH_TIMEOUT_SECONDS`   | Timeout HTTP al descargar cada feed.                                 | `30`    |
+| `PROTEST_FETCH_INTERVAL_SECONDS`  | Intervalo en segundos para ingesta periódica (Celery Beat).          | `300`   |
 | `PROTEST_FRONTEND_REFRESH_SECONDS`| Frecuencia de refresco del layer en el navegador.                    | `300`   |
 | `PROTEST_MIN_CONFIDENCE_TO_SHOW`  | Puntuación mínima de confianza (0–100) para mostrar un evento.       | `35`    |
 | `PROTEST_REQUIRE_SOURCE_URL`      | `1` = solo mostrar eventos con URL de fuente verificada.             | `1`     |
@@ -118,6 +119,17 @@ Layer de eventos de protesta inferidos automáticamente desde fuentes RSS.
 | `PROTEST_KEYWORDS_CONTEXT`        | Palabras de contexto (CSV). Requieren keyword fuerte para sumar.     | (vacío) |
 | `PROTEST_KEYWORDS_WEAK`           | Palabras clave débiles (CSV). Suman poco score individualmente.      | (vacío) |
 | `PROTEST_PLACE_ALIASES_JSON`      | JSON de alias de lugares cubanos para mejorar geocodificación.       | (vacío) |
+| `PROTEST_SOURCE_NAME_OVERRIDES_JSON` | JSON de overrides para nombres de fuentes en la UI.              | (vacío) |
+
+## Celery (ingesta periódica)
+
+| Variable                           | Descripción                                                          | Default |
+|------------------------------------|----------------------------------------------------------------------|---------|
+| `CELERY_BROKER_URL`                | URL del broker de Celery (recomendado Redis).                        | `redis://localhost:6379/1` |
+| `CELERY_RESULT_BACKEND`            | Backend de resultados de Celery.                                     | `redis://localhost:6379/1` |
+| `CELERY_TIMEZONE`                  | Zona horaria del scheduler Celery Beat.                              | `UTC`   |
+| `CELERY_PROTEST_INGESTION_ENABLED` | `1` habilita el job periódico de ingesta de protestas.              | `1`     |
+| `CELERY_PROTEST_QUEUE`             | Cola de Celery usada por la ingesta de protestas.                    | `ingestion` |
 
 
 ## GitHub Actions / Crowdin

@@ -4,6 +4,8 @@ set -euo pipefail
 APP_USER="soscuba"
 APP_DIR="/home/${APP_USER}/soscubamap"
 SERVICE_NAME="soscuba"
+CELERY_WORKER_SERVICE="${SERVICE_NAME}-celery-worker"
+CELERY_BEAT_SERVICE="${SERVICE_NAME}-celery-beat"
 FLASK_APP_PATH="${APP_DIR}/run.py"
 MIGRATIONS_DIR="${APP_DIR}/migrations"
 
@@ -13,6 +15,19 @@ run_as_app_user() {
   else
     "$@"
   fi
+}
+
+systemctl_cmd() {
+  if [[ $EUID -eq 0 ]]; then
+    systemctl "$@"
+  else
+    sudo systemctl "$@"
+  fi
+}
+
+service_exists() {
+  local service_name="$1"
+  systemctl list-unit-files "${service_name}.service" --no-legend 2>/dev/null | grep -q "^${service_name}.service"
 }
 
 if [[ ! -d "${APP_DIR}" ]]; then
@@ -50,10 +65,14 @@ else
 fi
 
 echo "[4/4] Reinicio de servicio"
-if [[ $EUID -eq 0 ]]; then
-  systemctl restart "${SERVICE_NAME}"
-else
-  sudo systemctl restart "${SERVICE_NAME}"
+systemctl_cmd restart "${SERVICE_NAME}"
+
+if service_exists "${CELERY_WORKER_SERVICE}"; then
+  systemctl_cmd restart "${CELERY_WORKER_SERVICE}"
+fi
+
+if service_exists "${CELERY_BEAT_SERVICE}"; then
+  systemctl_cmd restart "${CELERY_BEAT_SERVICE}"
 fi
 
 echo "Listo. Logs: sudo journalctl -u ${SERVICE_NAME} -f"
