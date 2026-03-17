@@ -1242,6 +1242,7 @@ def protests_geojson():
     include_hidden = _is_admin_user() and _truthy_param(request.args.get("include_hidden"))
 
     base_query = ProtestEvent.query
+    base_query = base_query.filter(ProtestEvent.review_status != "deleted_manual")
     if not include_hidden:
         base_query = base_query.filter(ProtestEvent.visible_on_map.is_(True))
     base_query = base_query.filter(
@@ -1475,9 +1476,11 @@ def delete_protest_event(event_id):
     if not event:
         return jsonify({"ok": False, "error": "Evento no encontrado."}), 404
 
-    db.session.delete(event)
+    event.visible_on_map = False
+    event.review_status = "deleted_manual"
+    event.updated_at = datetime.utcnow()
     db.session.commit()
-    return jsonify({"ok": True, "id": event_id})
+    return jsonify({"ok": True, "id": event_id, "status": "deleted_manual"})
 
 
 @api_bp.route("/push/subscribe", methods=["POST"])

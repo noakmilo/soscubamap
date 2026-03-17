@@ -110,6 +110,7 @@ def _upsert_event(payload):
         manual_locked = (existing.review_status or "").strip().lower() in {
             "approved_manual",
             "hidden_manual",
+            "deleted_manual",
         }
         updatable_fields = [
             "source_feed",
