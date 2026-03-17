@@ -6,11 +6,13 @@ import re
 import unicodedata
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
+from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from xml.etree import ElementTree
 
 import bleach
 
+from app.services import protest_settings
 from app.services.cuba_locations import MUNICIPALITIES, PROVINCES
 
 DEFAULT_STRONG_KEYWORDS = [
@@ -101,7 +103,7 @@ DEFAULT_MUNICIPALITY_PROVINCE_KEYS = [
 
 GENERIC_PLACE_TERMS = {"cuba", "la isla", "pais", "todo el pais"}
 
-_GAZETTEER_CACHE = {
+_GAZETTEER_CACHE: dict[str, Any] = {
     "signature": None,
     "data": None,
 }
@@ -112,7 +114,6 @@ def utcnow_naive():
 
 
 def _get_env_or_config(key, default=None):
-    """Kept for non-protest env/config lookups (e.g. GEOJSON paths)."""
     try:
         from flask import current_app
 
@@ -150,85 +151,65 @@ def _csv_env_list(value, defaults=None):
 
 
 def get_rss_feed_urls():
-    from app.services.protest_settings import get_rss_feeds_raw
-
-    return _csv_env_list(get_rss_feeds_raw())
+    return _csv_env_list(protest_settings.get_rss_feeds_raw())
 
 
 def get_fetch_timeout_seconds():
-    from app.services.protest_settings import get_fetch_timeout_seconds_raw
-
-    raw = get_fetch_timeout_seconds_raw()
     try:
-        return max(5, int(raw))
+        return max(5, int(protest_settings.get_fetch_timeout_seconds_raw()))
     except Exception:
         return 30
 
 
 def get_frontend_refresh_seconds():
-    from app.services.protest_settings import get_frontend_refresh_seconds_raw
-
-    raw = get_frontend_refresh_seconds_raw()
     try:
-        return max(30, int(raw))
+        return max(30, int(protest_settings.get_frontend_refresh_seconds_raw()))
     except Exception:
         return 300
 
 
 def get_min_confidence_to_show():
-    from app.services.protest_settings import get_min_confidence_raw
-
-    raw = get_min_confidence_raw()
     try:
-        return max(0.0, min(100.0, float(raw)))
+        return max(0.0, min(100.0, float(protest_settings.get_min_confidence_raw())))
     except Exception:
         return 35.0
 
 
 def require_source_url_for_map():
-    from app.services.protest_settings import get_require_source_url_raw
-
-    return _truthy(get_require_source_url_raw())
+    return _truthy(protest_settings.get_require_source_url_raw())
 
 
 def allow_unresolved_location_on_map():
-    from app.services.protest_settings import get_allow_unresolved_raw
-
-    return _truthy(get_allow_unresolved_raw())
+    return _truthy(protest_settings.get_allow_unresolved_raw())
 
 
 def get_max_items_per_feed():
-    from app.services.protest_settings import get_max_items_per_feed_raw
-
-    raw = get_max_items_per_feed_raw()
     try:
-        return max(1, int(raw))
+        return max(1, int(protest_settings.get_max_items_per_feed_raw()))
     except Exception:
         return 120
 
 
 def get_max_post_age_days():
-    from app.services.protest_settings import get_max_post_age_days_raw
-
-    raw = get_max_post_age_days_raw()
     try:
-        return max(1, int(raw))
+        return max(1, int(protest_settings.get_max_post_age_days_raw()))
     except Exception:
         return 30
 
 
 def get_protest_keyword_sets():
-    from app.services.protest_settings import (
-        get_keywords_context_raw,
-        get_keywords_strong_raw,
-        get_keywords_weak_raw,
+    strong = _csv_env_list(
+        protest_settings.get_keywords_strong_raw(),
+        defaults=DEFAULT_STRONG_KEYWORDS,
     )
-
-    strong = _csv_env_list(get_keywords_strong_raw(), defaults=DEFAULT_STRONG_KEYWORDS)
     context = _csv_env_list(
-        get_keywords_context_raw(), defaults=DEFAULT_CONTEXT_KEYWORDS
+        protest_settings.get_keywords_context_raw(),
+        defaults=DEFAULT_CONTEXT_KEYWORDS,
     )
-    weak = _csv_env_list(get_keywords_weak_raw(), defaults=DEFAULT_WEAK_KEYWORDS)
+    weak = _csv_env_list(
+        protest_settings.get_keywords_weak_raw(),
+        defaults=DEFAULT_WEAK_KEYWORDS,
+    )
     return {
         "strong": sorted({_normalize_text(item) for item in strong if item}),
         "context": sorted({_normalize_text(item) for item in context if item}),
@@ -343,9 +324,7 @@ def extract_source_name(feed_url):
 
 
 def _source_name_overrides():
-    from app.services.protest_settings import get_source_name_overrides_json_raw
-
-    raw = str(get_source_name_overrides_json_raw() or "").strip()
+    raw = str(protest_settings.get_source_name_overrides_json_raw() or "").strip()
     if not raw:
         return {}
     try:
@@ -521,9 +500,7 @@ def _add_entry(target, entry):
 
 
 def _parse_aliases():
-    from app.services.protest_settings import get_place_aliases_json_raw
-
-    raw = str(get_place_aliases_json_raw() or "").strip()
+    raw = str(protest_settings.get_place_aliases_json_raw() or "").strip()
     if not raw:
         return {}
     try:
@@ -720,8 +697,6 @@ def _build_gazetteer():
 
 
 def _gazetteer():
-    from app.services.protest_settings import get_place_aliases_json_raw
-
     signature = (
         _get_env_or_config("GEOJSON_PROVINCES_PATH", ""),
         _get_env_or_config("GEOJSON_MUNICIPALITIES_PATH", ""),
@@ -732,7 +707,7 @@ def _gazetteer():
         _get_env_or_config("GEOJSON_LOCALITY_KEYS", ""),
         _get_env_or_config("GEOJSON_LOCALITY_MUNICIPALITY_KEYS", ""),
         _get_env_or_config("GEOJSON_LOCALITY_PROVINCE_KEYS", ""),
-        get_place_aliases_json_raw(),
+        protest_settings.get_place_aliases_json_raw(),
     )
     if _GAZETTEER_CACHE["signature"] != signature:
         _GAZETTEER_CACHE["signature"] = signature

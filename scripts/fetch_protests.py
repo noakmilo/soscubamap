@@ -132,15 +132,6 @@ def _upsert_event(payload):
     payload["updated_at"] = now
     event = ProtestEvent(**payload)
     db.session.add(event)
-    try:
-        db.session.flush()
-    except Exception:
-        db.session.rollback()
-        # Race condition or duplicate feed+guid: treat as deduped
-        existing = _find_existing_event(payload)
-        if existing:
-            return "deduped", existing
-        raise
     return "stored", event
 
 
@@ -151,7 +142,9 @@ def run_ingestion(feeds):
         if not feed_urls:
             feed_urls = get_rss_feed_urls()
         if not feed_urls:
-            raise RuntimeError("PROTEST_RSS_FEEDS no configurado")
+            raise RuntimeError(
+                "No hay feeds de protestas configurados (admin/db o PROTEST_RSS_FEEDS)"
+            )
 
         timeout_seconds = get_fetch_timeout_seconds()
         run = ProtestIngestionRun(
@@ -275,7 +268,4 @@ def main():
 
 
 if __name__ == "__main__":
-    from dotenv import load_dotenv
-
-    load_dotenv()
     main()

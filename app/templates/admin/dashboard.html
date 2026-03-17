@@ -52,6 +52,7 @@
   <div class="admin-section">
     <h2>Reportes</h2>
     <div class="admin-links">
+      <a href="{{ url_for('admin.protest_settings') }}">Configurar protestas</a>
       <a href="{{ url_for('admin.reports', status='approved') }}">Activos</a>
       <a href="{{ url_for('admin.reports', status='hidden') }}">Ocultos</a>
       <a href="{{ url_for('admin.reports', status='pending') }}">Por moderar</a>
@@ -60,7 +61,6 @@
       <a href="{{ url_for('admin.location_reports') }}">Ubicaciones reportadas</a>
       <a href="{{ url_for('admin.discussions') }}">Discusiones</a>
       <a href="{{ url_for('admin.donations') }}">Donaciones</a>
-      <a href="{{ url_for('admin.protest_settings') }}">Configuración de protestas</a>
     </div>
   </div>
 

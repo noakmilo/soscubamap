@@ -44,6 +44,7 @@ from app.services.geo_lookup import (
     municipalities_map,
 )
 from app.services.input_safety import has_malicious_input
+from app.services.map_providers import get_map_provider_forms, get_map_provider_main
 from app.services.media_upload import (
     get_media_payload,
     media_json_from_post,
@@ -51,10 +52,10 @@ from app.services.media_upload import (
     upload_files,
     validate_files,
 )
+from app.services.protests import get_frontend_refresh_seconds
 from app.services.push_notifications import push_enabled, send_alert_notification
 from app.services.recaptcha import recaptcha_enabled, verify_recaptcha
 from app.services.vote_identity import get_voter_hash
-from app.services.map_providers import get_map_provider_forms, get_map_provider_main
 
 from . import map_bp
 
@@ -155,9 +156,7 @@ def dashboard():
         connectivity_refresh_seconds=current_app.config.get(
             "CONNECTIVITY_FRONTEND_REFRESH_SECONDS", 300
         ),
-        protest_refresh_seconds=current_app.config.get(
-            "PROTEST_FRONTEND_REFRESH_SECONDS", 300
-        ),
+        protest_refresh_seconds=get_frontend_refresh_seconds(),
         map_provider_main=map_provider_main,
         google_maps_api_key=_google_maps_api_key(),
     )
@@ -483,7 +482,9 @@ def new_post():
 
         if lat is not None and lng is not None and not is_within_cuba_bounds(lat, lng):
             errors["latitude"] = "La ubicación debe estar dentro del territorio cubano."
-            errors["longitude"] = "La ubicación debe estar dentro del territorio cubano."
+            errors["longitude"] = (
+                "La ubicación debe estar dentro del territorio cubano."
+            )
 
         if lat is not None and lng is not None:
             province, municipality = _resolve_geo_location(

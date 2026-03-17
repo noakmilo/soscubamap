@@ -1,46 +1,41 @@
-from flask import jsonify, request, make_response, session, current_app
-import math
 import json
+import math
 import os
 import secrets
 import unicodedata
-from datetime import datetime, timedelta, date
-from sqlalchemy.exc import IntegrityError
-from flask_login import current_user
+from datetime import date, datetime, timedelta
+
 import requests
+from flask import current_app, jsonify, make_response, request, session
+from flask_login import current_user
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import selectinload
 
 from app.extensions import db, limiter
-from app.services.input_safety import has_malicious_input
-from app.services.recaptcha import verify_recaptcha, recaptcha_enabled
-from app.services.text_sanitize import sanitize_text
-from app.models.comment import Comment
-from app.models.user import User
-from app.models.role import Role
-from app.models.media import Media
-from app.models.post_revision import PostRevision
-from app.models.post_edit_request import PostEditRequest
-from app.models.site_setting import SiteSetting
-from app.services.media_upload import (
-    validate_files,
-    upload_files,
-    media_json_from_post,
-    get_media_payload,
-)
+from app.models.category import Category
 from app.models.chat_message import ChatMessage
 from app.models.chat_presence import ChatPresence
-from app.models.discussion_post import DiscussionPost
-from app.models.discussion_comment import DiscussionComment
-from app.models.push_subscription import PushSubscription
-from app.models.vote_record import VoteRecord
-from app.services.vote_identity import get_voter_hash
-from app.models.connectivity_snapshot import ConnectivitySnapshot
+from app.models.comment import Comment
 from app.models.connectivity_ingestion_run import ConnectivityIngestionRun
 from app.models.connectivity_province_status import ConnectivityProvinceStatus
+from app.models.connectivity_snapshot import ConnectivitySnapshot
+from app.models.discussion_comment import DiscussionComment
+from app.models.discussion_post import DiscussionPost
+from app.models.media import Media
+from app.models.post import Post
+from app.models.post_edit_request import PostEditRequest
+from app.models.post_revision import PostRevision
 from app.models.protest_event import ProtestEvent
 from app.models.protest_ingestion_run import ProtestIngestionRun
+from app.models.push_subscription import PushSubscription
+from app.models.role import Role
+from app.models.site_setting import SiteSetting
+from app.models.user import User
+from app.models.vote_record import VoteRecord
 from app.services.connectivity import (
-    STATUS_CRITICAL,
     STATUS_COLORS,
+    STATUS_CRITICAL,
     STATUS_LABELS,
     STATUS_UNKNOWN,
     extract_series_points,
@@ -55,18 +50,33 @@ from app.services.connectivity_geo import (
     load_province_geojson,
     province_names_from_geojson,
 )
-from app.services.geo_lookup import list_provinces
 from app.services.cuba_locations import PROVINCES
+from app.services.geo_lookup import list_provinces
+from app.services.input_safety import has_malicious_input
+from app.services.media_upload import (
+    get_media_payload,
+    media_json_from_post,
+    upload_files,
+    validate_files,
+)
+from app.services.protests import display_source_name as protest_display_source_name
 from app.services.protests import (
-    display_source_name as protest_display_source_name,
+    get_fetch_timeout_seconds as protest_fetch_timeout_seconds,
+)
+from app.services.protests import (
     get_frontend_refresh_seconds as protest_frontend_refresh_seconds,
+)
+from app.services.protests import (
     get_min_confidence_to_show as protest_min_confidence_to_show,
 )
+from app.services.protests import get_rss_feed_urls as protest_get_rss_feed_urls
+from app.services.protests import (
+    require_source_url_for_map as protest_require_source_url,
+)
+from app.services.recaptcha import recaptcha_enabled, verify_recaptcha
+from app.services.text_sanitize import sanitize_text
+from app.services.vote_identity import get_voter_hash
 
-from app.models.post import Post
-from sqlalchemy.orm import selectinload
-from app.models.category import Category
-from sqlalchemy import func
 from . import api_bp
 
 
@@ -1427,19 +1437,11 @@ def protests_debug():
         {
             "generated_at_utc": serialize_snapshot_time(datetime.utcnow()),
             "config": {
-                "protest_rss_feeds": [
-                    item.strip()
-                    for item in str(current_app.config.get("PROTEST_RSS_FEEDS", "") or "").split(",")
-                    if item.strip()
-                ],
-                "protest_fetch_timeout_seconds": int(
-                    current_app.config.get("PROTEST_FETCH_TIMEOUT_SECONDS", 30)
-                ),
+                "protest_rss_feeds": protest_get_rss_feed_urls(),
+                "protest_fetch_timeout_seconds": protest_fetch_timeout_seconds(),
                 "protest_frontend_refresh_seconds": protest_frontend_refresh_seconds(),
                 "protest_min_confidence_to_show": protest_min_confidence_to_show(),
-                "protest_require_source_url": bool(
-                    current_app.config.get("PROTEST_REQUIRE_SOURCE_URL", True)
-                ),
+                "protest_require_source_url": protest_require_source_url(),
                 "geojson_provinces_path": current_app.config.get("GEOJSON_PROVINCES_PATH"),
                 "geojson_municipalities_path": current_app.config.get("GEOJSON_MUNICIPALITIES_PATH"),
                 "geojson_localities_path": current_app.config.get("GEOJSON_LOCALITIES_PATH"),
@@ -2467,6 +2469,13 @@ def chat_messages():
                     "id": m.id,
                     "author": m.author_label,
                     "body": m.body,
+                    "created_at": m.created_at.isoformat(),
+                }
+                for m in items
+            ],
+            "online_count": online_count,
+        }
+    )
                     "created_at": m.created_at.isoformat(),
                 }
                 for m in items

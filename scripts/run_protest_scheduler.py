@@ -24,5 +24,3 @@ signal.signal(signal.SIGINT, _handle_stop)
 
 if __name__ == "__main__":
     run_protest_scheduler_forever(app)
-if __name__ == "__main__":
-    run_protest_scheduler_forever(app)

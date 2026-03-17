@@ -102,22 +102,6 @@ Layer de datos de conectividad a internet por provincias, alimentado por Cloudfl
 
 ## Protestas (RSS / NLP)
 
-Layer de eventos de protesta inferidos automáticamente desde fuentes RSS.
-
-| Variable                          | Descripción                                                          | Default |
-|-----------------------------------|----------------------------------------------------------------------|---------|
-| `PROTEST_RSS_FEEDS`               | URLs de feeds RSS separadas por comas.                               | (vacío — layer deshabilitado) |
-| `PROTEST_FETCH_TIMEOUT_SECONDS`   | Timeout HTTP al descargar cada feed.                                 | `30`    |
-| `PROTEST_FRONTEND_REFRESH_SECONDS`| Frecuencia de refresco del layer en el navegador.                    | `300`   |
-| `PROTEST_MIN_CONFIDENCE_TO_SHOW`  | Puntuación mínima de confianza (0–100) para mostrar un evento.       | `35`    |
-| `PROTEST_REQUIRE_SOURCE_URL`      | `1` = solo mostrar eventos con URL de fuente verificada.             | `1`     |
-| `PROTEST_ALLOW_UNRESOLVED_TO_MAP` | `1` = mostrar eventos sin coordenadas resueltas.                     | `0`     |
-| `PROTEST_MAX_ITEMS_PER_FEED`      | Máximo de ítems a procesar por feed en cada ciclo.                   | `120`   |
-| `PROTEST_MAX_POST_AGE_DAYS`       | Ignorar ítems del feed con más de N días de antigüedad.              | `30`    |
-| `PROTEST_KEYWORDS_STRONG`         | Palabras clave de alta confianza (CSV). Aumentan score fuertemente.  | (vacío) |
-| `PROTEST_KEYWORDS_CONTEXT`        | Palabras de contexto (CSV). Requieren keyword fuerte para sumar.     | (vacío) |
-| `PROTEST_KEYWORDS_WEAK`           | Palabras clave débiles (CSV). Suman poco score individualmente.      | (vacío) |
-| `PROTEST_PLACE_ALIASES_JSON`      | JSON de alias de lugares cubanos para mejorar geocodificación.       | (vacío) |
 
 
 ## GitHub Actions / Crowdin
@@ -136,5 +120,5 @@ Secretos necesarios en **Settings → Secrets and variables → Actions** del re
 | `CHAT_DISABLED`       | Deshabilitar el chat en vivo. `1` = deshabilitado. | `0`     |
 | `ASSET_VERSION`       | Versión para cache-busting de assets estáticos.  | `1`      |
 | `TRUST_PROXY_HEADERS` | Confiar en cabeceras de proxy (X-Forwarded-For). `1` = sí. | `1` |
-| `PROTEST_SCHEDULER_ENABLED` | Habilita scheduler de protestas en el proceso actual. | `1` |
-| `PROTEST_SCHEDULER_IN_WEB` | Permite arrancar scheduler embebido en procesos web (Gunicorn). En producción se recomienda `0`. | `0` |
+| `PROTEST_SCHEDULER_ENABLED` | Habilita el scheduler de protestas en el proceso actual. | `1` |
+| `PROTEST_SCHEDULER_IN_WEB` | Ejecuta scheduler dentro de procesos web. En producción se recomienda `0`. | `0` |
