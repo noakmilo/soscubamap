@@ -147,6 +147,19 @@ def _upsert_event(payload):
                 # Respeta la decisión manual del admin aunque cambie la heurística automática.
                 continue
             new_value = payload.get(field)
+
+            if field == "source_url":
+                existing_url = str(existing.source_url or "").strip()
+                incoming_url = str(new_value or "").strip()
+                # Evita perder trazabilidad por fallos temporales del feed.
+                if existing_url and not incoming_url:
+                    continue
+
+            if field == "visible_on_map":
+                # Si ya estaba visible, no lo despublica automaticamente por variaciones transitorias.
+                if bool(existing.visible_on_map) and not bool(new_value):
+                    continue
+
             if getattr(existing, field) != new_value:
                 setattr(existing, field, new_value)
                 changed = True

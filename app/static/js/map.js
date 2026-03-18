@@ -38,6 +38,7 @@ let connectivityRegionNote;
 let connectivityRegionFocused = "";
 let protestLayerGroup;
 let protestRefreshTimer;
+let protestRefreshPromise;
 let protestRefreshSeconds = 300;
 let protestLastPayload = null;
 let protestTimelineStartDay = "";
@@ -1864,7 +1865,7 @@ async function deleteProtestEntry(protestId, options = {}) {
       throw new Error(result?.error || "No se pudo eliminar la protesta.");
     }
     protestSelectedFeatureId = null;
-    await refreshProtestLayer();
+    await refreshProtestLayer({ force: true });
     return true;
   } catch (error) {
     if (noteEl) {
@@ -2160,20 +2161,45 @@ async function fetchProtestData() {
   return await response.json();
 }
 
-async function refreshProtestLayer() {
+async function refreshProtestLayer(options = {}) {
+  const force = Boolean(options && options.force);
   if (activeBaseMode !== "protests") return;
-  try {
-    const payload = await fetchProtestData();
-    protestLastPayload = payload;
-    syncProtestTimelineControls(payload);
-    renderProtestSummary(payload);
-    renderProtestData(payload);
-  } catch (err) {
-    if (protestSummary) {
-      protestSummary.textContent = "No fue posible actualizar la capa Protestas.";
+  if (protestRefreshPromise) {
+    if (!force) return protestRefreshPromise;
+    try {
+      await protestRefreshPromise;
+    } catch (_error) {
+      // ignore and force a new attempt below
     }
-    renderProtestDetail(null);
-    clearProtestLayer();
+  }
+
+  protestRefreshPromise = (async () => {
+    try {
+      const payload = await fetchProtestData();
+      protestLastPayload = payload;
+      syncProtestTimelineControls(payload);
+      renderProtestSummary(payload);
+      renderProtestData(payload);
+    } catch (err) {
+      if (protestSummary) {
+        if (protestLastPayload && Array.isArray(protestLastPayload.features)) {
+          protestSummary.textContent =
+            "Actualizacion temporal fallida. Mostrando la ultima capa disponible.";
+        } else {
+          protestSummary.textContent = "No fue posible actualizar la capa Protestas.";
+        }
+      }
+      if (!protestLastPayload || !Array.isArray(protestLastPayload.features)) {
+        renderProtestDetail(null);
+        clearProtestLayer();
+      }
+    }
+  })();
+
+  try {
+    return await protestRefreshPromise;
+  } finally {
+    protestRefreshPromise = null;
   }
 }
 
