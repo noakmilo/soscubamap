@@ -494,9 +494,9 @@ body.map-dashboard-page .map-canvas {
 }
 
 .alert-console-floating .console-body {
-  height: 30px;
-  min-height: 30px;
-  max-height: 30px;
+  min-height: 68px;
+  max-height: 82px;
+  height: auto;
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -541,6 +541,64 @@ body.map-dashboard-page .map-canvas {
   font-size: 12px;
 }
 
+.alert-console.alert-console-floating .console-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.alert-console.alert-console-floating .console-head-copy {
+  min-width: 0;
+}
+
+.alert-console.alert-console-floating .console-title-row-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.alert-console.alert-console-floating .console-title {
+  font-size: 11px;
+  line-height: 1.2;
+  text-transform: none;
+  letter-spacing: 0.2px;
+  color: #ffd1c3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.alert-console.alert-console-floating .console-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 2px 6px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: #ffceb8;
+  background: rgba(255, 107, 107, 0.2);
+  border: 1px solid rgba(255, 107, 107, 0.45);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.alert-console.alert-console-floating .console-note {
+  margin-top: 3px;
+  font-size: 10px;
+  text-transform: none;
+  letter-spacing: 0.3px;
+  line-height: 1.25;
+  color: #ffb199;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .alert-console.alert-console-floating .console-header,
 .alert-console.alert-console-floating .console-body,
 .alert-console.alert-console-floating .console-item {
@@ -549,12 +607,38 @@ body.map-dashboard-page .map-canvas {
 }
 
 .alert-console.alert-console-floating .console-item {
-  padding: 7px 8px;
+  padding: 6px 8px;
 }
 
 .alert-console.alert-console-floating .console-actions .btn-secondary {
-  padding: 4px 7px;
-  font-size: 12px;
+  padding: 5px 8px;
+  font-size: 10px;
+  white-space: nowrap;
+  letter-spacing: 0.5px;
+}
+
+.alert-console.alert-console-floating .console-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-direction: row;
+}
+
+@media (max-width: 720px) {
+  .alert-console.alert-console-floating .console-header {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .alert-console.alert-console-floating .console-actions {
+    justify-content: flex-start;
+  }
+
+  .alert-console-floating .console-body {
+    min-height: 64px;
+    max-height: 74px;
+  }
 }
 
 .alert-console-floating.is-collapsed {

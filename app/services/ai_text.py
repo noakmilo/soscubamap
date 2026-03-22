@@ -60,7 +60,22 @@ def _load_openai_client():
         ) from exc
 
     timeout_seconds = int(current_app.config.get("OPENAI_TIMEOUT_SECONDS", 30) or 30)
-    return OpenAI(api_key=api_key, timeout=timeout_seconds)
+    try:
+        return OpenAI(api_key=api_key, timeout=timeout_seconds)
+    except TypeError as exc:
+        # Compatibilidad para entornos con openai viejo + httpx nuevo
+        # donde el cliente interno falla por el argumento "proxies".
+        if "proxies" not in str(exc).lower():
+            raise
+        try:
+            import httpx
+        except Exception as import_exc:
+            raise RuntimeError(
+                "Incompatibilidad de dependencias OpenAI/httpx. "
+                "Actualiza openai o instala httpx compatible."
+            ) from import_exc
+        http_client = httpx.Client(timeout=timeout_seconds, follow_redirects=True)
+        return OpenAI(api_key=api_key, http_client=http_client)
 
 
 def optimize_report_text(

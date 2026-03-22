@@ -15,7 +15,7 @@
   if (!enabled || !vapidKey) {
     toggle.disabled = true;
     toggle.textContent = "Alertas no disponibles";
-    statusEl.textContent = "Notificaciones deshabilitadas en el servidor.";
+    statusEl.textContent = "Notificaciones deshabilitadas en servidor.";
     statusEl.classList.add("is-muted");
     return;
   }
@@ -24,8 +24,7 @@
     toggle.disabled = true;
     toggle.textContent = "Instala la PWA";
     if (isMobile) {
-      statusEl.textContent =
-        "Para activar alertas debes instalar la PWA. iOS: Compartir → Añadir a pantalla de inicio → abre desde el icono. Android: Menú ⋮ → Instalar app / Añadir a pantalla de inicio.";
+      statusEl.textContent = "Instala la PWA y habilita notificaciones para recibir alertas.";
     } else {
       statusEl.textContent = "Tu navegador no soporta notificaciones push.";
     }
@@ -37,7 +36,7 @@
     if (state === "subscribed") {
       toggle.dataset.state = "on";
       toggle.textContent = "Desactivar alertas";
-      statusEl.textContent = "Alertas activas para movimiento, desconexiones y acción represiva.";
+      statusEl.textContent = "Alertas activas: movimiento, desconexiones y acción represiva.";
       return;
     }
     if (state === "blocked") {
@@ -49,7 +48,7 @@
     }
     toggle.dataset.state = "off";
     toggle.textContent = "Activar alertas";
-    statusEl.textContent = "Solo para movimiento, desconexiones y acción represiva.";
+    statusEl.textContent = "Incluye movimiento, desconexiones y acción represiva.";
   };
 
   const urlBase64ToUint8Array = (base64String) => {

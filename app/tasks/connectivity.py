@@ -24,6 +24,11 @@ from scripts.fetch_connectivity import run_ingestion
 
 
 ALERT_STATUS_SET = {STATUS_SEVERE, STATUS_CRITICAL}
+AUTO_CONNECTIVITY_REPORT_TITLE_PREFIX = "Alerta automatica Cloudflare:"
+AUTO_CONNECTIVITY_REPORT_DESCRIPTION_PREFIX = (
+    "Reporte automatico generado con Cloudflare Radar y SOSCubaMap."
+)
+AUTO_CONNECTIVITY_REPORT_MARKER = "auto_connectivity_cloudflare"
 
 
 def _normalize_text(value):
@@ -172,6 +177,50 @@ def _already_reported(category_id, province, movement_at_utc, title):
     )
 
 
+def _is_auto_connectivity_report(post):
+    if not post:
+        return False
+
+    marker = str(post.other_type or "").strip().lower()
+    if marker == AUTO_CONNECTIVITY_REPORT_MARKER:
+        return True
+
+    title = str(post.title or "").strip()
+    if title.startswith(AUTO_CONNECTIVITY_REPORT_TITLE_PREFIX):
+        return True
+
+    description = str(post.description or "").strip()
+    if description.startswith(AUTO_CONNECTIVITY_REPORT_DESCRIPTION_PREFIX):
+        return True
+
+    return False
+
+
+def _retire_recovered_auto_reports(category_id, active_alert_provinces, system_user_id=None):
+    active_keys = {
+        _normalize_text(name)
+        for name in (active_alert_provinces or [])
+        if _normalize_text(name)
+    }
+    query = Post.query.filter(
+        Post.category_id == category_id,
+        Post.status == "approved",
+    )
+    if system_user_id:
+        query = query.filter(Post.author_id == system_user_id)
+
+    retired = []
+    for post in query.all():
+        if not _is_auto_connectivity_report(post):
+            continue
+        province_key = _normalize_text(post.province)
+        if province_key and province_key in active_keys:
+            continue
+        post.status = "deleted"
+        retired.append(post)
+    return retired
+
+
 @celery.task(
     name="app.tasks.connectivity.poll_connectivity_and_create_reports",
     bind=True,
@@ -216,9 +265,32 @@ def poll_connectivity_and_create_reports(self):
 
     system_user = None
     user_email = celery.flask_app.config.get("AUTO_CONNECTIVITY_REPORT_USER_EMAIL", "")
+    normalized_user_email = str(user_email or "").strip().lower() or "radar-bot@soscuba.local"
+    system_user = User.query.filter_by(email=normalized_user_email).first()
+    active_alert_provinces = [
+        province
+        for province in sorted(current_state.keys())
+        if _should_create_alert((current_state.get(province) or {}).get("status"))
+    ]
     created_provinces = []
+    deleted_provinces = []
+    deleted_report_ids = []
 
     try:
+        retired_reports = _retire_recovered_auto_reports(
+            category.id,
+            active_alert_provinces,
+            system_user_id=system_user.id if system_user else None,
+        )
+        deleted_report_ids = [post.id for post in retired_reports]
+        deleted_provinces = sorted(
+            {
+                post.province
+                for post in retired_reports
+                if str(post.province or "").strip()
+            }
+        )
+
         for province in sorted(current_state.keys()):
             state = current_state.get(province) or {}
             current_status = state.get("status")
@@ -240,7 +312,7 @@ def poll_connectivity_and_create_reports(self):
                 continue
 
             if system_user is None:
-                system_user = _ensure_system_user(user_email)
+                system_user = _ensure_system_user(normalized_user_email)
 
             description = (
                 "Reporte automatico generado con Cloudflare Radar y SOSCubaMap. "
@@ -263,6 +335,7 @@ def poll_connectivity_and_create_reports(self):
                 category_id=category.id,
                 status="approved",
                 is_anonymous=True,
+                other_type=AUTO_CONNECTIVITY_REPORT_MARKER,
             )
             db.session.add(post)
             created_provinces.append(province)
@@ -280,4 +353,7 @@ def poll_connectivity_and_create_reports(self):
         else None,
         "reports_created": len(created_provinces),
         "provinces": created_provinces,
+        "reports_deleted": len(deleted_report_ids),
+        "deleted_report_ids": deleted_report_ids,
+        "deleted_provinces": deleted_provinces,
     }
