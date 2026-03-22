@@ -36,6 +36,16 @@ Estos valores se usan opcionalmente para geocodificación y mapas avanzados. La 
 | `GOOGLE_MAPS_API_KEY` | API key de Google Maps.       | (vacío)  |
 | `GOOGLE_MAPS_MAP_ID`  | Map ID para estilos custom.   | (vacío)  |
 
+## IA (OpenAI)
+
+Optimización opcional de título y descripción en la edición de reportes (solo admin).
+
+| Variable                 | Descripción                                              | Default       |
+|--------------------------|----------------------------------------------------------|---------------|
+| `OPENAI_API_KEY`         | API key de OpenAI para usar la optimización de texto.    | (vacío)       |
+| `OPENAI_TEXT_MODEL`      | Modelo usado para corregir texto de título/descripcion.  | `gpt-4o-mini` |
+| `OPENAI_TIMEOUT_SECONDS` | Timeout en segundos para la petición a OpenAI.           | `30`          |
+
 ## GeoJSON (datos geográficos de Cuba)
 
 Rutas a archivos GeoJSON para la resolución automática de provincia/municipio a partir de coordenadas.

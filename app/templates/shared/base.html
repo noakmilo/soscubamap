@@ -45,7 +45,7 @@
           {% if current_user.has_role('moderador') or current_user.has_role('administrador') %}
             <a href="{{ url_for('moderation.dashboard') }}">
               Moderación
-              {% if current_user.has_role('administrador') %}
+              {% if current_user.has_role('administrador') and (moderation_pending_count|int) > 0 %}
                 <span class="nav-badge">{{ moderation_pending_count }}</span>
               {% endif %}
             </a>

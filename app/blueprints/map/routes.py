@@ -11,6 +11,7 @@ from flask import (
     abort,
     current_app,
     flash,
+    jsonify,
     make_response,
     redirect,
     render_template,
@@ -35,6 +36,7 @@ from app.models.user import User
 from app.models.vote_record import VoteRecord
 from app.services.category_rules import is_other_type_allowed
 from app.services.category_sort import sort_categories_for_forms
+from app.services.ai_text import optimize_report_text
 from app.services.content_quality import validate_description, validate_title
 from app.services.geo_lookup import (
     is_within_cuba_bounds,
@@ -712,6 +714,57 @@ def _is_admin_user():
 
 def _is_edit_locked(post: Post) -> bool:
     return (post.verify_count or 0) >= 10 and not _is_admin_user()
+
+
+@map_bp.route("/reporte/<int:post_id>/ia/optimizar", methods=["POST"])
+@limiter.limit("5/minute; 40/hour", methods=["POST"])
+def optimize_report_text_ai(post_id):
+    if not _is_admin_user():
+        return jsonify({"ok": False, "error": "No autorizado."}), 403
+
+    post = Post.query.get_or_404(post_id)
+    payload = request.get_json(silent=True) or {}
+
+    field = (payload.get("field") or "").strip().lower()
+    text = payload.get("text") or ""
+    title_context = (payload.get("title_context") or "").strip() or post.title
+    description_context = (payload.get("description_context") or "").strip() or post.description
+
+    try:
+        optimized = optimize_report_text(
+            field,
+            text,
+            title_context=title_context,
+            description_context=description_context,
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
+    except Exception:
+        current_app.logger.exception("Error al optimizar texto con IA")
+        return (
+            jsonify({"ok": False, "error": "No se pudo optimizar el texto en este momento."}),
+            502,
+        )
+
+    if field == "title":
+        ok, error = validate_title(optimized)
+    else:
+        ok, error = validate_description(optimized)
+
+    if not ok:
+        return (
+            jsonify(
+                {
+                    "ok": False,
+                    "error": f"La IA devolvio un texto invalido: {error}",
+                }
+            ),
+            422,
+        )
+
+    return jsonify({"ok": True, "field": field, "optimized_text": optimized})
 
 
 @map_bp.route("/reporte/<int:post_id>/editar", methods=["GET", "POST"])

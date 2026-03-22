@@ -41,6 +41,11 @@ const isUrgentCategory = (key) => {
 
 const isResidenciaCategory = (key) => key.includes("residencia") && key.includes("represor");
 const isOtrosCategory = (key) => key === "otros" || key.includes("otros");
+const AI_REASON_SUFFIX = "corregido con IA por Admin.";
+const AI_REASON_TAGS = {
+  title: "[Titulo]",
+  description: "[Descripcion]",
+};
 
 function canUseGoogleMutant(provider) {
   if (provider !== MAP_PROVIDER_GOOGLE) return false;
@@ -548,6 +553,94 @@ function setupImageValidation() {
   });
 }
 
+function setupAiOptimization() {
+  const form = document.querySelector(".form-grid");
+  if (!form || form.dataset.isAdmin !== "1") return;
+
+  const endpoint = (form.dataset.aiOptimizeUrl || "").trim();
+  if (!endpoint) return;
+
+  const titleInput = document.getElementById("editTitleInput");
+  const descriptionInput = document.getElementById("editDescriptionInput");
+  const reasonInput = document.getElementById("editReasonInput");
+  const buttons = Array.from(form.querySelectorAll("[data-ai-optimize]"));
+  if (!titleInput || !descriptionInput || !reasonInput || buttons.length === 0) return;
+
+  const reasonTags = new Set();
+  if (/\[Titulo\]/i.test(reasonInput.value || "")) reasonTags.add(AI_REASON_TAGS.title);
+  if (/\[Descripcion\]/i.test(reasonInput.value || "")) reasonTags.add(AI_REASON_TAGS.description);
+
+  const setStatus = (field, message, isError) => {
+    const statusEl = form.querySelector(`[data-ai-status="${field}"]`);
+    if (!statusEl) return;
+    statusEl.textContent = message || "";
+    statusEl.classList.toggle("is-error", Boolean(isError));
+  };
+
+  const syncReason = () => {
+    const ordered = [AI_REASON_TAGS.title, AI_REASON_TAGS.description].filter((tag) =>
+      reasonTags.has(tag)
+    );
+    if (!ordered.length) return;
+    reasonInput.value = `${ordered.join(" ")} ${AI_REASON_SUFFIX}`;
+  };
+
+  buttons.forEach((button) => {
+    button.addEventListener("click", async () => {
+      const field = (button.dataset.aiOptimize || "").trim().toLowerCase();
+      if (field !== "title" && field !== "description") return;
+
+      const targetInput = field === "title" ? titleInput : descriptionInput;
+      const text = (targetInput.value || "").trim();
+      if (!text) {
+        setStatus(field, "Primero escribe texto en este campo.", true);
+        targetInput.focus();
+        return;
+      }
+
+      button.disabled = true;
+      setStatus(field, "Optimizando con IA...", false);
+
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            field,
+            text,
+            title_context: titleInput.value || "",
+            description_context: descriptionInput.value || "",
+          }),
+        });
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.ok) {
+          const error = payload.error || "No se pudo optimizar el texto.";
+          throw new Error(error);
+        }
+
+        const optimizedText = (payload.optimized_text || "").trim();
+        if (!optimizedText) {
+          throw new Error("La IA no devolvio un texto valido.");
+        }
+
+        targetInput.value = optimizedText;
+        reasonTags.add(field === "title" ? AI_REASON_TAGS.title : AI_REASON_TAGS.description);
+        syncReason();
+        setStatus(field, "Texto optimizado.", false);
+      } catch (error) {
+        const message = (error && error.message) || "No se pudo optimizar el texto.";
+        setStatus(field, message, true);
+      } finally {
+        button.disabled = false;
+      }
+    });
+  });
+}
+
 window.initDrawMap = setupDrawMap;
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -555,6 +648,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setupCategoryRequirements();
   setupProvinceMunicipality();
   setupImageValidation();
+  setupAiOptimization();
   setupDrawMap();
 
   const form = document.querySelector(".form-grid");

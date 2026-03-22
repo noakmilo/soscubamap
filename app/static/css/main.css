@@ -6,6 +6,7 @@
   --accent: #6ee7b7;
   --accent-2: #5ad8ff;
   --danger: #ff7b57;
+  --marker-olive: #6b8e23;
   --border: rgba(110, 231, 183, 0.2);
   --shadow: rgba(0, 0, 0, 0.55);
   --intel-border: rgba(110, 231, 183, 0.22);
@@ -1581,11 +1582,14 @@ body.map-dashboard-page *::-webkit-scrollbar {
 .pin-icon {
   width: 28px;
   height: 28px;
-  background: transparent;
-  border: none;
+  background: #0b0f12;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
   display: grid;
   place-items: center;
   color: var(--accent);
+  position: relative;
+  isolation: isolate;
 }
 
 .pin-icon.alert {
@@ -1597,12 +1601,16 @@ body.map-dashboard-page *::-webkit-scrollbar {
   line-height: 1;
   -webkit-text-stroke: 1px #000000;
   text-shadow: none;
+  position: relative;
+  z-index: 1;
 }
 
 .pin-image {
   width: 17.6px;
   height: 17.6px;
   object-fit: contain;
+  position: relative;
+  z-index: 1;
   filter:
     drop-shadow(1px 0 0 #000000)
     drop-shadow(-1px 0 0 #000000)
@@ -3243,6 +3251,31 @@ button:disabled,
   gap: 8px;
   color: var(--muted);
   font-size: 14px;
+}
+
+.field-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.btn-ai-optimize {
+  padding: 6px 10px;
+  font-size: 10px;
+  letter-spacing: 0.8px;
+  flex-shrink: 0;
+}
+
+.ai-status {
+  min-height: 14px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.ai-status.is-error {
+  color: var(--danger);
 }
 
 .form-grid input[type="date"],

@@ -98,6 +98,8 @@ const CUBA_BOUNDS = {
   east: -73.0,
 };
 const MOBILE_VIEWPORT_QUERY = "(max-width: 900px)";
+const ALERT_PANEL_HIDDEN_COOKIE = "soscuba_alert_panel_hidden";
+const ALERT_PANEL_HIDDEN_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 const HAVANA_CENTER = [23.1136, -82.3666];
 const MOBILE_HAVANA_ZOOM = 9;
 const MAP_PROVIDER_LEAFLET = "leaflet";
@@ -326,6 +328,43 @@ function isWithinCubaBounds(location) {
 
 function isMobileViewport() {
   return typeof window.matchMedia === "function" && window.matchMedia(MOBILE_VIEWPORT_QUERY).matches;
+}
+
+function readCookie(name) {
+  if (!name || typeof document === "undefined") return "";
+  const cookieName = `${name}=`;
+  const parts = String(document.cookie || "").split(";");
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (!trimmed.startsWith(cookieName)) continue;
+    return decodeURIComponent(trimmed.slice(cookieName.length));
+  }
+  return "";
+}
+
+function writeCookie(name, value, maxAgeSeconds = ALERT_PANEL_HIDDEN_COOKIE_MAX_AGE) {
+  if (!name || typeof document === "undefined") return;
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${name}=${encodeURIComponent(String(value || ""))}; Max-Age=${Math.max(
+    0,
+    Number(maxAgeSeconds) || 0
+  )}; Path=/; SameSite=Lax${secure}`;
+}
+
+function clearCookie(name) {
+  writeCookie(name, "", 0);
+}
+
+function isAlertPanelHiddenByCookie() {
+  return readCookie(ALERT_PANEL_HIDDEN_COOKIE) === "1";
+}
+
+function persistAlertPanelCollapsed(collapsed) {
+  if (collapsed) {
+    writeCookie(ALERT_PANEL_HIDDEN_COOKIE, "1");
+    return;
+  }
+  clearCookie(ALERT_PANEL_HIDDEN_COOKIE);
 }
 
 function parseDurationToMs(value, fallbackMs = 760) {
@@ -2746,20 +2785,25 @@ function setupAlertConsoleToggle() {
   alertConsoleUnreadBadge = document.getElementById("alertConsoleUnreadBadge");
   if (!alertConsolePanel || !alertConsoleToggle) return;
 
-  const setCollapsed = (collapsed) => {
+  const setCollapsed = (collapsed, options = {}) => {
+    const persist = options.persist === true;
     alertConsolePanel.classList.toggle("is-collapsed", collapsed);
     if (!collapsed) {
       alertConsoleUnreadCount = 0;
+    }
+    if (persist) {
+      persistAlertPanelCollapsed(collapsed);
     }
     renderAlertConsoleToggle();
   };
 
   alertConsoleToggle.addEventListener("click", () => {
     const collapsed = !alertConsolePanel.classList.contains("is-collapsed");
-    setCollapsed(collapsed);
+    setCollapsed(collapsed, { persist: true });
   });
 
-  setCollapsed(isMobileViewport());
+  const initialCollapsed = isAlertPanelHiddenByCookie() ? true : isMobileViewport();
+  setCollapsed(initialCollapsed);
 }
 
 function parseNominatimResult(item, fallbackLabel) {

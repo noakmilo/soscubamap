@@ -43,10 +43,25 @@
     <div class="draw-help">Usa polígono, rectángulo o círculo. Puedes editar el área antes de guardar.</div>
   </div>
 
-  <form class="form-grid" method="post" enctype="multipart/form-data" data-existing-media="{{ media_items|length }}">
+  <form
+    class="form-grid"
+    method="post"
+    enctype="multipart/form-data"
+    data-existing-media="{{ media_items|length }}"
+    data-is-admin="{{ 1 if current_user.is_authenticated and current_user.has_role('administrador') else 0 }}"
+    data-ai-optimize-url="{{ url_for('map.optimize_report_text_ai', post_id=post.id) }}"
+  >
     <label>
-      Título
-      <input type="text" name="title" value="{{ fd.title if use_form else post.title }}" required class="{{ 'field-error' if errors.get('title') else '' }}" />
+      <span class="field-label-row">
+        <span>Título</span>
+        {% if current_user.is_authenticated and current_user.has_role('administrador') %}
+          <button type="button" class="btn-secondary btn-ai-optimize" data-ai-optimize="title">Optimizar con IA</button>
+        {% endif %}
+      </span>
+      <input type="text" id="editTitleInput" name="title" value="{{ fd.title if use_form else post.title }}" required class="{{ 'field-error' if errors.get('title') else '' }}" />
+      {% if current_user.is_authenticated and current_user.has_role('administrador') %}
+        <div class="ai-status" data-ai-status="title"></div>
+      {% endif %}
       {% if errors.get("title") %}
         <div class="field-error-msg">{{ errors.get("title") }}</div>
       {% endif %}
@@ -128,15 +143,23 @@
       </div>
     </div>
     <label>
-      Descripción
-      <textarea name="description" rows="6" required minlength="50" class="{{ 'field-error' if errors.get('description') else '' }}">{{ fd.description if use_form else post.description }}</textarea>
+      <span class="field-label-row">
+        <span>Descripción</span>
+        {% if current_user.is_authenticated and current_user.has_role('administrador') %}
+          <button type="button" class="btn-secondary btn-ai-optimize" data-ai-optimize="description">Optimizar con IA</button>
+        {% endif %}
+      </span>
+      <textarea id="editDescriptionInput" name="description" rows="6" required minlength="50" class="{{ 'field-error' if errors.get('description') else '' }}">{{ fd.description if use_form else post.description }}</textarea>
+      {% if current_user.is_authenticated and current_user.has_role('administrador') %}
+        <div class="ai-status" data-ai-status="description"></div>
+      {% endif %}
       {% if errors.get("description") %}
         <div class="field-error-msg">{{ errors.get("description") }}</div>
       {% endif %}
     </label>
     <label>
       Motivo de edición
-      <textarea name="edit_reason" rows="3" required placeholder="Explica por qué realizas este cambio." class="{{ 'field-error' if errors.get('edit_reason') else '' }}">{{ fd.edit_reason if use_form else '' }}</textarea>
+      <textarea id="editReasonInput" name="edit_reason" rows="3" required placeholder="Explica por qué realizas este cambio." class="{{ 'field-error' if errors.get('edit_reason') else '' }}">{{ fd.edit_reason if use_form else '' }}</textarea>
       {% if errors.get("edit_reason") %}
         <div class="field-error-msg">{{ errors.get("edit_reason") }}</div>
       {% endif %}

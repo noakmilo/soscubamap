@@ -7,3 +7,4 @@ instance/
 .pytest_cache/
 .idea/
 /.coverage
+.DS_Store
