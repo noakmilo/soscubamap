@@ -145,10 +145,9 @@ document.addEventListener("DOMContentLoaded", () => {
     widget.dataset.state = "open";
     if (toggleBtn) toggleBtn.setAttribute("aria-expanded", "true");
     if (isMobileView()) {
-      if (backdrop) backdrop.hidden = false;
       document.body.classList.add("chat-widget-mobile-open");
-    } else if (backdrop) {
-      backdrop.hidden = true;
+    } else {
+      document.body.classList.remove("chat-widget-mobile-open");
     }
     markCurrentAsRead(unreadEl);
     if (container) {
@@ -164,17 +163,14 @@ document.addEventListener("DOMContentLoaded", () => {
     widget.classList.remove("is-open");
     widget.dataset.state = "closed";
     if (toggleBtn) toggleBtn.setAttribute("aria-expanded", "false");
-    if (backdrop) backdrop.hidden = true;
     document.body.classList.remove("chat-widget-mobile-open");
   };
 
   const syncViewportState = () => {
     if (!widget) return;
     if (!isMobileView()) {
-      if (backdrop) backdrop.hidden = true;
       document.body.classList.remove("chat-widget-mobile-open");
-    } else if (isChatOpen(widget) && backdrop) {
-      backdrop.hidden = false;
+    } else if (isChatOpen(widget)) {
       document.body.classList.add("chat-widget-mobile-open");
     }
   };
@@ -209,6 +205,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (backdrop) {
+    backdrop.hidden = false;
+    backdrop.removeAttribute("hidden");
     backdrop.addEventListener("click", closeChat);
   }
 

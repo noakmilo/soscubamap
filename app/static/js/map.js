@@ -59,8 +59,16 @@ let protestApplyRangeBtn;
 let protestResetRangeBtn;
 let protestSummary;
 let protestDetailPanel;
+let reportDetailPanel;
 let activePopup;
-let recentTimer;
+let alertTimer;
+let alertConsolePanel;
+let alertConsoleToggle;
+let alertConsoleToggleLabel;
+let alertConsoleUnreadBadge;
+let alertConsoleUnreadCount = 0;
+let knownAlertIds = new Set();
+let alertsSnapshotReady = false;
 let searchMarker;
 let isAdmin = false;
 let allPosts = [];
@@ -69,6 +77,19 @@ let mapImageModalImg;
 let mapImageModalCaption;
 let pendingMarkers = [];
 let mainBaseLayers = {};
+let mapAppShell;
+let mapSidePanel;
+let mapSideScroll;
+let mapPanelToggle;
+let mapSheetHandle;
+let selectedReportId = null;
+let selectedLegendCategory = "all";
+let mobileSheetState = "mid";
+let mobileSheetPointerStartY = null;
+let mobileSheetPointerId = null;
+let mobileSheetDragStartOffsetPct = null;
+let panelResizeInvalidateInterval = null;
+let panelResizeInvalidateTimeout = null;
 
 const CUBA_BOUNDS = {
   north: 24.2,
@@ -81,6 +102,11 @@ const HAVANA_CENTER = [23.1136, -82.3666];
 const MOBILE_HAVANA_ZOOM = 9;
 const MAP_PROVIDER_LEAFLET = "leaflet";
 const MAP_PROVIDER_GOOGLE = "google";
+const MOBILE_SHEET_OFFSETS = {
+  peek: 92,
+  mid: 42,
+  full: 6,
+};
 const CONNECTIVITY_STATUS_COLORS = {
   normal: "#2E7D32",
   degraded: "#F9A825",
@@ -298,17 +324,256 @@ function isWithinCubaBounds(location) {
   return lat <= CUBA_BOUNDS.north && lat >= CUBA_BOUNDS.south && lng >= CUBA_BOUNDS.west && lng <= CUBA_BOUNDS.east;
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  const filters = document.querySelector(".filters");
-  const toggle = document.getElementById("filtersToggle");
-  if (filters && toggle) {
-    toggle.addEventListener("click", () => {
-      const isCollapsed = filters.classList.toggle("collapsed");
-      toggle.textContent = isCollapsed ? "Mostrar filtros" : "Ocultar filtros";
-      toggle.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
+function isMobileViewport() {
+  return typeof window.matchMedia === "function" && window.matchMedia(MOBILE_VIEWPORT_QUERY).matches;
+}
+
+function parseDurationToMs(value, fallbackMs = 760) {
+  const raw = String(value || "").trim();
+  if (!raw) return fallbackMs;
+  if (raw.endsWith("ms")) {
+    const parsed = parseFloat(raw.slice(0, -2));
+    return Number.isFinite(parsed) ? parsed : fallbackMs;
+  }
+  if (raw.endsWith("s")) {
+    const parsed = parseFloat(raw.slice(0, -1));
+    return Number.isFinite(parsed) ? parsed * 1000 : fallbackMs;
+  }
+  const parsed = parseFloat(raw);
+  return Number.isFinite(parsed) ? parsed : fallbackMs;
+}
+
+function getPanelShellDurationMs() {
+  if (!mapAppShell) return 760;
+  const styles = window.getComputedStyle(mapAppShell);
+  return parseDurationToMs(styles.getPropertyValue("--panel-shell-duration"), 760);
+}
+
+function clearPanelResizeInvalidateTimers() {
+  if (panelResizeInvalidateInterval) {
+    window.clearInterval(panelResizeInvalidateInterval);
+    panelResizeInvalidateInterval = null;
+  }
+  if (panelResizeInvalidateTimeout) {
+    window.clearTimeout(panelResizeInvalidateTimeout);
+    panelResizeInvalidateTimeout = null;
+  }
+}
+
+function scheduleMapResizeInvalidate() {
+  if (!map || isMobileViewport()) return;
+  clearPanelResizeInvalidateTimers();
+
+  const durationMs = getPanelShellDurationMs();
+  const tickMs = 90;
+
+  map.invalidateSize({ pan: false, animate: false });
+
+  panelResizeInvalidateInterval = window.setInterval(() => {
+    if (!map) return;
+    map.invalidateSize({ pan: false, animate: false });
+  }, tickMs);
+
+  panelResizeInvalidateTimeout = window.setTimeout(() => {
+    clearPanelResizeInvalidateTimers();
+    if (!map) return;
+    map.invalidateSize({ pan: false, animate: false });
+  }, durationMs + 140);
+}
+
+function syncMapShellHeight() {
+  if (!mapAppShell) return;
+  const content = document.querySelector("main.content");
+  const header = document.querySelector(".site-header");
+  const footer = document.querySelector(".site-footer");
+  const flashGroup = content ? content.querySelector(".flash-group") : null;
+  const contentStyle = content ? window.getComputedStyle(content) : null;
+  const padTop = contentStyle ? parseFloat(contentStyle.paddingTop) || 0 : 0;
+  const padBottom = contentStyle ? parseFloat(contentStyle.paddingBottom) || 0 : 0;
+  const reserved =
+    (header ? header.offsetHeight : 0) +
+    (footer ? footer.offsetHeight : 0) +
+    (flashGroup ? flashGroup.offsetHeight : 0) +
+    padTop +
+    padBottom +
+    14;
+  const height = Math.max(420, Math.floor(window.innerHeight - reserved));
+  mapAppShell.style.setProperty("--map-shell-height", `${height}px`);
+  if (map) {
+    requestAnimationFrame(() => {
+      map.invalidateSize();
+    });
+  }
+}
+
+function setDesktopPanelCollapsed(collapsed) {
+  if (!mapAppShell || !mapPanelToggle) return;
+  mapAppShell.classList.toggle("is-panel-collapsed", collapsed);
+  const label = collapsed ? "Mostrar panel" : "Ocultar panel";
+  mapPanelToggle.setAttribute("aria-label", label);
+  mapPanelToggle.setAttribute("title", label);
+  mapPanelToggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+  mapPanelToggle.classList.toggle("is-collapsed", collapsed);
+  scheduleMapResizeInvalidate();
+}
+
+function setMobileSheetState(nextState, options = {}) {
+  if (!mapSidePanel) return;
+  const state = MOBILE_SHEET_OFFSETS[nextState] !== undefined ? nextState : "mid";
+  const animate = options.animate !== false;
+  mobileSheetState = state;
+  mapSidePanel.dataset.mobileState = state;
+  mapSidePanel.style.setProperty("--mobile-sheet-offset", `${MOBILE_SHEET_OFFSETS[state]}%`);
+  mapSidePanel.classList.toggle("is-dragging", !animate);
+}
+
+function getClosestMobileSheetState(offsetPercent) {
+  const entries = Object.entries(MOBILE_SHEET_OFFSETS);
+  if (!entries.length) return "mid";
+  let bestState = entries[0][0];
+  let bestDiff = Math.abs(offsetPercent - Number(entries[0][1]));
+  for (let index = 1; index < entries.length; index += 1) {
+    const [state, value] = entries[index];
+    const diff = Math.abs(offsetPercent - Number(value));
+    if (diff < bestDiff) {
+      bestState = state;
+      bestDiff = diff;
+    }
+  }
+  return bestState;
+}
+
+function moveMobileSheetState(direction) {
+  const order = ["peek", "mid", "full"];
+  const currentIndex = Math.max(0, order.indexOf(mobileSheetState));
+  const nextIndex = Math.min(order.length - 1, Math.max(0, currentIndex + direction));
+  setMobileSheetState(order[nextIndex]);
+}
+
+function ensureContextPanelVisible(options = {}) {
+  const mobileState = options.mobileState || "mid";
+  if (isMobileViewport()) {
+    setMobileSheetState(mobileState);
+    return;
+  }
+  setDesktopPanelCollapsed(false);
+}
+
+function setupContextPanelLayout() {
+  mapAppShell = document.getElementById("mapAppShell");
+  mapSidePanel = document.getElementById("mapSidePanel");
+  mapSideScroll = mapSidePanel ? mapSidePanel.querySelector(".map-side-scroll") : null;
+  mapPanelToggle = document.getElementById("mapPanelToggle");
+  mapSheetHandle = document.getElementById("mapSheetHandle");
+  if (!mapAppShell || !mapSidePanel) return;
+
+  document.body.classList.add("map-dashboard-page");
+  const content = document.querySelector("main.content");
+  if (content) {
+    content.classList.add("map-dashboard-content");
+  }
+
+  const syncViewportLayout = () => {
+    syncMapShellHeight();
+    if (isMobileViewport()) {
+      mapAppShell.classList.remove("is-panel-collapsed");
+      setMobileSheetState(mobileSheetState || "mid");
+    } else {
+      mapSidePanel.classList.remove("is-dragging");
+      mapSidePanel.style.removeProperty("--mobile-sheet-offset");
+      if (!mapAppShell.classList.contains("is-panel-collapsed")) {
+        setDesktopPanelCollapsed(false);
+      } else {
+        setDesktopPanelCollapsed(true);
+      }
+    }
+  };
+
+  if (mapPanelToggle) {
+    mapPanelToggle.addEventListener("click", () => {
+      if (isMobileViewport()) {
+        setMobileSheetState("full");
+        return;
+      }
+      const collapsed = !mapAppShell.classList.contains("is-panel-collapsed");
+      setDesktopPanelCollapsed(collapsed);
+      syncMapShellHeight();
     });
   }
 
+  if (mapSheetHandle) {
+    mapSheetHandle.addEventListener("pointerdown", (event) => {
+      if (!isMobileViewport()) return;
+      mobileSheetPointerStartY = event.clientY;
+      mobileSheetPointerId = event.pointerId;
+      mobileSheetDragStartOffsetPct = Number(MOBILE_SHEET_OFFSETS[mobileSheetState] ?? MOBILE_SHEET_OFFSETS.mid);
+      mapSidePanel.classList.add("is-dragging");
+      if (mapSheetHandle.setPointerCapture) {
+        try {
+          mapSheetHandle.setPointerCapture(event.pointerId);
+        } catch (_error) {
+          // ignore capture failures
+        }
+      }
+    });
+
+    const releasePointer = () => {
+      mobileSheetPointerStartY = null;
+      mobileSheetPointerId = null;
+      mobileSheetDragStartOffsetPct = null;
+      mapSidePanel.classList.remove("is-dragging");
+    };
+
+    mapSheetHandle.addEventListener("pointermove", (event) => {
+      if (!isMobileViewport()) return;
+      if (!Number.isFinite(mobileSheetPointerStartY)) return;
+      if (mobileSheetPointerId !== null && event.pointerId !== mobileSheetPointerId) return;
+
+      const panelHeight = mapSidePanel.getBoundingClientRect().height || 0;
+      if (!panelHeight) return;
+
+      const startOffsetPct = Number.isFinite(mobileSheetDragStartOffsetPct)
+        ? mobileSheetDragStartOffsetPct
+        : Number(MOBILE_SHEET_OFFSETS[mobileSheetState] ?? MOBILE_SHEET_OFFSETS.mid);
+      const deltaPx = event.clientY - mobileSheetPointerStartY;
+      const minOffsetPx = (MOBILE_SHEET_OFFSETS.full / 100) * panelHeight;
+      const maxOffsetPx = (MOBILE_SHEET_OFFSETS.peek / 100) * panelHeight;
+      const startOffsetPx = (startOffsetPct / 100) * panelHeight;
+      const nextOffsetPx = Math.max(minOffsetPx, Math.min(maxOffsetPx, startOffsetPx + deltaPx));
+      const nextOffsetPct = (nextOffsetPx / panelHeight) * 100;
+      mapSidePanel.style.setProperty("--mobile-sheet-offset", `${nextOffsetPct}%`);
+    });
+
+    mapSheetHandle.addEventListener("pointerup", (event) => {
+      if (!isMobileViewport()) return;
+      const startY = mobileSheetPointerStartY;
+      if (!Number.isFinite(startY)) {
+        releasePointer();
+        setMobileSheetState("full");
+        return;
+      }
+      const deltaY = event.clientY - startY;
+      const rawOffset = parseFloat(mapSidePanel.style.getPropertyValue("--mobile-sheet-offset") || "");
+      const hasDragged = Math.abs(deltaY) >= 10;
+      releasePointer();
+      if (!hasDragged) {
+        moveMobileSheetState(1);
+        return;
+      }
+      const targetState = Number.isFinite(rawOffset)
+        ? getClosestMobileSheetState(rawOffset)
+        : mobileSheetState;
+      setMobileSheetState(targetState);
+    });
+
+    mapSheetHandle.addEventListener("pointercancel", releasePointer);
+  }
+
+  window.addEventListener("resize", syncViewportLayout, { passive: true });
+  syncViewportLayout();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
   const searchInput = document.getElementById("mapSearch");
   if (searchInput) {
     const placeholders = [
@@ -324,6 +589,7 @@ document.addEventListener("DOMContentLoaded", () => {
     searchInput.setAttribute("placeholder", pick);
   }
 
+  setupContextPanelLayout();
   initMap();
 });
 
@@ -385,21 +651,48 @@ function createMarkerIcon(iconClass, imageUrl, slug, pending) {
     className: "pin-icon-wrap",
     html: `<div class="${classes.join(" ")}">${iconHtml}</div>`,
     iconSize: [28, 28],
-    iconAnchor: [14, 28],
-    popupAnchor: [0, -24],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -14],
   });
 }
 
 function syncLegend() {
-  const items = document.querySelectorAll(".legend-item");
+  const items = document.querySelectorAll(".legend-item[data-slug]");
   items.forEach((item) => {
     const slug = item.dataset.slug;
-    const iconClass = CATEGORY_ICONS[slug] || "fa-location-dot";
+    const iconClass = slug === "__all__" ? "fa-layer-group" : CATEGORY_ICONS[slug] || "fa-location-dot";
     const icon = item.querySelector("i");
     if (icon) {
       icon.className = `fa-solid ${iconClass}`;
     }
   });
+}
+
+function setLegendCategoryFilter(value, options = {}) {
+  const normalized = String(value || "all").trim() || "all";
+  selectedLegendCategory = normalized;
+  const buttons = document.querySelectorAll(".legend-item[data-category-filter]");
+  buttons.forEach((button) => {
+    const key = String(button.dataset.categoryFilter || "all");
+    const isActive = key === selectedLegendCategory;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+  });
+  if (options.apply !== false) {
+    applyFilters();
+  }
+}
+
+function setupLegendCategoryFilter() {
+  const buttons = document.querySelectorAll(".legend-item[data-category-filter]");
+  buttons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const key = String(button.dataset.categoryFilter || "all");
+      if (key === selectedLegendCategory) return;
+      setLegendCategoryFilter(key);
+    });
+  });
+  setLegendCategoryFilter(selectedLegendCategory, { apply: false });
 }
 
 function clearMarkers() {
@@ -451,6 +744,10 @@ async function ensureMapModeForReportFocus() {
   }
 
   activeBaseMode = "map";
+  setReportLegendVisible(true);
+  setReportDetailVisible(true);
+  setConnectivityLegendVisible(false);
+  setProtestOverlayVisible(false);
   await applyFilters();
 }
 
@@ -462,6 +759,11 @@ function setMapHintVisible(visible) {
 function setReportLegendVisible(visible) {
   if (!reportLegendSection) return;
   reportLegendSection.hidden = !visible;
+}
+
+function setReportDetailVisible(visible) {
+  if (!reportDetailPanel) return;
+  reportDetailPanel.hidden = !visible;
 }
 
 function setConnectivityLegendVisible(visible) {
@@ -905,18 +1207,6 @@ function renderConnectivityRegionChart(payload) {
   });
 }
 
-function getSelectedCategoryIds() {
-  const checkboxes = document.querySelectorAll(".category-checkbox");
-  const selected = new Set();
-  checkboxes.forEach((cb) => {
-    if (cb.checked) {
-      const id = parseInt(cb.value, 10);
-      if (!Number.isNaN(id)) selected.add(id);
-    }
-  });
-  return selected;
-}
-
 function getSelectedLocationFilters() {
   const province = document.getElementById("provinceFilter")?.value || "";
   const municipality = document.getElementById("municipalityFilter")?.value || "";
@@ -1101,10 +1391,10 @@ function attachPopupActions(post, popupElement, popupRef) {
   }
 }
 
-function popupHtmlForPost(post) {
+function reportDetailHtmlForPost(post) {
   const created = post.created_at ? new Date(post.created_at) : null;
   const createdText = created ? created.toLocaleString("es-ES") : "";
-  const safeTitle = escapeHtml(post.title);
+  const safeTitle = escapeHtml(post.title || "Reporte");
   const safeCategory = escapeHtml(post.category?.name || "");
   const safeAnon = escapeHtml(post.anon || "Anon");
   const safeDescription = escapeHtml(post.description || "");
@@ -1134,16 +1424,16 @@ function popupHtmlForPost(post) {
   const verifyDisabled = verifiedByMe ? "disabled data-verified=\"1\"" : "";
 
   return `
-    <div style="color:#111;max-width:260px;">
-      <h3 style="margin:0 0 6px;">${safeTitle}</h3>
-      <div style="font-size:12px;color:#555;margin-bottom:6px;">${safeCategory}</div>
-      <div style="font-size:12px;color:#333;margin-bottom:6px;">${safeAnon}</div>
-      ${createdText ? `<div style="font-size:12px;color:#666;margin-bottom:6px;">${createdText}</div>` : ""}
-      <p style="margin:0 0 6px;">${safeDescription}</p>
+    <div class="report-detail-content">
+      <h3 class="report-detail-title">${safeTitle}</h3>
+      <div class="report-detail-meta">${safeCategory}</div>
+      <div class="report-detail-meta">${safeAnon}</div>
+      ${createdText ? `<div class="report-detail-meta">${createdText}</div>` : ""}
+      <p class="report-detail-description">${safeDescription || "Sin descripcion."}</p>
       ${mediaHtml}
       ${
         post.links && post.links.length
-          ? `<div style="font-size:12px;margin-top:6px;">
+          ? `<div class="report-detail-links">
                ${post.links
                  .map((link) => {
                    const href = safeUrl(link);
@@ -1176,9 +1466,36 @@ function popupHtmlForPost(post) {
             : ""
         }
       </div>
-      ${post.address ? `<div style="font-size:12px;color:#666;">${safeAddress}</div>` : ""}
+      ${post.address ? `<div class="report-detail-address">${safeAddress}</div>` : ""}
     </div>
   `;
+}
+
+function triggerReportDetailReveal() {
+  if (!reportDetailPanel) return;
+  reportDetailPanel.classList.remove("is-revealing");
+  // Force reflow to restart the animation when selecting another report.
+  void reportDetailPanel.offsetWidth;
+  reportDetailPanel.classList.add("is-revealing");
+}
+
+function renderReportDetail(post, options = {}) {
+  if (!reportDetailPanel) return;
+  if (!post) {
+    selectedReportId = null;
+    reportDetailPanel.classList.remove("is-revealing");
+    reportDetailPanel.innerHTML =
+      '<div class="report-detail-empty">Haz click en un reporte para ver sus detalles.</div>';
+    return;
+  }
+
+  selectedReportId = Number(post.id) || null;
+  reportDetailPanel.innerHTML = reportDetailHtmlForPost(post);
+  triggerReportDetailReveal();
+  attachPopupActions(post, reportDetailPanel, null);
+  if (options.scrollToTop !== false && mapSideScroll) {
+    mapSideScroll.scrollTop = 0;
+  }
 }
 
 function renderMarkers(posts) {
@@ -1198,24 +1515,25 @@ function renderMarkers(posts) {
       icon: createMarkerIcon(iconClass, imageUrl, slug, false),
     }).addTo(map);
 
-    const popupHtml = popupHtmlForPost(post);
-    marker.bindPopup(popupHtml, MAP_POPUP_OPTIONS);
-
-    marker.on("popupopen", (evt) => {
-      activePopup = evt.popup;
-      const popupElement = evt.popup.getElement();
-      attachPopupActions(post, popupElement, evt.popup);
-    });
-
     marker.on("click", () => {
       closeActivePopup();
-      marker.openPopup();
+      renderReportDetail(post);
+      ensureContextPanelVisible({ mobileState: "full" });
     });
 
     markers.push(marker);
     markerIndex.set(post.id, { marker, post });
     renderGeometry(post);
   });
+
+  if (selectedReportId) {
+    const selectedEntry = markerIndex.get(selectedReportId);
+    if (selectedEntry?.post) {
+      renderReportDetail(selectedEntry.post, { scrollToTop: false });
+    } else {
+      renderReportDetail(null);
+    }
+  }
 }
 
 function openPostOnMap(post) {
@@ -1226,13 +1544,17 @@ function openPostOnMap(post) {
 
   map.setView([lat, lng], Math.max(map.getZoom(), 14));
   const entry = markerIndex.get(post.id);
-  if (entry?.marker) {
-    closeActivePopup();
-    entry.marker.openPopup();
+  if (entry?.post) {
+    renderReportDetail(entry.post);
+    ensureContextPanelVisible({ mobileState: "full" });
+    return;
   }
+  renderReportDetail(post);
+  ensureContextPanelVisible({ mobileState: "full" });
 }
 
 function updateLegendCounts(posts) {
+  const total = Array.isArray(posts) ? posts.length : 0;
   const counts = {};
   (posts || []).forEach((post) => {
     const id = post.category?.id;
@@ -1241,8 +1563,8 @@ function updateLegendCounts(posts) {
   });
 
   document.querySelectorAll(".legend-count").forEach((el) => {
-    const id = parseInt(el.id.replace("legend-count-", ""), 10);
-    const value = counts[id] || 0;
+    const raw = String(el.id || "").replace("legend-count-", "");
+    const value = raw === "all" ? total : counts[parseInt(raw, 10)] || 0;
     el.textContent = value;
   });
 }
@@ -1254,7 +1576,6 @@ window.handleNewReport = function (payload) {
       allPosts.unshift(payload);
     }
     updateLegendCounts(allPosts);
-    refreshRecent();
     refreshAlerts();
     return;
   }
@@ -1286,7 +1607,6 @@ window.handleNewReport = function (payload) {
     pendingMarkers.push(marker);
     map.setView([lat, lng], Math.max(map.getZoom(), 12));
     marker.openPopup();
-    refreshRecent();
     refreshAlerts();
     return;
   }
@@ -1297,7 +1617,6 @@ window.handleNewReport = function (payload) {
   updateLegendCounts(allPosts);
   applyFilters();
   map.setView([lat, lng], Math.max(map.getZoom(), 12));
-  refreshRecent();
   refreshAlerts();
 };
 
@@ -1373,7 +1692,10 @@ function onConnectivityFeature(feature, layer) {
     if (connectivityGeoLayer?.setStyle) {
       connectivityGeoLayer.setStyle(styleForConnectivityFeature);
     }
+    syncSelectedProvinceStateFromPayload(connectivityLastPayload);
     renderConnectivityRegionChart(connectivityLastPayload);
+    renderConnectivityProvincePanel(connectivityLastPayload);
+    ensureContextPanelVisible({ mobileState: "full" });
   });
 }
 
@@ -1697,7 +2019,10 @@ async function refreshConnectivityLayer() {
       connectivityGeoLayer.setStyle(styleForConnectivityFeature);
     }
     updateConnectivityUpdatedLabel(payload);
+    updateConnectivityTrafficPanel(payload);
+    syncSelectedProvinceStateFromPayload(payload);
     renderConnectivityRegionChart(payload);
+    renderConnectivityProvincePanel(payload);
   } catch (err) {
     if (connectivityUpdatedLabel) {
       connectivityUpdatedLabel.textContent = "No fue posible actualizar conectividad.";
@@ -1705,6 +2030,8 @@ async function refreshConnectivityLayer() {
     if (connectivityRegionNote) {
       connectivityRegionNote.textContent = "No fue posible cargar la serie regional de la ventana.";
     }
+    updateConnectivityTrafficPanel(null);
+    renderConnectivityProvincePanel(null);
     renderConnectivityRegionChart(null);
   }
 }
@@ -1721,9 +2048,13 @@ async function enableConnectivityMode() {
   activeBaseMode = "connectivity";
   clearMarkers();
   closeActivePopup();
+  renderReportDetail(null);
   setMapHintVisible(false);
   setReportLegendVisible(false);
+  setReportDetailVisible(false);
   setConnectivityLegendVisible(true);
+  setProtestOverlayVisible(false);
+  ensureContextPanelVisible({ mobileState: "mid" });
   await refreshConnectivityLayer();
   startConnectivityPolling();
 }
@@ -1737,10 +2068,14 @@ function disableConnectivityMode() {
   connectivityLastRenderKey = null;
   connectivityLastPayload = null;
   selectedConnectivityProvince = "";
+  selectedConnectivityProvinceState = null;
   connectivityRegionFocused = "";
   setConnectivityLegendVisible(false);
   setReportLegendVisible(true);
+  setReportDetailVisible(true);
   setMapHintVisible(true);
+  updateConnectivityTrafficPanel(null);
+  renderConnectivityProvincePanel(null);
   renderConnectivityRegionChart(null);
 }
 
@@ -2121,15 +2456,10 @@ function renderProtestData(payload) {
         sticky: true,
       }
     );
-    marker.bindPopup(protestPopupHtml(feature), MAP_POPUP_OPTIONS);
     marker.on("click", () => {
       protestSelectedFeatureId = Number(feature?.properties?.id) || null;
       renderProtestDetail(feature);
-    });
-    marker.on("popupopen", (event) => {
-      const popupElement = event?.popup?.getElement?.();
-      if (!popupElement) return;
-      attachProtestPopupActions(feature, popupElement);
+      ensureContextPanelVisible({ mobileState: "full" });
     });
     marker.addTo(protestLayerGroup);
     if (isSelected) {
@@ -2207,10 +2537,13 @@ async function enableProtestMode() {
   activeBaseMode = "protests";
   clearMarkers();
   closeActivePopup();
+  renderReportDetail(null);
   setMapHintVisible(false);
   setReportLegendVisible(false);
+  setReportDetailVisible(false);
   setConnectivityLegendVisible(false);
   setProtestOverlayVisible(true);
+  ensureContextPanelVisible({ mobileState: "mid" });
   await refreshProtestLayer();
   startProtestPolling();
 }
@@ -2227,6 +2560,7 @@ function disableProtestMode() {
   protestSelectedEndDay = "";
   setProtestOverlayVisible(false);
   setReportLegendVisible(true);
+  setReportDetailVisible(true);
   setMapHintVisible(true);
   renderProtestDetail(null);
 }
@@ -2238,9 +2572,15 @@ async function applyFilters() {
     return;
   }
 
-  const selected = getSelectedCategoryIds();
   const { province, municipality } = getSelectedLocationFilters();
-  let filtered = selected.size ? allPosts.filter((post) => selected.has(post.category?.id)) : [];
+  let filtered = Array.isArray(allPosts) ? [...allPosts] : [];
+
+  if (selectedLegendCategory !== "all") {
+    const categoryId = Number(selectedLegendCategory);
+    if (Number.isFinite(categoryId)) {
+      filtered = filtered.filter((post) => Number(post.category?.id) === categoryId);
+    }
+  }
 
   if (province) {
     filtered = filtered.filter((post) => post.province === province);
@@ -2253,81 +2593,85 @@ async function applyFilters() {
   renderMarkers(filtered);
 }
 
-async function loadRecent() {
-  const res = await fetch("/api/posts?limit=8", { cache: "no-store" });
-  return await res.json();
-}
-
 async function loadAlerts() {
   const res = await fetch("/api/posts?limit=40", { cache: "no-store" });
   return await res.json();
 }
 
-function renderRecent(posts) {
-  const container = document.getElementById("recentFeed");
-  if (!container) return;
+function getAlertPosts(posts) {
+  return (posts || []).filter((post) => isAlertCategory(post.category?.slug));
+}
 
-  if (!posts.length) {
-    container.innerHTML = `<div class="console-empty">Sin aportaciones visibles aun.</div>`;
+function isAlertPanelCollapsed() {
+  return Boolean(alertConsolePanel && alertConsolePanel.classList.contains("is-collapsed"));
+}
+
+function renderAlertConsoleToggle() {
+  if (!alertConsoleToggle) return;
+
+  const collapsed = isAlertPanelCollapsed();
+  const label = collapsed ? "Mostrar notificaciones" : "Ocultar notificaciones";
+  const hasUnread = collapsed && alertConsoleUnreadCount > 0;
+  const unreadText = alertConsoleUnreadCount > 99 ? "99+" : String(alertConsoleUnreadCount);
+
+  if (alertConsoleToggleLabel) {
+    alertConsoleToggleLabel.textContent = label;
+  } else {
+    alertConsoleToggle.textContent = label;
+  }
+
+  if (alertConsoleUnreadBadge) {
+    alertConsoleUnreadBadge.textContent = unreadText;
+    alertConsoleUnreadBadge.hidden = !hasUnread;
+  }
+
+  alertConsoleToggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+  if (hasUnread) {
+    alertConsoleToggle.setAttribute(
+      "aria-label",
+      `${label}. ${alertConsoleUnreadCount} notificaciones nuevas`
+    );
+  } else {
+    alertConsoleToggle.setAttribute("aria-label", label);
+  }
+}
+
+function updateAlertUnreadCounter(posts) {
+  const alerts = getAlertPosts(posts);
+  const ids = alerts
+    .map((post) => {
+      if (!post || post.id === null || post.id === undefined) return "";
+      return String(post.id);
+    })
+    .filter(Boolean);
+
+  if (!alertsSnapshotReady) {
+    ids.forEach((id) => knownAlertIds.add(id));
+    alertsSnapshotReady = true;
+    renderAlertConsoleToggle();
     return;
   }
 
-  container.innerHTML = posts
-    .map((post) => {
-      const safeTitle = escapeHtml(post.title || "");
-      const safeCategory = escapeHtml(post.category?.name || "");
-      const safeAnon = escapeHtml(post.anon || "Anon");
-      return `
-        <div class="console-item">
-          <div>
-            <button class="console-title-row console-link" type="button" data-detail-url="/reporte/${post.id}">${safeTitle}</button>
-            <div class="console-meta">${safeCategory}</div>
-            <div class="console-meta">${safeAnon}</div>
-          </div>
-          <div class="console-side">
-            <div class="console-coords">${post.latitude.toFixed(4)}, ${post.longitude.toFixed(4)}</div>
-            <div class="console-time">${post.created_at ? new Date(post.created_at).toLocaleString("es-ES") : ""}</div>
-            <button class="btn-secondary console-btn" data-pan-lat="${post.latitude}" data-pan-lng="${post.longitude}" data-post-id="${post.id}">Ver en mapa</button>
-          </div>
-        </div>
-      `;
-    })
-    .join("");
-
-  container.querySelectorAll("[data-pan-lat]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const lat = parseFloat(btn.getAttribute("data-pan-lat"));
-      const lng = parseFloat(btn.getAttribute("data-pan-lng"));
-      if (!Number.isFinite(lat) || !Number.isFinite(lng) || !map) return;
-      const postId = parseInt(btn.getAttribute("data-post-id"), 10);
-      const post = allPosts.find((p) => p.id === postId) || { id: postId, latitude: lat, longitude: lng };
-      await ensureMapModeForReportFocus();
-      openPostOnMap(post);
-      const mapEl = document.getElementById("map");
-      if (mapEl) {
-        mapEl.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-    });
+  let newCount = 0;
+  ids.forEach((id) => {
+    if (!knownAlertIds.has(id)) {
+      newCount += 1;
+    }
+    knownAlertIds.add(id);
   });
 
-  container.querySelectorAll(".console-link").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const url = btn.getAttribute("data-detail-url");
-      if (!url) return;
-      if (window.openReportModal) {
-        window.openReportModal(url);
-      } else {
-        window.location.href = url;
-      }
-    });
-  });
+  if (newCount > 0 && isAlertPanelCollapsed()) {
+    alertConsoleUnreadCount += newCount;
+  }
+
+  renderAlertConsoleToggle();
 }
 
 function renderAlerts(posts) {
   const container = document.getElementById("alertFeed");
   if (!container) return;
 
-  const alerts = (posts || []).filter((post) => isAlertCategory(post.category?.slug));
+  const alerts = getAlertPosts(posts);
   if (!alerts.length) {
     container.innerHTML = `<div class="console-empty">Sin movimientos, desconexiones o acciones recientes.</div>`;
     return;
@@ -2346,7 +2690,12 @@ function renderAlerts(posts) {
       return `
         <div class="console-item">
           <div>
-            <button class="console-title-row console-link" type="button" data-detail-url="/reporte/${post.id}">${safeTitle}</button>
+            <button
+              class="console-title-row console-link"
+              type="button"
+              data-post-id="${post.id}"
+              data-detail-url="/reporte/${post.id}"
+            >${safeTitle}</button>
             <div class="console-meta">${safeCategory}</div>
             <div class="console-meta">${locationText}</div>
           </div>
@@ -2359,7 +2708,16 @@ function renderAlerts(posts) {
     .join("");
 
   container.querySelectorAll(".console-link").forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
+      const postId = Number(btn.getAttribute("data-post-id"));
+      const post = Number.isFinite(postId)
+        ? allPosts.find((row) => Number(row.id) === postId)
+        : null;
+      if (post && map) {
+        await ensureMapModeForReportFocus();
+        openPostOnMap(post);
+        return;
+      }
       const url = btn.getAttribute("data-detail-url");
       if (!url) return;
       if (window.openReportModal) {
@@ -2371,22 +2729,37 @@ function renderAlerts(posts) {
   });
 }
 
-async function refreshRecent() {
+async function refreshAlerts() {
   try {
-    const posts = await loadRecent();
-    renderRecent(posts);
+    const posts = await loadAlerts();
+    updateAlertUnreadCounter(posts);
+    renderAlerts(posts);
   } catch (err) {
     // no-op
   }
 }
 
-async function refreshAlerts() {
-  try {
-    const posts = await loadAlerts();
-    renderAlerts(posts);
-  } catch (err) {
-    // no-op
-  }
+function setupAlertConsoleToggle() {
+  alertConsolePanel = document.getElementById("alertConsolePanel");
+  alertConsoleToggle = document.getElementById("alertConsoleToggle");
+  alertConsoleToggleLabel = document.getElementById("alertConsoleToggleLabel");
+  alertConsoleUnreadBadge = document.getElementById("alertConsoleUnreadBadge");
+  if (!alertConsolePanel || !alertConsoleToggle) return;
+
+  const setCollapsed = (collapsed) => {
+    alertConsolePanel.classList.toggle("is-collapsed", collapsed);
+    if (!collapsed) {
+      alertConsoleUnreadCount = 0;
+    }
+    renderAlertConsoleToggle();
+  };
+
+  alertConsoleToggle.addEventListener("click", () => {
+    const collapsed = !alertConsolePanel.classList.contains("is-collapsed");
+    setCollapsed(collapsed);
+  });
+
+  setCollapsed(isMobileViewport());
 }
 
 function parseNominatimResult(item, fallbackLabel) {
@@ -2403,12 +2776,13 @@ function parseNominatimResult(item, fallbackLabel) {
   };
 }
 
-async function searchSuggestionsInCuba(query, limit = 5) {
+async function searchSuggestionsInCuba(query, limit = 5, offset = 0) {
   const q = String(query || "").trim();
   if (!q) return [];
 
-  const size = Math.min(Math.max(parseInt(limit, 10) || 5, 1), 8);
-  const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&accept-language=es&limit=${size}&countrycodes=cu&q=${encodeURIComponent(
+  const size = Math.max(parseInt(limit, 10) || 5, 1);
+  const start = Math.max(parseInt(offset, 10) || 0, 0);
+  const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&accept-language=es&limit=${size}&offset=${start}&countrycodes=cu&q=${encodeURIComponent(
     q
   )}`;
   const res = await fetch(url, {
@@ -2420,14 +2794,10 @@ async function searchSuggestionsInCuba(query, limit = 5) {
   const data = await res.json();
   if (!Array.isArray(data) || !data.length) return [];
 
-  const seen = new Set();
   const results = [];
   data.forEach((item) => {
     const parsed = parseNominatimResult(item, q);
     if (!parsed) return;
-    const key = `${parsed.lat.toFixed(6)},${parsed.lng.toFixed(6)}`;
-    if (seen.has(key)) return;
-    seen.add(key);
     results.push(parsed);
   });
 
@@ -2457,10 +2827,18 @@ function setupMapSearchAutocomplete(searchInput) {
   const searchBar = searchInput.closest(".map-search-bar");
   if (!searchBar) return;
 
+  const SEARCH_BATCH_SIZE = 6;
+  const SCROLL_NEAR_BOTTOM_PX = 18;
   let suggestions = [];
   let activeIndex = -1;
   let debounceTimer = null;
   let requestToken = 0;
+  let currentQuery = "";
+  let nextOffset = 0;
+  let isLoadingMore = false;
+  let canLoadMore = false;
+  let seenSuggestionKeys = new Set();
+  let touchStartY = null;
 
   let dropdown = searchBar.querySelector(".map-search-suggestions");
   if (!dropdown) {
@@ -2485,6 +2863,20 @@ function setupMapSearchAutocomplete(searchInput) {
     searchInput.setAttribute("aria-expanded", "false");
   };
 
+  const suggestionKey = (entry) => {
+    if (!entry) return "";
+    const lat = Number(entry.lat);
+    const lng = Number(entry.lng);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      return `${lat.toFixed(6)},${lng.toFixed(6)}`;
+    }
+    return String(entry.label || "");
+  };
+
+  const isNearDropdownBottom = () => {
+    return dropdown.scrollTop + dropdown.clientHeight >= dropdown.scrollHeight - SCROLL_NEAR_BOTTOM_PX;
+  };
+
   const refreshActiveItem = () => {
     const items = dropdown.querySelectorAll(".map-search-suggestion");
     items.forEach((item, idx) => {
@@ -2504,55 +2896,185 @@ function setupMapSearchAutocomplete(searchInput) {
     focusSearchResult(entry);
   };
 
-  const renderDropdown = () => {
+  const renderDropdown = ({ replace = true, appendFrom = 0 } = {}) => {
     if (!suggestions.length) {
       closeDropdown();
       return;
     }
-    dropdown.innerHTML = suggestions
-      .map((entry, idx) => {
-        const label = escapeHtml(entry.label || "");
-        const activeClass = idx === activeIndex ? " is-active" : "";
-        const selected = idx === activeIndex ? "true" : "false";
-        return `<button type="button" class="map-search-suggestion${activeClass}" data-idx="${idx}" role="option" aria-selected="${selected}">${label}</button>`;
-      })
-      .join("");
-    dropdown.hidden = false;
-    searchInput.setAttribute("aria-expanded", "true");
 
-    dropdown.querySelectorAll(".map-search-suggestion").forEach((item) => {
+    if (replace) {
+      dropdown.innerHTML = "";
+      appendFrom = 0;
+    }
+
+    const fragment = document.createDocumentFragment();
+    for (let idx = appendFrom; idx < suggestions.length; idx += 1) {
+      const entry = suggestions[idx];
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "map-search-suggestion";
+      item.setAttribute("role", "option");
+      item.setAttribute("data-idx", String(idx));
+      item.setAttribute("aria-selected", idx === activeIndex ? "true" : "false");
+      item.textContent = entry.label || "";
+      if (!replace) {
+        item.classList.add("is-revealing");
+        item.addEventListener(
+          "animationend",
+          () => {
+            item.classList.remove("is-revealing");
+          },
+          { once: true }
+        );
+      }
       item.addEventListener("mousedown", (event) => {
         event.preventDefault();
       });
       item.addEventListener("click", () => {
-        const idx = parseInt(item.getAttribute("data-idx"), 10);
-        if (Number.isNaN(idx)) return;
-        selectSuggestion(suggestions[idx]);
+        const parsed = parseInt(item.getAttribute("data-idx"), 10);
+        if (Number.isNaN(parsed)) return;
+        selectSuggestion(suggestions[parsed]);
       });
-    });
+      fragment.appendChild(item);
+    }
+    dropdown.appendChild(fragment);
+    dropdown.hidden = false;
+    searchInput.setAttribute("aria-expanded", "true");
+    refreshActiveItem();
+  };
+
+  const loadMoreSuggestions = async () => {
+    if (!canLoadMore || isLoadingMore) return;
+    const query = searchInput.value.trim();
+    if (query.length < 3) return;
+    if (query !== currentQuery) return;
+
+    isLoadingMore = true;
+    const offset = nextOffset;
+    const token = ++requestToken;
+
+    try {
+      const found = await searchSuggestionsInCuba(query, SEARCH_BATCH_SIZE, offset);
+      if (token !== requestToken) return;
+      nextOffset += SEARCH_BATCH_SIZE;
+
+      const previousCount = suggestions.length;
+      found.forEach((entry) => {
+        const key = suggestionKey(entry);
+        if (!key || seenSuggestionKeys.has(key)) return;
+        seenSuggestionKeys.add(key);
+        suggestions.push(entry);
+      });
+
+      const addedCount = suggestions.length - previousCount;
+      if (addedCount > 0) {
+        if (activeIndex < 0) activeIndex = 0;
+        renderDropdown({ replace: false, appendFrom: previousCount });
+      }
+
+      canLoadMore = found.length === SEARCH_BATCH_SIZE;
+    } catch (err) {
+      if (token !== requestToken) return;
+      canLoadMore = false;
+    } finally {
+      isLoadingMore = false;
+    }
   };
 
   const runSearch = async () => {
     const query = searchInput.value.trim();
     if (query.length < 3) {
       suggestions = [];
+      currentQuery = "";
+      nextOffset = 0;
+      canLoadMore = false;
+      isLoadingMore = false;
+      seenSuggestionKeys = new Set();
       closeDropdown();
       return;
     }
 
     const token = ++requestToken;
     try {
-      const found = await searchSuggestionsInCuba(query, 6);
+      const found = await searchSuggestionsInCuba(query, SEARCH_BATCH_SIZE, 0);
       if (token !== requestToken) return;
-      suggestions = found;
+      seenSuggestionKeys = new Set();
+      suggestions = [];
+      found.forEach((entry) => {
+        const key = suggestionKey(entry);
+        if (!key || seenSuggestionKeys.has(key)) return;
+        seenSuggestionKeys.add(key);
+        suggestions.push(entry);
+      });
+      currentQuery = query;
+      nextOffset = SEARCH_BATCH_SIZE;
+      canLoadMore = found.length === SEARCH_BATCH_SIZE;
+      isLoadingMore = false;
       activeIndex = suggestions.length ? 0 : -1;
-      renderDropdown();
+      renderDropdown({ replace: true });
     } catch (err) {
       if (token !== requestToken) return;
       suggestions = [];
+      currentQuery = "";
+      nextOffset = 0;
+      canLoadMore = false;
+      isLoadingMore = false;
+      seenSuggestionKeys = new Set();
       closeDropdown();
     }
   };
+
+  dropdown.addEventListener("scroll", () => {
+    if (dropdown.hidden) return;
+    if (!canLoadMore || isLoadingMore) return;
+    if (!isNearDropdownBottom()) return;
+    loadMoreSuggestions();
+  });
+
+  dropdown.addEventListener(
+    "wheel",
+    (event) => {
+      if (dropdown.hidden) return;
+      if (!canLoadMore || isLoadingMore) return;
+      if (event.deltaY <= 0) return;
+      const noOverflow = dropdown.scrollHeight <= dropdown.clientHeight + 1;
+      if (!noOverflow && !isNearDropdownBottom()) return;
+      loadMoreSuggestions();
+    },
+    { passive: true }
+  );
+
+  dropdown.addEventListener(
+    "touchstart",
+    (event) => {
+      if (!event.touches || !event.touches.length) return;
+      touchStartY = event.touches[0].clientY;
+    },
+    { passive: true }
+  );
+
+  dropdown.addEventListener(
+    "touchmove",
+    (event) => {
+      if (dropdown.hidden) return;
+      if (!canLoadMore || isLoadingMore) return;
+      if (!event.touches || !event.touches.length || touchStartY === null) return;
+      const deltaY = touchStartY - event.touches[0].clientY;
+      if (deltaY <= 6) return;
+      const noOverflow = dropdown.scrollHeight <= dropdown.clientHeight + 1;
+      if (!noOverflow && !isNearDropdownBottom()) return;
+      loadMoreSuggestions();
+    },
+    { passive: true }
+  );
+
+  dropdown.addEventListener(
+    "touchend",
+    () => {
+      touchStartY = null;
+    },
+    { passive: true }
+  );
 
   searchInput.addEventListener("input", () => {
     if (debounceTimer) window.clearTimeout(debounceTimer);
@@ -2614,10 +3136,10 @@ function setupMapSearchAutocomplete(searchInput) {
 async function initMap() {
   setupMapImageModal();
   syncLegend();
+  setupAlertConsoleToggle();
 
   const mapEl = document.getElementById("map");
   if (!mapEl || typeof L === "undefined") {
-    refreshRecent();
     refreshAlerts();
     return;
   }
@@ -2662,9 +3184,12 @@ async function initMap() {
   protestResetRangeBtn = document.getElementById("protestResetRangeBtn");
   protestSummary = document.getElementById("protestSummary");
   protestDetailPanel = document.getElementById("protestDetailPanel");
+  reportDetailPanel = document.getElementById("reportDetailPanel");
   setActiveConnectivityWindow(connectivityWindowHours);
+  renderReportDetail(null);
   renderConnectivityRegionChart(null);
   renderProtestDetail(null);
+  setReportDetailVisible(true);
   setProtestOverlayVisible(false);
 
   const nowUtc = new Date();
@@ -2834,14 +3359,13 @@ async function initMap() {
     applyFilters();
   });
 
-  const isMobileViewport =
-    typeof window.matchMedia === "function" && window.matchMedia(MOBILE_VIEWPORT_QUERY).matches;
+  const onMobileViewport = isMobileViewport();
   const cubaBounds = cubaLatLngBounds();
-  map.fitBounds(cubaBounds, { padding: isMobileViewport ? [0, 0] : [16, 16] });
-  if (isMobileViewport) {
+  map.fitBounds(cubaBounds, { padding: onMobileViewport ? [0, 0] : [16, 16] });
+  if (onMobileViewport) {
     map.setView(HAVANA_CENTER, MOBILE_HAVANA_ZOOM);
   }
-  map.setMaxBounds(cubaBounds.pad(isMobileViewport ? 0.2 : 0.35));
+  map.setMaxBounds(cubaBounds.pad(onMobileViewport ? 0.2 : 0.35));
 
   const params = new URLSearchParams(window.location.search);
   const latParam = parseFloat(params.get("lat"));
@@ -2856,15 +3380,10 @@ async function initMap() {
     setupMapSearchAutocomplete(searchInput);
   }
 
+  setupLegendCategoryFilter();
   allPosts = await loadPosts();
   await applyFilters();
-  await refreshRecent();
   await refreshAlerts();
-
-  const filters = document.querySelectorAll(".category-checkbox");
-  filters.forEach((checkbox) => {
-    checkbox.addEventListener("change", applyFilters);
-  });
 
   const provinceSelect = document.getElementById("provinceFilter");
   const municipalitySelect = document.getElementById("municipalityFilter");
@@ -2946,11 +3465,12 @@ async function initMap() {
     }
   });
 
-  if (recentTimer) {
-    clearInterval(recentTimer);
+  syncMapShellHeight();
+
+  if (alertTimer) {
+    clearInterval(alertTimer);
   }
-  recentTimer = setInterval(() => {
-    refreshRecent();
+  alertTimer = setInterval(() => {
     refreshAlerts();
   }, 8000);
 }

@@ -1,6 +1,7 @@
 from flask import Flask
 from dotenv import load_dotenv
 from werkzeug.middleware.proxy_fix import ProxyFix
+from flask_login import current_user
 from .extensions import db, migrate, login_manager, limiter
 from .blueprints.auth import auth_bp
 from .blueprints.map import map_bp
@@ -31,5 +32,20 @@ def create_app(config_object="config.settings.Config"):
     app.register_blueprint(api_bp, url_prefix="/api")
     app.register_blueprint(discussions_bp)
     app.register_blueprint(panic_bp)
+
+    @app.context_processor
+    def inject_moderation_pending_count():
+        pending_count = 0
+        try:
+            if current_user.is_authenticated and current_user.has_role("administrador"):
+                from app.models.post import Post
+                from app.models.post_edit_request import PostEditRequest
+
+                pending_posts = Post.query.filter_by(status="pending").count()
+                pending_edits = PostEditRequest.query.filter_by(status="pending").count()
+                pending_count = int(pending_posts or 0) + int(pending_edits or 0)
+        except Exception:
+            pending_count = 0
+        return {"moderation_pending_count": pending_count}
 
     return app

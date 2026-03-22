@@ -2,239 +2,291 @@
 {% block title %} | Mapa{% endblock %}
 {% block meta_description %}Mapa represivo de Cuba con reportes anónimos y verificados. Explora acciones represivas, sedes oficiales y centros clave en un mapa interactivo.{% endblock %}
 {% block content %}
-<section class="hero">
-  <div>
-    <h1>Mapa Represivo de Cuba</h1>
-    <p>Documenta y visibiliza acciones y lugares de represión. Los reportes aparecen como anónimos.</p>
-  </div>
-  <div class="status">
-    <div class="stat">
-      <span class="label">Categorías</span>
-      <span class="value">{{ categories|length }}</span>
-    </div>
-    <div class="stat">
-      <span class="label">Reportes activos</span>
-      <span class="value">{{ posts|length }}</span>
-    </div>
-  </div>
-</section>
+<section class="map-app-shell" id="mapAppShell">
+  <div class="map-main-stage">
+    <div class="map-floating-stack">
+      <section class="map-search-wrap">
+        <div class="map-search-bar">
+          <input id="mapSearch" type="text" placeholder="Ej: Sector PNR" />
+        </div>
+      </section>
 
-<section class="filters collapsed">
-  <div class="filter-header">
-    <div class="filter-title">Filtros</div>
-    <button type="button" class="btn-secondary" id="filtersToggle" aria-expanded="false">Mostrar filtros</button>
-  </div>
-  <div class="filter-controls">
-    <div class="filter-group">
-      <div class="filter-label">Categorías</div>
-      <div class="filter-checkboxes" id="categoryFilter">
-        {% for cat in categories %}
-          <label class="checkbox-item">
-            <input type="checkbox" class="category-checkbox" value="{{ cat.id }}" checked />
-            <span>{{ cat.name }}</span>
-          </label>
-        {% endfor %}
+      <section class="alert-console alert-console-floating" id="alertConsolePanel">
+        <button
+          type="button"
+          id="alertConsoleToggle"
+          class="btn-secondary alert-console-toggle"
+          aria-controls="alertConsoleContent"
+          aria-expanded="true"
+          aria-label="Ocultar notificaciones"
+        >
+          <span id="alertConsoleToggleLabel">Ocultar notificaciones</span>
+          <span id="alertConsoleUnreadBadge" class="alert-console-toggle-badge" hidden aria-hidden="true">0</span>
+        </button>
+        <div id="alertConsoleContent" class="alert-console-content">
+          <div class="console-header">
+            <div>
+              <div class="console-title">Movimientos, desconexiones y acciones represivas</div>
+              <div class="console-status">En vivo</div>
+            </div>
+            <div class="console-actions">
+              <button
+                type="button"
+                id="alertPushToggle"
+                class="btn-secondary"
+                data-enabled="{{ 1 if push_alerts_enabled else 0 }}"
+                data-vapid-key="{{ vapid_public_key }}"
+              >
+                Activar alertas
+              </button>
+              <div id="alertPushStatus" class="console-note">Solo para movimiento, desconexiones y acción represiva.</div>
+            </div>
+          </div>
+          <div id="alertFeed" class="console-body">
+            <div class="console-empty">Sin movimientos, desconexiones o acciones recientes.</div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="map-wrap">
+      <div
+        id="map"
+        class="map-canvas"
+        data-new-url="{{ url_for('map.new_post') }}"
+        data-is-admin="{{ 1 if current_user.is_authenticated and current_user.has_role('administrador') else 0 }}"
+        data-connectivity-refresh-seconds="{{ connectivity_refresh_seconds }}"
+        data-protest-refresh-seconds="{{ protest_refresh_seconds }}"
+        data-map-provider="{{ map_provider_main }}"
+        data-allow-zoom="1"
+      >
+        <div class="map-placeholder">
+          <div class="map-title">OpenStreetMap</div>
+          <div class="map-subtitle">Cargando mapa base.</div>
+        </div>
+        <div class="map-hint" id="mapHint">Haz click en el mapa para crear un reporte</div>
       </div>
-    </div>
-    <label>
-      Provincia
-      <select id="provinceFilter">
-        <option value="">Todas</option>
-        {% for prov in provinces %}
-          <option value="{{ prov }}">{{ prov }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label>
-      Municipio
-      <select id="municipalityFilter">
-        <option value="">Todos</option>
-      </select>
-    </label>
+    </section>
   </div>
-</section>
 
-{% if categories|length == 0 %}
-  <section class="panel notice">
-    <strong>No hay categorías cargadas.</strong>
-    <div>Ejecuta: <code>python -m scripts.seed_categories</code></div>
-  </section>
-{% endif %}
-
-<section class="alert-console">
-  <div class="console-header">
-    <div>
-      <div class="console-title">Movimientos, desconexiones y acciones represivas</div>
-      <div class="console-status">En vivo</div>
-    </div>
-    <div class="console-actions">
+  <aside class="map-side-panel" id="mapSidePanel" data-mobile-state="mid">
+    <div class="map-side-topbar">
       <button
         type="button"
-        id="alertPushToggle"
-        class="btn-secondary"
-        data-enabled="{{ 1 if push_alerts_enabled else 0 }}"
-        data-vapid-key="{{ vapid_public_key }}"
+        class="map-panel-toggle"
+        id="mapPanelToggle"
+        aria-controls="mapSidePanel"
+        aria-expanded="true"
+        aria-label="Ocultar panel"
+        title="Ocultar panel"
       >
-        Activar alertas
+        <i class="fa-solid fa-bars" aria-hidden="true"></i>
       </button>
-      <div id="alertPushStatus" class="console-note">Solo para movimiento, desconexiones y acción represiva.</div>
+      <div class="map-side-topbar-title">Filtros y detalles</div>
     </div>
-  </div>
-  <div id="alertFeed" class="console-body">
-    <div class="console-empty">Sin movimientos, desconexiones o acciones recientes.</div>
-  </div>
-</section>
 
-<section class="map-search-wrap">
-  <div class="map-search-label">Buscar dirección (Cuba)</div>
-  <div class="map-search-bar">
-    <input id="mapSearch" type="text" placeholder="Ej: Sector PNR" />
-  </div>
-</section>
+    <button
+      type="button"
+      class="map-sheet-handle"
+      id="mapSheetHandle"
+      aria-controls="mapSidePanel"
+      aria-label="Mover panel"
+    >
+      <span class="map-sheet-grip" aria-hidden="true"></span>
+      <span class="map-sheet-title">Filtros y detalles</span>
+    </button>
 
-<section class="map-wrap">
-  <div
-    id="map"
-    class="map-canvas"
-    data-new-url="{{ url_for('map.new_post') }}"
-    data-is-admin="{{ 1 if current_user.is_authenticated and current_user.has_role('administrador') else 0 }}"
-    data-connectivity-refresh-seconds="{{ connectivity_refresh_seconds }}"
-    data-protest-refresh-seconds="{{ protest_refresh_seconds }}"
-    data-map-provider="{{ map_provider_main }}"
-    data-allow-zoom="1"
-  >
-    <div class="map-placeholder">
-      <div class="map-title">OpenStreetMap</div>
-      <div class="map-subtitle">Cargando mapa base.</div>
-    </div>
-    <div class="map-hint" id="mapHint">Haz click en el mapa para crear un reporte</div>
-  </div>
-  <div id="connectivityLegendOverlay" class="connectivity-legend-overlay" hidden>
-    <div class="connectivity-legend-title">Conectividad</div>
-    <div class="connectivity-window-switch" role="group" aria-label="Ventana de conectividad">
-      <button type="button" class="connectivity-window-btn is-active" data-connectivity-window-hours="24" aria-pressed="true">24h</button>
-      <button type="button" class="connectivity-window-btn" data-connectivity-window-hours="6" aria-pressed="false">6h</button>
-      <button type="button" class="connectivity-window-btn" data-connectivity-window-hours="2" aria-pressed="false">2h</button>
-    </div>
-    <div class="connectivity-legend-item">
-      <span class="dot dot-normal"></span>
-      <span>Normal</span>
-    </div>
-    <div class="connectivity-legend-item">
-      <span class="dot dot-degraded"></span>
-      <span>Degradación leve</span>
-    </div>
-    <div class="connectivity-legend-item">
-      <span class="dot dot-severe"></span>
-      <span>Problemas severos</span>
-    </div>
-    <div class="connectivity-legend-item">
-      <span class="dot dot-critical"></span>
-      <span>Apagón o conectividad crítica</span>
-    </div>
-    <div class="connectivity-updated" id="connectivityUpdatedLabel"></div>
-    <div class="connectivity-region-panel" id="connectivityRegionPanel">
-      <div class="connectivity-region-title">Traffic volume by region</div>
-      <div class="connectivity-region-subtitle">
-        Cada linea representa una region. Haz clic en una region para destacarla.
-      </div>
-      <svg
-        id="connectivityRegionChart"
-        class="connectivity-region-chart"
-        viewBox="0 0 280 176"
-        preserveAspectRatio="none"
-        aria-label="Traffic volume by region"
-      ></svg>
-      <div class="connectivity-region-note" id="connectivityRegionNote">
-        Sin serie regional disponible para la ventana activa.
-      </div>
-      <div class="connectivity-region-legend" id="connectivityRegionLegend">
-        <div class="connectivity-region-legend-empty">Sin regiones con datos.</div>
-      </div>
-    </div>
-    {% if current_user.is_authenticated and current_user.has_role('administrador') %}
-      <div class="connectivity-source-credit">Hecho con tecnología de Cloudflare Radar</div>
-    {% endif %}
-  </div>
-  <div id="protestOverlay" class="protest-overlay" hidden>
-    <div class="protest-title">Protestas</div>
-    <div class="protest-subtitle">Eventos detectados en publicaciones RSS con enlace a fuente original.</div>
-    <div class="protest-timeline-wrap">
-      <label for="protestTimelineSlider" class="protest-control-label">Linea de tiempo (UTC)</label>
-      <input id="protestTimelineSlider" type="range" min="0" max="0" step="1" value="0" />
-      <div id="protestTimelineLabel" class="protest-timeline-label">Sin datos historicos.</div>
-    </div>
-    <div class="protest-date-controls">
-      <label>
-        Dia UTC
-        <input id="protestDayInput" type="date" />
-      </label>
-      <button type="button" id="protestApplyDayBtn" class="protest-btn">Ver dia</button>
-    </div>
-    <div class="protest-range-controls">
-      <label>
-        Inicio UTC
-        <input id="protestStartInput" type="date" />
-      </label>
-      <label>
-        Fin UTC
-        <input id="protestEndInput" type="date" />
-      </label>
-      <button type="button" id="protestApplyRangeBtn" class="protest-btn">Ver rango</button>
-      <button type="button" id="protestResetRangeBtn" class="protest-btn protest-btn-muted">Hoy</button>
-    </div>
-    <div class="protest-legend">
-      <div class="protest-legend-item"><span class="dot dot-confirmed"></span><span>Confirmada</span></div>
-      <div class="protest-legend-item"><span class="dot dot-probable"></span><span>Probable</span></div>
-      <div class="protest-legend-item"><span class="dot dot-related"></span><span>Relacionada</span></div>
-      <div class="protest-legend-item"><span class="dot dot-unresolved"></span><span>Ubicacion aproximada</span></div>
-    </div>
-    <div id="protestSummary" class="protest-summary">Sin datos de protestas para la vista activa.</div>
-    <div id="protestDetailPanel" class="protest-detail-panel">
-      <div class="protest-detail-empty">Haz clic en un evento para ver detalles y enlace original.</div>
-    </div>
-    <div class="protest-source-credit">Cada evento mostrado enlaza su publicacion original para trazabilidad.</div>
-  </div>
-</section>
+    <div class="map-side-scroll">
+      {% if categories|length == 0 %}
+        <section class="panel notice">
+          <strong>No hay categorías cargadas.</strong>
+          <div>Ejecuta: <code>python -m scripts.seed_categories</code></div>
+        </section>
+      {% endif %}
 
-<section class="legend" id="reportLegendSection">
-  {% set alert_slugs = ["accion-represiva", "movimiento-tropas", "desconexion-internet"] %}
-  <div class="legend-header">
-    <div class="legend-title">Leyenda de íconos</div>
-  </div>
-  <div class="legend-grid">
-    {% for cat in categories %}
-      <div class="legend-item{% if cat.slug in alert_slugs %} alert{% endif %}" data-slug="{{ cat.slug }}">
-        <span class="legend-icon">
-          <i class="fa-solid fa-location-dot"></i>
-        </span>
-        <span class="legend-label">{{ cat.name }}</span>
-        <span class="legend-count" id="legend-count-{{ cat.id }}">0</span>
-      </div>
-    {% endfor %}
-  </div>
-</section>
+      <section id="reportDetailPanel" class="report-detail-panel">
+        <div class="report-detail-empty">Haz click en un reporte para ver sus detalles.</div>
+      </section>
 
-<section class="live-console">
-  <div class="console-header">
-    <div class="console-title">Aportaciones recientes</div>
-    <div class="console-status">En vivo</div>
-  </div>
-  <div id="recentFeed" class="console-body">
-    <div class="console-empty">Sin aportaciones visibles aún.</div>
-  </div>
-</section>
+      <section class="legend" id="reportLegendSection">
+        {% set alert_slugs = ["accion-represiva", "movimiento-tropas", "desconexion-internet"] %}
+        <div class="legend-header">
+          <div class="legend-title">Filtros por categoría</div>
+        </div>
+        <div class="legend-grid">
+          <button
+            type="button"
+            class="legend-item legend-filter is-active"
+            data-category-filter="all"
+            data-slug="__all__"
+            aria-pressed="true"
+          >
+            <span class="legend-icon">
+              <i class="fa-solid fa-layer-group"></i>
+            </span>
+            <span class="legend-label">Todos</span>
+            <span class="legend-count" id="legend-count-all" data-category-filter="all">0</span>
+          </button>
+          {% for cat in categories %}
+            <button
+              type="button"
+              class="legend-item legend-filter{% if cat.slug in alert_slugs %} alert{% endif %}"
+              data-category-filter="{{ cat.id }}"
+              data-slug="{{ cat.slug }}"
+              aria-pressed="false"
+            >
+              <span class="legend-icon">
+                <i class="fa-solid fa-location-dot"></i>
+              </span>
+              <span class="legend-label">{{ cat.name }}</span>
+              <span class="legend-count" id="legend-count-{{ cat.id }}" data-category-filter="{{ cat.id }}">0</span>
+            </button>
+          {% endfor %}
+        </div>
+        <div class="legend-location-filters">
+          <label>
+            Provincia
+            <select id="provinceFilter">
+              <option value="">Todas</option>
+              {% for prov in provinces %}
+                <option value="{{ prov }}">{{ prov }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            Municipio
+            <select id="municipalityFilter">
+              <option value="">Todos</option>
+            </select>
+          </label>
+        </div>
+      </section>
 
-<section class="categories">
-  <h2>Categorías</h2>
-  <div class="category-grid">
-    {% for cat in categories %}
-      <div class="category-card">
-        <div class="category-name">{{ cat.name }}</div>
-        <div class="category-desc">{{ cat.description }}</div>
+      <div id="connectivityLegendOverlay" class="connectivity-legend-overlay" hidden>
+        <div class="connectivity-legend-title">Conectividad</div>
+        <div class="connectivity-window-switch" role="group" aria-label="Ventana de conectividad">
+          <button type="button" class="connectivity-window-btn is-active" data-connectivity-window-hours="24" aria-pressed="true">24h</button>
+          <button type="button" class="connectivity-window-btn" data-connectivity-window-hours="6" aria-pressed="false">6h</button>
+          <button type="button" class="connectivity-window-btn" data-connectivity-window-hours="2" aria-pressed="false">2h</button>
+        </div>
+        <div class="connectivity-legend-item">
+          <span class="dot dot-normal"></span>
+          <span>Normal</span>
+        </div>
+        <div class="connectivity-legend-item">
+          <span class="dot dot-degraded"></span>
+          <span>Degradación leve</span>
+        </div>
+        <div class="connectivity-legend-item">
+          <span class="dot dot-severe"></span>
+          <span>Problemas severos</span>
+        </div>
+        <div class="connectivity-legend-item">
+          <span class="dot dot-critical"></span>
+          <span>Apagón o conectividad crítica</span>
+        </div>
+        <div class="connectivity-updated" id="connectivityUpdatedLabel"></div>
+        <div class="connectivity-traffic-panel" id="connectivityTrafficPanel">
+          <div class="connectivity-traffic-title">Trafico HTTP nacional</div>
+          <div class="connectivity-traffic-kpi" id="connectivityTrafficValue">N/D</div>
+          <div class="connectivity-traffic-meta">
+            <div id="connectivityTrafficDelta">Variacion vs control: N/D</div>
+            <div id="connectivityTrafficDrop">Caida maxima: N/D</div>
+          </div>
+          <svg
+            class="connectivity-sparkline"
+            viewBox="0 0 280 56"
+            preserveAspectRatio="none"
+            aria-label="Serie de trafico HTTP"
+          >
+            <path id="connectivitySparkPrev" class="spark-prev"></path>
+            <path id="connectivitySparkMain" class="spark-main"></path>
+          </svg>
+          <div class="connectivity-traffic-note" id="connectivityTrafficNote">
+            Sin serie disponible para la ventana activa.
+          </div>
+        </div>
+        <div class="connectivity-region-panel" id="connectivityRegionPanel">
+          <div class="connectivity-region-title">Traffic volume by region</div>
+          <div class="connectivity-region-subtitle">
+            Cada linea representa una region. Haz clic en una region para destacarla.
+          </div>
+          <svg
+            id="connectivityRegionChart"
+            class="connectivity-region-chart"
+            viewBox="0 0 280 176"
+            preserveAspectRatio="none"
+            aria-label="Traffic volume by region"
+          ></svg>
+          <div class="connectivity-region-note" id="connectivityRegionNote">
+            Sin serie regional disponible para la ventana activa.
+          </div>
+          <div class="connectivity-region-legend" id="connectivityRegionLegend">
+            <div class="connectivity-region-legend-empty">Sin regiones con datos.</div>
+          </div>
+        </div>
+        <div class="connectivity-province-panel" id="connectivityProvincePanel">
+          <div class="connectivity-province-head">
+            <div class="connectivity-province-title" id="connectivityProvinceTitle">Selecciona una provincia</div>
+          </div>
+          <div class="connectivity-province-status" id="connectivityProvinceStatus">
+            Haz clic en una provincia para ver detalle horario.
+          </div>
+          <div class="connectivity-province-range" id="connectivityProvinceRange"></div>
+          <svg class="connectivity-province-chart" viewBox="0 0 280 86" preserveAspectRatio="none">
+            <path class="spark-prev" id="connectivityProvinceChartPrev"></path>
+            <path class="spark-main" id="connectivityProvinceChartMain"></path>
+          </svg>
+          <div class="connectivity-province-log" id="connectivityProvinceLog">
+            <div class="connectivity-province-log-empty">Sin provincia seleccionada.</div>
+          </div>
+        </div>
+        {% if current_user.is_authenticated and current_user.has_role('administrador') %}
+          <div class="connectivity-source-credit">Hecho con tecnología de Cloudflare Radar</div>
+        {% endif %}
       </div>
-    {% endfor %}
-  </div>
+
+      <div id="protestOverlay" class="protest-overlay" hidden>
+        <div class="protest-title">Protestas</div>
+        <div class="protest-subtitle">Eventos detectados en publicaciones RSS con enlace a fuente original.</div>
+        <div class="protest-timeline-wrap">
+          <label for="protestTimelineSlider" class="protest-control-label">Linea de tiempo (UTC)</label>
+          <input id="protestTimelineSlider" type="range" min="0" max="0" step="1" value="0" />
+          <div id="protestTimelineLabel" class="protest-timeline-label">Sin datos historicos.</div>
+        </div>
+        <div class="protest-date-controls">
+          <label>
+            Dia UTC
+            <input id="protestDayInput" type="date" />
+          </label>
+          <button type="button" id="protestApplyDayBtn" class="protest-btn">Ver dia</button>
+        </div>
+        <div class="protest-range-controls">
+          <label>
+            Inicio UTC
+            <input id="protestStartInput" type="date" />
+          </label>
+          <label>
+            Fin UTC
+            <input id="protestEndInput" type="date" />
+          </label>
+          <button type="button" id="protestApplyRangeBtn" class="protest-btn">Ver rango</button>
+          <button type="button" id="protestResetRangeBtn" class="protest-btn protest-btn-muted">Hoy</button>
+        </div>
+        <div class="protest-legend">
+          <div class="protest-legend-item"><span class="dot dot-confirmed"></span><span>Confirmada</span></div>
+          <div class="protest-legend-item"><span class="dot dot-probable"></span><span>Probable</span></div>
+          <div class="protest-legend-item"><span class="dot dot-related"></span><span>Relacionada</span></div>
+          <div class="protest-legend-item"><span class="dot dot-unresolved"></span><span>Ubicacion aproximada</span></div>
+        </div>
+        <div id="protestSummary" class="protest-summary">Sin datos de protestas para la vista activa.</div>
+        <div id="protestDetailPanel" class="protest-detail-panel">
+          <div class="protest-detail-empty">Haz clic en un evento para ver detalles y enlace original.</div>
+        </div>
+        <div class="protest-source-credit">Cada evento mostrado enlaza su publicacion original para trazabilidad.</div>
+      </div>
+    </div>
+  </aside>
 </section>
 
 <div id="mapImageModal" class="image-modal" aria-hidden="true" data-allow-zoom="1">

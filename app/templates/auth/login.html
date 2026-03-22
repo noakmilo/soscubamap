@@ -1,16 +1,18 @@
 {% extends "shared/base.html" %}
 {% block title %} | Login{% endblock %}
 {% block content %}
-<section class="panel narrow">
-  <h1>Acceder</h1>
-  <form method="post" class="form-grid">
-    <label>Email
-      <input type="email" name="email" required />
-    </label>
-    <label>Contraseña
-      <input type="password" name="password" required />
-    </label>
-    <button type="submit" class="btn-primary">Entrar</button>
-  </form>
+<section class="auth-center-shell">
+  <section class="panel narrow auth-panel">
+    <h1>Acceder</h1>
+    <form method="post" class="form-grid">
+      <label>Email
+        <input type="email" name="email" required />
+      </label>
+      <label>Contraseña
+        <input type="password" name="password" required />
+      </label>
+      <button type="submit" class="btn-primary">Entrar</button>
+    </form>
+  </section>
 </section>
 {% endblock %}
