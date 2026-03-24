@@ -24,6 +24,7 @@ from app.services.connectivity import (
 )
 from app.services.cuba_locations import PROVINCES, PROVINCE_RADAR_GEOIDS
 from app.services.geo_lookup import list_provinces
+from app.services.location_names import canonicalize_province_name, normalize_location_key
 
 
 def parse_args():
@@ -56,24 +57,6 @@ def _parse_scheduled_for(raw):
     return dt
 
 
-def _normalize_name(value):
-    text = str(value or "").strip().lower()
-    if not text:
-        return ""
-    replacements = {
-        "á": "a",
-        "é": "e",
-        "í": "i",
-        "ó": "o",
-        "ú": "u",
-        "ü": "u",
-        "ñ": "n",
-    }
-    for source, target in replacements.items():
-        text = text.replace(source, target)
-    return " ".join(text.split())
-
-
 def _province_geoids():
     env_raw = (os.getenv("CF_RADAR_PROVINCE_GEOIDS_JSON") or "").strip()
     base = dict(PROVINCE_RADAR_GEOIDS)
@@ -87,10 +70,9 @@ def _province_geoids():
     if not isinstance(payload, dict):
         return base
 
-    normalized = {_normalize_name(name): name for name in PROVINCES}
     merged = dict(base)
     for raw_name, raw_id in payload.items():
-        name = normalized.get(_normalize_name(raw_name), str(raw_name or "").strip())
+        name = canonicalize_province_name(raw_name) or str(raw_name or "").strip()
         try:
             geo_id = int(str(raw_id).strip())
         except Exception:
@@ -243,10 +225,26 @@ def _compute_payload_snapshot(payload):
 
 
 def _upsert_snapshot(run, best_payloads_by_province):
-    try:
-        provinces = list_provinces() or list(PROVINCES)
-    except Exception:
-        provinces = list(PROVINCES)
+    raw_provinces = list(best_payloads_by_province.keys())
+    if not raw_provinces:
+        try:
+            raw_provinces = list_provinces() or list(PROVINCES)
+        except Exception:
+            raw_provinces = list(PROVINCES)
+    if not raw_provinces:
+        raw_provinces = list(PROVINCES)
+
+    provinces = []
+    seen_province_keys = set()
+    for raw_province in raw_provinces:
+        province_name = canonicalize_province_name(raw_province) or str(raw_province or "").strip()
+        if not province_name:
+            continue
+        province_key = normalize_location_key(province_name)
+        if not province_key or province_key in seen_province_keys:
+            continue
+        seen_province_keys.add(province_key)
+        provinces.append(province_name)
     if not provinces:
         provinces = list(PROVINCES)
 

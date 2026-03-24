@@ -3,6 +3,11 @@ import os
 import unicodedata
 
 from app.services.cuba_locations import PROVINCES, MUNICIPALITIES
+from app.services.location_names import (
+    canonicalize_municipality_name,
+    canonicalize_province_name,
+    normalize_location_key,
+)
 
 
 DEFAULT_PROVINCE_KEYS = [
@@ -51,12 +56,16 @@ def _normalize(value):
     return "".join(c for c in text if not unicodedata.combining(c))
 
 
-PROVINCE_CANONICAL = {_normalize(p): p for p in PROVINCES}
-MUNICIPALITY_CANONICAL = {
-    _normalize(m): m
-    for province, muns in MUNICIPALITIES.items()
-    for m in muns
-}
+PROVINCE_CANONICAL = {}
+for province_name in PROVINCES:
+    PROVINCE_CANONICAL[_normalize(province_name)] = province_name
+    PROVINCE_CANONICAL[normalize_location_key(province_name)] = province_name
+
+MUNICIPALITY_CANONICAL = {}
+for municipality_names in MUNICIPALITIES.values():
+    for municipality_name in municipality_names:
+        MUNICIPALITY_CANONICAL[_normalize(municipality_name)] = municipality_name
+        MUNICIPALITY_CANONICAL[normalize_location_key(municipality_name)] = municipality_name
 
 
 _cache = {
@@ -140,7 +149,7 @@ def _load_features(path, keys, canonical_map, province_keys=None, province_canon
         name = _pick_name(props, keys)
         if name:
             name_norm = _normalize(name)
-            name = canonical_map.get(name_norm, str(name).strip())
+            name = canonical_map.get(name_norm) or canonical_map.get(normalize_location_key(name)) or str(name).strip()
         else:
             name = None
         province = None
@@ -149,7 +158,11 @@ def _load_features(path, keys, canonical_map, province_keys=None, province_canon
             if province_val:
                 province_norm = _normalize(province_val)
                 if province_canonical:
-                    province = province_canonical.get(province_norm, str(province_val).strip())
+                    province = (
+                        province_canonical.get(province_norm)
+                        or province_canonical.get(normalize_location_key(province_val))
+                        or str(province_val).strip()
+                    )
                 else:
                     province = str(province_val).strip()
         items.append({"name": name, "polygons": polygons, "province": province})
@@ -246,8 +259,13 @@ def lookup_location(lat, lng):
 def list_provinces():
     _load_layers()
     items = [i["name"] for i in (_cache.get("provinces") or []) if i.get("name")]
-    if items:
-        return sorted(set(items))
+    normalized_items = set()
+    for item in items:
+        canonical = canonicalize_province_name(item) or str(item).strip()
+        if canonical:
+            normalized_items.add(canonical)
+    if normalized_items:
+        return sorted(normalized_items)
     mun_map = municipalities_map()
     if mun_map:
         return sorted(mun_map.keys())
@@ -270,11 +288,12 @@ def municipalities_map():
     items = _cache.get("municipalities") or []
     mapping = {}
     for item in items:
-        province = item.get("province")
-        name = item.get("name")
+        province = canonicalize_province_name(item.get("province"))
+        name = canonicalize_municipality_name(item.get("name"), province)
         if not province or not name:
             continue
         mapping.setdefault(province, set()).add(name)
+
     if mapping:
         return {province: sorted(list(names)) for province, names in mapping.items()}
     return MUNICIPALITIES

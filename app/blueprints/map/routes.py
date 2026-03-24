@@ -47,7 +47,11 @@ from app.services.geo_lookup import (
     lookup_location,
     municipalities_map,
 )
-from app.services.location_names import canonicalize_location_names
+from app.services.location_names import (
+    canonicalize_location_names,
+    canonicalize_province_name,
+    normalize_location_key,
+)
 from app.services.input_safety import has_malicious_input
 from app.services.media_upload import (
     get_media_payload,
@@ -132,6 +136,42 @@ def _resolve_geo_location(lat, lng, province, municipality):
     if auto_mun:
         municipality = auto_mun
     return province, municipality
+
+
+def _matching_post_province_values(selected_province):
+    canonical = canonicalize_province_name(selected_province)
+    if not canonical:
+        return []
+    target_key = normalize_location_key(canonical)
+    if not target_key:
+        return []
+
+    rows = (
+        db.session.query(Post.province)
+        .filter(
+            Post.province.isnot(None),
+            Post.province != "",
+        )
+        .distinct()
+        .all()
+    )
+
+    values = []
+    seen = set()
+    for row in rows:
+        raw_text = str(row[0] or "").strip()
+        if not raw_text:
+            continue
+        if normalize_location_key(raw_text) != target_key:
+            continue
+        if raw_text in seen:
+            continue
+        seen.add(raw_text)
+        values.append(raw_text)
+
+    if canonical not in seen:
+        values.append(canonical)
+    return values
 
 
 def _clean_captions(raw, count):
@@ -1254,12 +1294,15 @@ def post_history(post_id):
 
 @map_bp.route("/reportes")
 def reports():
-    selected_province = request.args.get("provincia", "").strip()
+    selected_province = canonicalize_province_name(request.args.get("provincia", "").strip()) or ""
     selected_municipality = request.args.get("municipio", "").strip()
+    province_filter_values = _matching_post_province_values(selected_province) if selected_province else []
+    if selected_province and not province_filter_values:
+        province_filter_values = [selected_province]
 
     query = Post.query.filter_by(status="approved")
-    if selected_province:
-        query = query.filter_by(province=selected_province)
+    if province_filter_values:
+        query = query.filter(Post.province.in_(province_filter_values))
     if selected_municipality:
         query = query.filter_by(municipality=selected_municipality)
 
@@ -1287,7 +1330,7 @@ def reports():
 @map_bp.route("/represores")
 def repressors():
     q = request.args.get("q", "").strip()
-    selected_province = request.args.get("provincia", "").strip()
+    selected_province = canonicalize_province_name(request.args.get("provincia", "").strip()) or ""
     selected_municipality = request.args.get("municipio", "").strip()
     try:
         page = max(int(request.args.get("page", "1")), 1)

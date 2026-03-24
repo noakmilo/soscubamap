@@ -4,6 +4,7 @@ import os
 import unicodedata
 
 from app.services.cuba_locations import PROVINCES
+from app.services.location_names import normalize_location_key
 
 DEFAULT_PROVINCE_KEYS = [
     "province",
@@ -28,7 +29,10 @@ def _normalize(value):
     return "".join(c for c in text if not unicodedata.combining(c))
 
 
-PROVINCE_CANONICAL = {_normalize(name): name for name in PROVINCES}
+PROVINCE_CANONICAL = {}
+for province_name in PROVINCES:
+    PROVINCE_CANONICAL[_normalize(province_name)] = province_name
+    PROVINCE_CANONICAL[normalize_location_key(province_name)] = province_name
 
 _CACHE = {
     "signature": None,
@@ -116,7 +120,11 @@ def _load_geojson_from_disk(path, keys):
         if not raw_name:
             continue
 
-        canonical = PROVINCE_CANONICAL.get(_normalize(raw_name), raw_name)
+        canonical = (
+            PROVINCE_CANONICAL.get(_normalize(raw_name))
+            or PROVINCE_CANONICAL.get(normalize_location_key(raw_name))
+            or raw_name
+        )
 
         normalized_features.append(
             {

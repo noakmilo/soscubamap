@@ -157,6 +157,43 @@ def _canonical_province_name(value):
     return canonicalize_province_name(value) or str(value or "").strip()
 
 
+def _matching_stored_province_values(model_column, selected_province):
+    canonical = _canonical_province_name(selected_province)
+    if not canonical:
+        return []
+    target_key = normalize_location_key(canonical)
+    if not target_key:
+        return []
+
+    rows = (
+        db.session.query(model_column)
+        .filter(
+            model_column.isnot(None),
+            model_column != "",
+        )
+        .distinct()
+        .all()
+    )
+
+    values = []
+    seen = set()
+    for row in rows:
+        raw_value = row[0]
+        raw_text = str(raw_value or "").strip()
+        if not raw_text:
+            continue
+        if normalize_location_key(raw_text) != target_key:
+            continue
+        if raw_text in seen:
+            continue
+        seen.add(raw_text)
+        values.append(raw_text)
+
+    if canonical not in seen:
+        values.append(canonical)
+    return values
+
+
 def _cf_api_token():
     return (current_app.config.get("CF_API_TOKEN") or os.getenv("CF_API_TOKEN") or "").strip()
 
@@ -830,12 +867,20 @@ def connectivity_latest():
 
     geojson = load_province_geojson()
     try:
-        province_names = set(list_provinces() or [])
+        province_names = {
+            _canonical_province_name(name)
+            for name in (list_provinces() or [])
+            if _canonical_province_name(name)
+        }
     except Exception:
         province_names = set(PROVINCES)
     if not province_names:
         province_names = set(PROVINCES)
-    province_names.update(province_names_from_geojson(geojson))
+    province_names.update(
+        _canonical_province_name(name)
+        for name in province_names_from_geojson(geojson)
+        if _canonical_province_name(name)
+    )
 
     national_score = None
     national_status = STATUS_UNKNOWN
@@ -971,8 +1016,11 @@ def connectivity_latest():
         province_score_map = {}
         for snap in window_snapshots:
             for row in snap.provinces:
-                province_score_map.setdefault(row.province, []).append(row.score)
-                province_names.add(row.province)
+                province_name = _canonical_province_name(row.province)
+                if not province_name:
+                    continue
+                province_score_map.setdefault(province_name, []).append(row.score)
+                province_names.add(province_name)
 
         for province, scores in province_score_map.items():
             if window_aggregation == "worst":
@@ -1038,9 +1086,12 @@ def connectivity_latest():
         partial = bool(snapshot.is_partial)
 
         for row in snapshot.provinces:
+            province_name = _canonical_province_name(row.province)
+            if not province_name:
+                continue
             status_key = score_to_status(row.score)
-            status_by_province[row.province] = {
-                "province": row.province,
+            status_by_province[province_name] = {
+                "province": province_name,
                 "score": row.score,
                 "status": status_key,
                 "status_label": STATUS_LABELS.get(status_key, STATUS_LABELS[STATUS_UNKNOWN]),
@@ -1048,7 +1099,7 @@ def connectivity_latest():
                 "confidence": row.confidence or "estimated_country_level",
                 "is_estimated": True,
             }
-            province_names.add(row.province)
+            province_names.add(province_name)
 
         window_payload.update(
             {
@@ -2069,7 +2120,17 @@ def _parse_date(value: str):
 
 
 def _build_connectivity_outage_events(start_dt, end_dt, province=""):
-    selected_province = (province or "").strip() or None
+    selected_province = _canonical_province_name((province or "").strip()) or None
+    selected_province_values = (
+        _matching_stored_province_values(
+            ConnectivityProvinceStatus.province,
+            selected_province,
+        )
+        if selected_province
+        else []
+    )
+    if selected_province and not selected_province_values:
+        selected_province_values = [selected_province]
 
     if selected_province:
         base_query = db.session.query(
@@ -2082,7 +2143,7 @@ def _build_connectivity_outage_events(start_dt, end_dt, province=""):
             ConnectivityProvinceStatus,
             ConnectivityProvinceStatus.snapshot_id == ConnectivitySnapshot.id,
         ).filter(
-            ConnectivityProvinceStatus.province == selected_province,
+            ConnectivityProvinceStatus.province.in_(selected_province_values),
         )
     else:
         base_query = db.session.query(
@@ -2128,7 +2189,8 @@ def _build_connectivity_outage_events(start_dt, end_dt, province=""):
             "score_at_end": None,
             "start_snapshot_id": getattr(item, "snapshot_id", None),
             "end_snapshot_id": None,
-            "province": getattr(item, "province", None) or selected_province,
+            "province": _canonical_province_name(getattr(item, "province", None))
+            or selected_province,
             "_start_dt": start_raw,
         }
         return event
@@ -2183,7 +2245,10 @@ def analytics_v1():
     start_raw = (request.args.get("start") or "").strip()
     end_raw = (request.args.get("end") or "").strip()
     category_id = request.args.get("category_id")
-    province = (request.args.get("province") or "").strip()
+    province = _canonical_province_name((request.args.get("province") or "").strip())
+    province_filter_values = _matching_stored_province_values(Post.province, province) if province else []
+    if province and not province_filter_values:
+        province_filter_values = [province]
 
     end_dt = _parse_date(end_raw) or datetime.utcnow()
     start_dt = _parse_date(start_raw) or (end_dt - timedelta(days=90))
@@ -2203,8 +2268,8 @@ def analytics_v1():
             base_query = base_query.filter(Post.category_id == int(category_id))
         except ValueError:
             pass
-    if province:
-        base_query = base_query.filter(Post.province == province)
+    if province_filter_values:
+        base_query = base_query.filter(Post.province.in_(province_filter_values))
 
     day_expr = func.date(Post.created_at).label("day")
     reports_over_time = (
@@ -2225,8 +2290,8 @@ def analytics_v1():
             reports_over_time = reports_over_time.filter(Post.category_id == int(category_id))
         except ValueError:
             pass
-    if province:
-        reports_over_time = reports_over_time.filter(Post.province == province)
+    if province_filter_values:
+        reports_over_time = reports_over_time.filter(Post.province.in_(province_filter_values))
 
     reports_series = [
         {"date": row[0].isoformat(), "count": row[1]}
@@ -2249,8 +2314,8 @@ def analytics_v1():
             category_distribution = category_distribution.filter(Post.category_id == int(category_id))
         except ValueError:
             pass
-    if province:
-        category_distribution = category_distribution.filter(Post.province == province)
+    if province_filter_values:
+        category_distribution = category_distribution.filter(Post.province.in_(province_filter_values))
 
     category_items = [
         {"id": row[0], "name": row[1], "count": row[2]}
@@ -2274,11 +2339,21 @@ def analytics_v1():
             province_distribution = province_distribution.filter(Post.category_id == int(category_id))
         except ValueError:
             pass
-    if province:
-        province_distribution = province_distribution.filter(Post.province == province)
+    if province_filter_values:
+        province_distribution = province_distribution.filter(Post.province.in_(province_filter_values))
 
+    province_counter = {}
+    for row in province_distribution.all():
+        canonical_name = _canonical_province_name(row[0])
+        if not canonical_name:
+            continue
+        province_counter[canonical_name] = province_counter.get(canonical_name, 0) + int(row[1] or 0)
     province_items = [
-        {"name": row[0], "count": row[1]} for row in province_distribution.limit(10).all()
+        {"name": name, "count": count}
+        for name, count in sorted(
+            province_counter.items(),
+            key=lambda item: (-int(item[1]), item[0]),
+        )[:10]
     ]
 
     municipality_distribution = (
@@ -2298,8 +2373,8 @@ def analytics_v1():
             municipality_distribution = municipality_distribution.filter(Post.category_id == int(category_id))
         except ValueError:
             pass
-    if province:
-        municipality_distribution = municipality_distribution.filter(Post.province == province)
+    if province_filter_values:
+        municipality_distribution = municipality_distribution.filter(Post.province.in_(province_filter_values))
 
     municipality_items = [
         {"name": row[0], "count": row[1]} for row in municipality_distribution.limit(10).all()
@@ -2327,8 +2402,8 @@ def analytics_v1():
             top_verified = top_verified.filter(Post.category_id == int(category_id))
         except ValueError:
             pass
-    if province:
-        top_verified = top_verified.filter(Post.province == province)
+    if province_filter_values:
+        top_verified = top_verified.filter(Post.province.in_(province_filter_values))
 
     top_verified_items = [
         {"id": p.id, "title": p.title, "verify_count": p.verify_count or 0}

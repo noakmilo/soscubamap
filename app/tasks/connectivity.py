@@ -20,6 +20,7 @@ from app.services.connectivity import (
 )
 from app.services.connectivity_geo import load_province_geojson
 from app.services.cuba_locations import PROVINCE_CENTER_FALLBACKS
+from app.services.location_names import canonicalize_province_name, normalize_location_key
 from scripts.fetch_connectivity import run_ingestion
 
 
@@ -37,6 +38,13 @@ def _normalize_text(value):
         return ""
     normalized = unicodedata.normalize("NFKD", text)
     return "".join(ch for ch in normalized if not unicodedata.combining(ch))
+
+
+def _canonical_province_name(value):
+    canonical = canonicalize_province_name(value)
+    if canonical:
+        return canonical
+    return str(value or "").strip()
 
 
 def _extract_polygon_points(geometry):
@@ -85,7 +93,7 @@ def _province_centers_from_geojson():
     geojson = load_province_geojson()
     for feature in geojson.get("features") or []:
         props = feature.get("properties") or {}
-        province = str(props.get("province") or "").strip()
+        province = _canonical_province_name(props.get("province"))
         if not province:
             continue
         lat, lng = _geometry_center(feature.get("geometry"))
@@ -112,7 +120,7 @@ FALLBACK_CENTERS = _fallback_centers()
 
 
 def _resolve_province_center(province, geojson_centers):
-    key = _normalize_text(province)
+    key = _normalize_text(_canonical_province_name(province))
     if not key:
         return None, None
 
@@ -128,13 +136,24 @@ def _status_by_province(snapshot):
         return {}
     payload = {}
     for row in snapshot.provinces or []:
-        province = str(row.province or "").strip()
+        province = _canonical_province_name(row.province)
         if not province:
             continue
-        payload[province] = {
+        existing = payload.get(province)
+        candidate = {
             "status": str(row.status or "").strip().lower(),
             "score": row.score,
         }
+        if existing is None:
+            payload[province] = candidate
+            continue
+
+        existing_score = existing.get("score")
+        candidate_score = candidate.get("score")
+        if candidate_score is None:
+            continue
+        if existing_score is None or candidate_score < existing_score:
+            payload[province] = candidate
     return payload
 
 
@@ -198,9 +217,9 @@ def _is_auto_connectivity_report(post):
 
 def _retire_recovered_auto_reports(category_id, active_alert_provinces, system_user_id=None):
     active_keys = {
-        _normalize_text(name)
+        normalize_location_key(_canonical_province_name(name))
         for name in (active_alert_provinces or [])
-        if _normalize_text(name)
+        if normalize_location_key(_canonical_province_name(name))
     }
     query = Post.query.filter(
         Post.category_id == category_id,
@@ -213,7 +232,7 @@ def _retire_recovered_auto_reports(category_id, active_alert_provinces, system_u
     for post in query.all():
         if not _is_auto_connectivity_report(post):
             continue
-        province_key = _normalize_text(post.province)
+        province_key = normalize_location_key(_canonical_province_name(post.province))
         if province_key and province_key in active_keys:
             continue
         post.status = "deleted"
@@ -298,16 +317,17 @@ def poll_connectivity_and_create_reports(self):
                 continue
 
             status_label = STATUS_LABELS.get(current_status, "Conectividad afectada")
-            title = f"Alerta automatica Cloudflare: {status_label} en {province}"
+            canonical_province = _canonical_province_name(province)
+            title = f"Alerta automatica Cloudflare: {status_label} en {canonical_province}"
             if _already_reported(
                 category.id,
-                province,
+                canonical_province,
                 latest_snapshot.observed_at_utc,
                 title,
             ):
                 continue
 
-            lat, lng = _resolve_province_center(province, centers)
+            lat, lng = _resolve_province_center(canonical_province, centers)
             if lat is None or lng is None:
                 continue
 
@@ -327,8 +347,8 @@ def poll_connectivity_and_create_reports(self):
                 description=f"{description} Estado detectado: {status_label}. Score estimado: {score_text}.",
                 latitude=lat,
                 longitude=lng,
-                address=f"Centro aproximado de {province}",
-                province=province,
+                address=f"Centro aproximado de {canonical_province}",
+                province=canonical_province,
                 municipality=None,
                 movement_at=latest_snapshot.observed_at_utc,
                 author_id=system_user.id,
@@ -338,7 +358,7 @@ def poll_connectivity_and_create_reports(self):
                 other_type=AUTO_CONNECTIVITY_REPORT_MARKER,
             )
             db.session.add(post)
-            created_provinces.append(province)
+            created_provinces.append(canonical_province)
 
         db.session.commit()
     except Exception:
