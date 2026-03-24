@@ -28,6 +28,7 @@ class Post(db.Model):
     movement_at = db.Column(db.DateTime)
     repressor_name = db.Column(db.String(160))
     other_type = db.Column(db.String(160))
+    repressor_id = db.Column(db.Integer, db.ForeignKey("repressors.id"), index=True)
     polygon_geojson = db.Column(db.Text)
     links_json = db.Column(db.Text)
     verify_count = db.Column(db.Integer, default=0)
@@ -43,6 +44,7 @@ class Post(db.Model):
 
     author = db.relationship("User", back_populates="posts")
     category = db.relationship("Category", back_populates="posts")
+    repressor = db.relationship("Repressor", back_populates="posts")
     media = db.relationship("Media", back_populates="post", cascade="all, delete-orphan")
 
     def __repr__(self):

@@ -641,6 +641,43 @@ body.map-dashboard-page .map-canvas {
   }
 }
 
+.report-repressor-card {
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(11, 15, 18, 0.05);
+}
+
+.report-repressor-head {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.report-repressor-image {
+  width: 54px;
+  height: 54px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+
+.report-repressor-title {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.report-repressor-meta {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.report-repressor-actions {
+  margin-top: 8px;
+}
+
 .alert-console-floating.is-collapsed {
   padding: 0;
   border-color: transparent;

@@ -54,7 +54,7 @@ Lista reportes aprobados para el mapa.
 | `category_id` | int    | Filtrar por categoría              |
 | `limit`       | int    | Máximo de resultados               |
 
-**Respuesta:** `200` — Array de objetos post con campos: `id`, `title`, `description`, `latitude`, `longitude`, `address`, `province`, `municipality`, `movement_at`, `repressor_name`, `other_type`, `created_at`, `anon`, `polygon_geojson`, `links`, `media`, `verify_count`, `verified_by_me`, `category`.
+**Respuesta:** `200` — Array de objetos post con campos: `id`, `title`, `description`, `latitude`, `longitude`, `address`, `province`, `municipality`, `movement_at`, `repressor_name`, `repressor_id`, `other_type`, `created_at`, `anon`, `polygon_geojson`, `links`, `media`, `verify_count`, `verified_by_me`, `category`, `repressor`.
 
 ---
 
@@ -125,6 +125,102 @@ Detalle de un reporte específico. Rate limit: 120/minuto.
 ### `GET /api/v1/categories`
 
 Alias de `/api/categories`.
+
+---
+
+## Catálogo de represores
+
+### `GET /api/v1/repressors`
+
+Lista paginada del catálogo local de represores sincronizado desde API externa.
+
+**Parámetros query:**
+
+| Parámetro      | Tipo   | Default | Descripción |
+|----------------|--------|---------|-------------|
+| `q`            | string | —       | Busca por nombre, apellido, apodo, institución o ID externo |
+| `province`     | string | —       | Filtra por provincia |
+| `municipality` | string | —       | Filtra por municipio |
+| `page`         | int    | `1`     | Página |
+| `per_page`     | int    | `50`    | Tamaño de página (máx 100) |
+
+**Respuesta:** `200`
+
+```json
+{
+  "page": 1,
+  "per_page": 50,
+  "total": 812,
+  "pages": 17,
+  "has_next": true,
+  "has_prev": false,
+  "items": [
+    {
+      "id": 25,
+      "external_id": 130,
+      "name": "NOMBRE",
+      "lastname": "APELLIDO",
+      "full_name": "NOMBRE APELLIDO",
+      "nickname": null,
+      "institution_name": "Poder Popular",
+      "campus_name": "MINSAP",
+      "province_name": "Holguín",
+      "municipality_name": "Frank País",
+      "image_url": "https://...",
+      "types": ["Bata Blanca"],
+      "crimes": ["..."],
+      "source_detail_url": "https://represorescubanos.com/repressor-detail/130",
+      "last_synced_at": "2026-03-24T08:00:00"
+    }
+  ]
+}
+```
+
+### `GET /api/v1/repressors/<id>`
+
+Devuelve ficha completa de represor + reportes de residencia aprobados.
+
+### `GET /api/v1/repressors/stats`
+
+Devuelve tabla agregada por provincia y municipio.
+
+### `POST /api/v1/repressors/<id>/residence-reports`
+
+Crea reporte ciudadano de posible vivienda y genera un post de mapa categoría `residencia-represor`.
+
+Rate limit: `6/min`, `80/día`.
+
+**Body (JSON):**
+
+```json
+{
+  "latitude": 23.11,
+  "longitude": -82.36,
+  "province": "La Habana",
+  "municipality": "Playa",
+  "address": "Opcional",
+  "message": "Descripción de la evidencia...",
+  "links": ["https://..."],
+  "recaptcha": "token-opcional"
+}
+```
+
+**Respuesta:** `201`
+
+```json
+{
+  "ok": true,
+  "residence_report": {
+    "id": 10,
+    "status": "pending",
+    "created_post_id": 534
+  },
+  "post": {
+    "id": 534,
+    "status": "pending"
+  }
+}
+```
 
 ---
 

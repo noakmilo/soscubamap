@@ -131,6 +131,21 @@ Layer de eventos de protesta inferidos automáticamente desde fuentes RSS.
 | `PROTEST_PLACE_ALIASES_JSON`      | JSON de alias de lugares cubanos para mejorar geocodificación.       | (vacío) |
 | `PROTEST_SOURCE_NAME_OVERRIDES_JSON` | JSON de overrides para nombres de fuentes en la UI.              | (vacío) |
 
+## Represores (catálogo externo + backup local)
+
+| Variable                               | Descripción                                                                 | Default |
+|----------------------------------------|-----------------------------------------------------------------------------|---------|
+| `REPRESSOR_API_BASE_URL`               | Base URL de API externa de represores.                                      | `https://data.represorescubanos.com` |
+| `REPRESSOR_PUBLIC_BASE_URL`            | Base URL pública de fichas (`/repressor-detail/<id>`).                      | `https://represorescubanos.com/repressor-detail` |
+| `REPRESSOR_FETCH_TIMEOUT_SECONDS`      | Timeout HTTP por request de ingesta.                                        | `20` |
+| `REPRESSOR_FETCH_RETRIES`              | Reintentos HTTP por request de ingesta.                                     | `3` |
+| `REPRESSOR_FETCH_PAUSE_SECONDS`        | Pausa entre IDs durante ingesta para no saturar la fuente.                  | `0` |
+| `REPRESSOR_SCAN_START_ID`              | ID inicial de escaneo.                                                      | `1` |
+| `REPRESSOR_SCAN_END_ID`                | ID final de escaneo.                                                        | `3000` |
+| `REPRESSOR_INGESTION_INTERVAL_SECONDS` | Intervalo de ingesta automática (Celery Beat).                              | `86400` |
+| `REPRESSOR_BACKUP_JSON_PATH`           | Ruta del backup JSON local del catálogo sincronizado.                       | `data/repressors_backup_latest.json` |
+| `REPRESSOR_RESIDENCE_AUTO_APPROVE`     | `1` publica automático reportes de vivienda; `0` los deja en moderación.    | `0` |
+
 ## Celery (ingesta periódica)
 
 | Variable                           | Descripción                                                          | Default |
@@ -140,6 +155,11 @@ Layer de eventos de protesta inferidos automáticamente desde fuentes RSS.
 | `CELERY_TIMEZONE`                  | Zona horaria del scheduler Celery Beat.                              | `UTC`   |
 | `CELERY_PROTEST_INGESTION_ENABLED` | `1` habilita el job periódico de ingesta de protestas.              | `1`     |
 | `CELERY_PROTEST_QUEUE`             | Cola de Celery usada por la ingesta de protestas.                    | `ingestion` |
+| `CELERY_CONNECTIVITY_POLLING_ENABLED` | `1` habilita el polling automático de conectividad.               | `1` |
+| `CELERY_CONNECTIVITY_POLLING_INTERVAL_SECONDS` | Intervalo del polling de conectividad.                     | `7200` |
+| `CELERY_CONNECTIVITY_QUEUE`        | Cola usada por el polling de conectividad.                           | `ingestion` |
+| `CELERY_REPRESSOR_INGESTION_ENABLED` | `1` habilita la ingesta periódica de represores.                   | `1` |
+| `CELERY_REPRESSOR_QUEUE`           | Cola usada por la ingesta de represores.                             | `ingestion` |
 
 
 ## GitHub Actions / Crowdin

@@ -4,6 +4,7 @@ import json
 import os
 import secrets
 import unicodedata
+from decimal import Decimal
 from datetime import datetime, timedelta, date
 from sqlalchemy.exc import IntegrityError
 from flask_login import current_user
@@ -38,6 +39,11 @@ from app.models.connectivity_ingestion_run import ConnectivityIngestionRun
 from app.models.connectivity_province_status import ConnectivityProvinceStatus
 from app.models.protest_event import ProtestEvent
 from app.models.protest_ingestion_run import ProtestIngestionRun
+from app.models.repressor import (
+    Repressor,
+    RepressorIngestionRun,
+    RepressorResidenceReport,
+)
 from app.services.connectivity import (
     STATUS_CRITICAL,
     STATUS_COLORS,
@@ -55,7 +61,7 @@ from app.services.connectivity_geo import (
     load_province_geojson,
     province_names_from_geojson,
 )
-from app.services.geo_lookup import list_provinces
+from app.services.geo_lookup import is_within_cuba_bounds, list_provinces, lookup_location
 from app.services.cuba_locations import PROVINCES
 from app.services.protests import (
     display_source_name as protest_display_source_name,
@@ -67,6 +73,11 @@ from app.services.protests import (
     require_source_url_for_map as protest_require_source_url,
     allow_unresolved_location_on_map as protest_allow_unresolved_location_on_map,
 )
+from app.services.repressors import (
+    build_residence_post_description,
+    build_residence_post_title,
+    serialize_repressor,
+)
 
 from app.models.post import Post
 from sqlalchemy.orm import selectinload
@@ -77,6 +88,25 @@ from . import api_bp
 
 def _is_admin_user():
     return current_user.is_authenticated and current_user.has_role("administrador")
+
+
+def _get_or_create_anon_user():
+    if current_user.is_authenticated:
+        return current_user
+
+    anon_user = User(email=f"anon+{secrets.token_hex(6)}@local")
+    anon_user.set_password(secrets.token_urlsafe(16))
+    anon_user.ensure_anon_code()
+    default_role = Role.query.filter_by(name="colaborador").first()
+    if default_role:
+        anon_user.roles.append(default_role)
+    db.session.add(anon_user)
+    db.session.flush()
+    return anon_user
+
+
+def _residence_category():
+    return Category.query.filter_by(slug="residencia-represor").first()
 
 
 def _get_chat_nick():
@@ -1476,11 +1506,9 @@ def delete_protest_event(event_id):
     if not event:
         return jsonify({"ok": False, "error": "Evento no encontrado."}), 404
 
-    event.visible_on_map = False
-    event.review_status = "deleted_manual"
-    event.updated_at = datetime.utcnow()
+    db.session.delete(event)
     db.session.commit()
-    return jsonify({"ok": True, "id": event_id, "status": "deleted_manual"})
+    return jsonify({"ok": True, "id": event_id, "status": "deleted"})
 
 
 @api_bp.route("/push/subscribe", methods=["POST"])
@@ -1548,11 +1576,20 @@ def categories():
     )
 
 
+def _serialize_post_repressor(post: Post, include_relationships: bool = False):
+    if not getattr(post, "repressor", None):
+        return None
+    return serialize_repressor(post.repressor, include_relationships=include_relationships)
+
+
 @api_bp.route("/posts")
 def posts():
     category_id = request.args.get("category_id")
     limit = request.args.get("limit")
-    query = Post.query.options(selectinload(Post.media)).filter_by(status="approved")
+    query = Post.query.options(
+        selectinload(Post.media),
+        selectinload(Post.repressor),
+    ).filter_by(status="approved")
     if category_id:
         query = query.filter_by(category_id=int(category_id))
 
@@ -1578,6 +1615,7 @@ def posts():
                 "municipality": p.municipality,
                 "movement_at": p.movement_at.isoformat() if p.movement_at else None,
                 "repressor_name": p.repressor_name,
+                "repressor_id": p.repressor_id,
                 "other_type": p.other_type,
                 "created_at": p.created_at.isoformat(),
                 "anon": f"Anon-{p.author.anon_code}" if p.author and p.author.anon_code else "Anon",
@@ -1586,6 +1624,7 @@ def posts():
                 "media": get_media_payload(p)[:4],
                 "verify_count": p.verify_count or 0,
                 "verified_by_me": p.id in verified_ids,
+                "repressor": _serialize_post_repressor(p, include_relationships=False),
                 "category": {
                     "id": p.category.id,
                     "name": p.category.name,
@@ -1609,12 +1648,14 @@ def _serialize_post(post: Post):
         "municipality": post.municipality,
         "movement_at": post.movement_at.isoformat() if post.movement_at else None,
         "repressor_name": post.repressor_name,
+        "repressor_id": post.repressor_id,
         "other_type": post.other_type,
         "status": post.status,
         "polygon_geojson": post.polygon_geojson,
         "links": json.loads(post.links_json) if post.links_json else [],
         "media": get_media_payload(post),
         "verify_count": post.verify_count or 0,
+        "repressor": _serialize_post_repressor(post, include_relationships=True),
         "created_at": post.created_at.isoformat() if post.created_at else None,
         "updated_at": post.updated_at.isoformat() if post.updated_at else None,
         "anon": f"Anon-{post.author.anon_code}" if post.author and post.author.anon_code else "Anon",
@@ -1647,6 +1688,8 @@ def reports_v1():
         selectinload(Post.media),
         selectinload(Post.category),
         selectinload(Post.author),
+        selectinload(Post.repressor).selectinload(Repressor.crimes),
+        selectinload(Post.repressor).selectinload(Repressor.types),
     )
     query = query.filter(Post.status == status)
 
@@ -1700,6 +1743,8 @@ def report_detail_v1(post_id):
         selectinload(Post.media),
         selectinload(Post.category),
         selectinload(Post.author),
+        selectinload(Post.repressor).selectinload(Repressor.crimes),
+        selectinload(Post.repressor).selectinload(Repressor.types),
     )
     post = query.get_or_404(post_id)
     if post.status != "approved" and not _is_admin_user():
@@ -1710,6 +1755,289 @@ def report_detail_v1(post_id):
 @api_bp.route("/v1/categories")
 def categories_v1():
     return categories()
+
+
+def _serialize_repressor_residence_report(report: RepressorResidenceReport):
+    return {
+        "id": report.id,
+        "repressor_id": report.repressor_id,
+        "status": report.status,
+        "latitude": float(report.latitude) if report.latitude is not None else None,
+        "longitude": float(report.longitude) if report.longitude is not None else None,
+        "address": report.address,
+        "province": report.province,
+        "municipality": report.municipality,
+        "message": report.message,
+        "source_image_url": report.source_image_url,
+        "created_post_id": report.created_post_id,
+        "rejection_reason": report.rejection_reason,
+        "reviewed_at": report.reviewed_at.isoformat() if report.reviewed_at else None,
+        "created_at": report.created_at.isoformat() if report.created_at else None,
+        "updated_at": report.updated_at.isoformat() if report.updated_at else None,
+    }
+
+
+@api_bp.route("/v1/repressors")
+@limiter.limit("120/minute")
+def repressors_v1():
+    q = (request.args.get("q") or "").strip()
+    province = (request.args.get("province") or "").strip()
+    municipality = (request.args.get("municipality") or "").strip()
+
+    query = Repressor.query.options(
+        selectinload(Repressor.crimes),
+        selectinload(Repressor.types),
+    )
+
+    if q:
+        token = f"%{q}%"
+        filters = [
+            Repressor.name.ilike(token),
+            Repressor.lastname.ilike(token),
+            Repressor.nickname.ilike(token),
+            Repressor.institution_name.ilike(token),
+            Repressor.campus_name.ilike(token),
+        ]
+        if q.isdigit():
+            filters.append(Repressor.external_id == int(q))
+        query = query.filter(or_(*filters))
+
+    if province:
+        query = query.filter(Repressor.province_name.ilike(province))
+    if municipality:
+        query = query.filter(Repressor.municipality_name.ilike(municipality))
+
+    try:
+        page = max(int(request.args.get("page", 1)), 1)
+    except ValueError:
+        page = 1
+    try:
+        per_page = max(int(request.args.get("per_page", 50)), 1)
+    except ValueError:
+        per_page = 50
+    per_page = min(per_page, 100)
+
+    total = query.count()
+    pages = max(math.ceil(total / per_page), 1) if per_page else 1
+    items = (
+        query.order_by(Repressor.updated_at.desc(), Repressor.id.desc())
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
+
+    return jsonify(
+        {
+            "page": page,
+            "per_page": per_page,
+            "total": total,
+            "pages": pages,
+            "has_next": page < pages,
+            "has_prev": page > 1,
+            "items": [serialize_repressor(item, include_relationships=True) for item in items],
+        }
+    )
+
+
+@api_bp.route("/v1/repressors/<int:repressor_id>")
+@limiter.limit("120/minute")
+def repressor_detail_v1(repressor_id):
+    repressor = (
+        Repressor.query.options(
+            selectinload(Repressor.crimes),
+            selectinload(Repressor.types),
+        )
+        .filter_by(id=repressor_id)
+        .first_or_404()
+    )
+    approved_residence_reports = (
+        RepressorResidenceReport.query.filter_by(
+            repressor_id=repressor.id,
+            status="approved",
+        )
+        .order_by(RepressorResidenceReport.created_at.desc())
+        .limit(50)
+        .all()
+    )
+    payload = serialize_repressor(repressor, include_relationships=True)
+    payload["approved_residence_reports"] = [
+        _serialize_repressor_residence_report(item)
+        for item in approved_residence_reports
+    ]
+    return jsonify(payload)
+
+
+@api_bp.route("/v1/repressors/stats")
+@limiter.limit("120/minute")
+def repressor_stats_v1():
+    province = (request.args.get("province") or "").strip()
+
+    base = Repressor.query
+    if province:
+        base = base.filter(Repressor.province_name.ilike(province))
+
+    total = base.count()
+
+    province_rows = (
+        db.session.query(
+            Repressor.province_name,
+            func.count(Repressor.id),
+        )
+        .group_by(Repressor.province_name)
+        .order_by(func.count(Repressor.id).desc())
+        .all()
+    )
+
+    municipality_query = db.session.query(
+        Repressor.province_name,
+        Repressor.municipality_name,
+        func.count(Repressor.id),
+    )
+    if province:
+        municipality_query = municipality_query.filter(
+            Repressor.province_name.ilike(province)
+        )
+    municipality_rows = (
+        municipality_query.group_by(
+            Repressor.province_name,
+            Repressor.municipality_name,
+        )
+        .order_by(func.count(Repressor.id).desc())
+        .all()
+    )
+
+    return jsonify(
+        {
+            "total_repressors": total,
+            "by_province": [
+                {
+                    "province": row[0],
+                    "count": int(row[1] or 0),
+                }
+                for row in province_rows
+            ],
+            "by_province_municipality": [
+                {
+                    "province": row[0],
+                    "municipality": row[1],
+                    "count": int(row[2] or 0),
+                }
+                for row in municipality_rows
+            ],
+        }
+    )
+
+
+@api_bp.route("/v1/repressors/<int:repressor_id>/residence-reports", methods=["POST"])
+@limiter.limit("6/minute; 80/day")
+def create_repressor_residence_report_v1(repressor_id):
+    repressor = Repressor.query.get_or_404(repressor_id)
+    payload = request.get_json(silent=True) or {}
+
+    message = (payload.get("message") or "").strip()
+    address = (payload.get("address") or "").strip()
+    province = (payload.get("province") or "").strip()
+    municipality = (payload.get("municipality") or "").strip()
+    links = payload.get("links") if isinstance(payload.get("links"), list) else []
+    links = [str(item or "").strip() for item in links if str(item or "").strip()]
+
+    if recaptcha_enabled():
+        token = (payload.get("recaptcha") or "").strip()
+        if not verify_recaptcha(token, request.remote_addr):
+            return jsonify({"ok": False, "error": "Verificación reCAPTCHA falló."}), 400
+
+    if not message:
+        return jsonify({"ok": False, "error": "El mensaje es obligatorio."}), 400
+    if len(message) < 30:
+        return jsonify({"ok": False, "error": "El mensaje debe tener al menos 30 caracteres."}), 400
+    if has_malicious_input([message, address, province, municipality] + links):
+        return jsonify({"ok": False, "error": "Se detectó contenido sospechoso."}), 400
+
+    try:
+        lat = Decimal(str(payload.get("latitude")))
+        lng = Decimal(str(payload.get("longitude")))
+    except Exception:
+        return jsonify({"ok": False, "error": "Latitud/longitud inválidas."}), 400
+
+    if not is_within_cuba_bounds(lat, lng):
+        return jsonify({"ok": False, "error": "La ubicación debe estar dentro de Cuba."}), 400
+
+    try:
+        auto_province, auto_municipality = lookup_location(lat, lng)
+    except Exception:
+        auto_province, auto_municipality = None, None
+    if auto_province:
+        province = auto_province
+    if auto_municipality:
+        municipality = auto_municipality
+
+    if not province or not municipality:
+        return jsonify({"ok": False, "error": "Provincia y municipio son obligatorios."}), 400
+
+    category = _residence_category()
+    if not category:
+        return jsonify({"ok": False, "error": "Categoría residencia-represor no disponible."}), 500
+
+    reporter = _get_or_create_anon_user()
+    auto_approve = bool(current_app.config.get("REPRESSOR_RESIDENCE_AUTO_APPROVE", False))
+    post_status = "approved" if auto_approve else "pending"
+    report_status = "approved" if auto_approve else "pending"
+
+    post = Post(
+        title=build_residence_post_title(repressor),
+        description=build_residence_post_description(repressor, message),
+        latitude=lat,
+        longitude=lng,
+        address=address or None,
+        province=province or None,
+        municipality=municipality or None,
+        repressor_name=repressor.full_name,
+        repressor_id=repressor.id,
+        links_json=json.dumps(links, ensure_ascii=False) if links else None,
+        status=post_status,
+        author_id=reporter.id,
+        category_id=category.id,
+    )
+    db.session.add(post)
+    db.session.flush()
+
+    if repressor.image_url:
+        db.session.add(
+            Media(
+                post_id=post.id,
+                file_url=repressor.image_url,
+                caption=f"Represor: {repressor.full_name}",
+            )
+        )
+
+    residence_report = RepressorResidenceReport(
+        repressor_id=repressor.id,
+        status=report_status,
+        reporter_id=reporter.id,
+        latitude=lat,
+        longitude=lng,
+        address=address or None,
+        province=province or None,
+        municipality=municipality or None,
+        message=message,
+        evidence_links_json=json.dumps(links, ensure_ascii=False) if links else None,
+        source_image_url=repressor.image_url,
+        created_post_id=post.id,
+        reviewed_at=datetime.utcnow() if auto_approve else None,
+    )
+    db.session.add(residence_report)
+    db.session.commit()
+
+    return (
+        jsonify(
+            {
+                "ok": True,
+                "residence_report": _serialize_repressor_residence_report(residence_report),
+                "post": _serialize_post(post),
+            }
+        ),
+        201,
+    )
 
 
 def _parse_date(value: str):
@@ -2059,22 +2387,6 @@ def analytics_v1():
             "connectivity_24h": connectivity_24h,
         }
     )
-
-
-def _get_or_create_anon_user():
-    if current_user.is_authenticated:
-        return current_user
-    anon_user = User(email=f"anon+{secrets.token_hex(6)}@local")
-    anon_user.set_password(secrets.token_urlsafe(16))
-    anon_user.ensure_anon_code()
-    default_role = Role.query.filter_by(name="colaborador").first()
-    if default_role:
-        anon_user.roles.append(default_role)
-    db.session.add(anon_user)
-    db.session.flush()
-    return anon_user
-
-
 @api_bp.route("/posts/<int:post_id>/verify", methods=["POST"])
 @limiter.limit("10/minute; 200/day")
 def verify_post(post_id):

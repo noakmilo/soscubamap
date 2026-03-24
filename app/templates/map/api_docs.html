@@ -92,6 +92,26 @@
   </div>
 
   <div class="api-section">
+    <h2>Catálogo de represores</h2>
+    <div class="api-endpoint">
+      <div class="api-method">GET</div>
+      <div class="api-path">/api/v1/repressors</div>
+    </div>
+    <p>Lista paginada de represores sincronizados en base de datos local.</p>
+    <div class="api-params">
+      <div><code>q</code> (opcional) · busca por nombre/apodo/institución/ID.</div>
+      <div><code>province</code> (opcional) · filtra por provincia.</div>
+      <div><code>municipality</code> (opcional) · filtra por municipio.</div>
+      <div><code>page</code> / <code>per_page</code> para paginación.</div>
+    </div>
+    <div class="api-endpoint" style="margin-top:10px;">
+      <div class="api-method">POST</div>
+      <div class="api-path">/api/v1/repressors/&lt;id&gt;/residence-reports</div>
+    </div>
+    <p>Crea reporte de vivienda y genera post categoría <code>residencia-represor</code>.</p>
+  </div>
+
+  <div class="api-section">
     <h2>Notas</h2>
     <ul class="api-notes">
       <li>Solo se exponen reportes con estado <code>approved</code>.</li>

@@ -76,6 +76,30 @@ class Config:
     PROTEST_KEYWORDS_WEAK = os.getenv("PROTEST_KEYWORDS_WEAK", "")
     PROTEST_PLACE_ALIASES_JSON = os.getenv("PROTEST_PLACE_ALIASES_JSON", "")
     PROTEST_SOURCE_NAME_OVERRIDES_JSON = os.getenv("PROTEST_SOURCE_NAME_OVERRIDES_JSON", "")
+    REPRESSOR_API_BASE_URL = os.getenv(
+        "REPRESSOR_API_BASE_URL", "https://data.represorescubanos.com"
+    )
+    REPRESSOR_PUBLIC_BASE_URL = os.getenv(
+        "REPRESSOR_PUBLIC_BASE_URL", "https://represorescubanos.com/repressor-detail"
+    )
+    REPRESSOR_FETCH_TIMEOUT_SECONDS = float(
+        os.getenv("REPRESSOR_FETCH_TIMEOUT_SECONDS", "20")
+    )
+    REPRESSOR_FETCH_RETRIES = int(os.getenv("REPRESSOR_FETCH_RETRIES", "3"))
+    REPRESSOR_FETCH_PAUSE_SECONDS = float(
+        os.getenv("REPRESSOR_FETCH_PAUSE_SECONDS", "0")
+    )
+    REPRESSOR_SCAN_START_ID = int(os.getenv("REPRESSOR_SCAN_START_ID", "1"))
+    REPRESSOR_SCAN_END_ID = int(os.getenv("REPRESSOR_SCAN_END_ID", "3000"))
+    REPRESSOR_INGESTION_INTERVAL_SECONDS = int(
+        os.getenv("REPRESSOR_INGESTION_INTERVAL_SECONDS", "86400")
+    )
+    REPRESSOR_BACKUP_JSON_PATH = os.getenv(
+        "REPRESSOR_BACKUP_JSON_PATH", "data/repressors_backup_latest.json"
+    )
+    REPRESSOR_RESIDENCE_AUTO_APPROVE = (
+        os.getenv("REPRESSOR_RESIDENCE_AUTO_APPROVE", "0") == "1"
+    )
     CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/1")
     CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", CELERY_BROKER_URL)
     CELERY_TIMEZONE = os.getenv("CELERY_TIMEZONE", "UTC")
@@ -88,6 +112,10 @@ class Config:
         os.getenv("CELERY_CONNECTIVITY_POLLING_INTERVAL_SECONDS", "7200")
     )
     CELERY_CONNECTIVITY_QUEUE = os.getenv("CELERY_CONNECTIVITY_QUEUE", "ingestion")
+    CELERY_REPRESSOR_INGESTION_ENABLED = (
+        os.getenv("CELERY_REPRESSOR_INGESTION_ENABLED", "1") == "1"
+    )
+    CELERY_REPRESSOR_QUEUE = os.getenv("CELERY_REPRESSOR_QUEUE", "ingestion")
     AUTO_CONNECTIVITY_REPORTS_ENABLED = (
         os.getenv("AUTO_CONNECTIVITY_REPORTS_ENABLED", "1") == "1"
     )

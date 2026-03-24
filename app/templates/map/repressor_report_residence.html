@@ -1,0 +1,224 @@
+{% extends "shared/base.html" %}
+{% block title %} | Identificar vivienda{% endblock %}
+{% block meta_description %}Formulario para reportar posible residencia de represor en el mapa con validación por provincia/municipio y moderación.{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="admin-toolbar">
+    <h1>Identificar vivienda de represor</h1>
+    <a class="btn-secondary" href="{{ url_for('map.repressor_detail', repressor_id=repressor.id) }}">← Volver a ficha</a>
+  </div>
+
+  <div class="report-repressor-card">
+    <div class="report-repressor-head">
+      {% if repressor_payload.image_url %}
+        <img src="{{ repressor_payload.image_url }}" alt="{{ repressor_payload.full_name }}" class="report-repressor-image" style="width:76px;height:76px;" />
+      {% endif %}
+      <div>
+        <div class="report-repressor-title">{{ repressor_payload.full_name }}</div>
+        <div class="report-repressor-meta">ID externo: {{ repressor_payload.external_id }}</div>
+        {% if repressor_payload.nickname %}
+          <div class="report-repressor-meta">Seudónimo: {{ repressor_payload.nickname }}</div>
+        {% endif %}
+        {% if repressor_payload.institution_name %}
+          <div class="report-repressor-meta">Institución: {{ repressor_payload.institution_name }}</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {% if submitted %}
+    <div class="flash success">Reporte enviado correctamente.</div>
+    <div class="muted">
+      {% if config.REPRESSOR_RESIDENCE_AUTO_APPROVE %}
+        Tu reporte fue publicado en el mapa.
+      {% else %}
+        Tu reporte quedó en moderación antes de publicarse en el mapa.
+      {% endif %}
+    </div>
+    <a class="btn-primary" href="{{ url_for('map.repressor_detail', repressor_id=repressor.id) }}">Volver a la ficha</a>
+  {% else %}
+    {% if errors.get("form") %}
+      <div class="flash error">{{ errors.get("form") }}</div>
+    {% endif %}
+    <p class="muted">
+      Marca el punto en el mapa y describe por qué consideras que esa ubicación corresponde a una residencia del represor.
+      Tu envío queda registrado con evidencias y será revisado.
+    </p>
+
+    <div class="draw-wrap">
+      <div class="draw-title">Selecciona ubicación en el mapa</div>
+      <div
+        id="residenceMap"
+        class="draw-map"
+        data-lat="{{ form_data.latitude }}"
+        data-lng="{{ form_data.longitude }}"
+        data-map-provider="{{ map_provider_forms }}"
+        data-allow-zoom="1"
+      ></div>
+      <div class="draw-help">Haz clic para colocar/mover el punto.</div>
+    </div>
+
+    <form method="post" class="form-grid">
+      <label>
+        Mensaje
+        <textarea name="message" rows="6" required minlength="30" class="{{ 'field-error' if errors.get('message') else '' }}" placeholder="Explica por qué esta ubicación corresponde a la residencia del represor.">{{ form_data.message }}</textarea>
+        {% if errors.get("message") %}
+          <div class="field-error-msg">{{ errors.get("message") }}</div>
+        {% endif %}
+      </label>
+      <label>
+        Dirección (opcional)
+        <input type="text" name="address" value="{{ form_data.address }}" />
+      </label>
+      <div class="two-col">
+        <label>
+          Latitud
+          <input id="latInput" type="text" name="latitude" value="{{ form_data.latitude }}" required class="{{ 'field-error' if errors.get('latitude') else '' }}" />
+          {% if errors.get("latitude") %}
+            <div class="field-error-msg">{{ errors.get("latitude") }}</div>
+          {% endif %}
+        </label>
+        <label>
+          Longitud
+          <input id="lngInput" type="text" name="longitude" value="{{ form_data.longitude }}" required class="{{ 'field-error' if errors.get('longitude') else '' }}" />
+          {% if errors.get("longitude") %}
+            <div class="field-error-msg">{{ errors.get("longitude") }}</div>
+          {% endif %}
+        </label>
+      </div>
+      <div class="two-col">
+        <label>
+          Provincia
+          <select name="province" id="provinceSelect" required class="{{ 'field-error' if errors.get('province') else '' }}">
+            <option value="">Seleccionar</option>
+            {% for prov in provinces %}
+              <option value="{{ prov }}" {% if form_data.province == prov %}selected{% endif %}>{{ prov }}</option>
+            {% endfor %}
+          </select>
+          {% if errors.get("province") %}
+            <div class="field-error-msg">{{ errors.get("province") }}</div>
+          {% endif %}
+        </label>
+        <label>
+          Municipio
+          <select name="municipality" id="municipalitySelect" required class="{{ 'field-error' if errors.get('municipality') else '' }}">
+            <option value="">Seleccionar</option>
+          </select>
+          {% if errors.get("municipality") %}
+            <div class="field-error-msg">{{ errors.get("municipality") }}</div>
+          {% endif %}
+        </label>
+      </div>
+
+      <div class="links-group">
+        <div class="links-header">
+          <span>Enlaces de evidencia</span>
+          <button type="button" class="btn-secondary" id="addLinkBtn">+ Agregar</button>
+        </div>
+        <div id="linksList" class="links-list">
+          {% for link in form_data.links %}
+            <input type="url" name="links[]" value="{{ link }}" placeholder="https://ejemplo.com/evidencia" />
+          {% endfor %}
+        </div>
+      </div>
+
+      {% if recaptcha_site_key %}
+        <div class="recaptcha-wrap">
+          <div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div>
+        </div>
+        {% if errors.get("recaptcha") %}
+          <div class="field-error-msg">{{ errors.get("recaptcha") }}</div>
+        {% endif %}
+      {% endif %}
+
+      <button class="btn-primary" type="submit">Enviar reporte de residencia</button>
+    </form>
+  {% endif %}
+</section>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+  window.CUBA_MUNICIPALITIES = {{ municipalities_map|tojson }};
+</script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const source = window.CUBA_MUNICIPALITIES || {};
+    const provinceSelect = document.getElementById("provinceSelect");
+    const municipalitySelect = document.getElementById("municipalitySelect");
+    const selectedMunicipality = "{{ form_data.municipality }}";
+
+    const renderMunicipalities = () => {
+      const province = provinceSelect ? provinceSelect.value : "";
+      let items = [];
+      if (province && source[province]) {
+        items = source[province];
+      } else {
+        Object.values(source).forEach((list) => {
+          items = items.concat(list || []);
+        });
+        items = Array.from(new Set(items)).sort();
+      }
+      municipalitySelect.innerHTML =
+        '<option value="">Seleccionar</option>' +
+        items
+          .map((name) => `<option value="${name}" ${name === selectedMunicipality ? "selected" : ""}>${name}</option>`)
+          .join("");
+    };
+    if (provinceSelect && municipalitySelect) {
+      renderMunicipalities();
+      provinceSelect.addEventListener("change", () => {
+        const province = provinceSelect.value;
+        const list = (province && source[province]) ? source[province] : [];
+        municipalitySelect.innerHTML =
+          '<option value="">Seleccionar</option>' +
+          list.map((name) => `<option value="${name}">${name}</option>`).join("");
+      });
+    }
+
+    const linksList = document.getElementById("linksList");
+    const addLinkBtn = document.getElementById("addLinkBtn");
+    if (addLinkBtn && linksList) {
+      addLinkBtn.addEventListener("click", () => {
+        const input = document.createElement("input");
+        input.type = "url";
+        input.name = "links[]";
+        input.placeholder = "https://ejemplo.com/evidencia";
+        linksList.appendChild(input);
+      });
+    }
+
+    const mapEl = document.getElementById("residenceMap");
+    const latInput = document.getElementById("latInput");
+    const lngInput = document.getElementById("lngInput");
+    if (!mapEl || typeof L === "undefined" || !latInput || !lngInput) return;
+
+    const fallbackLat = 23.1136;
+    const fallbackLng = -82.3666;
+    const lat = Number(latInput.value || mapEl.dataset.lat || fallbackLat);
+    const lng = Number(lngInput.value || mapEl.dataset.lng || fallbackLng);
+    const map = L.map(mapEl).setView([lat, lng], 12);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    let marker = L.marker([lat, lng]).addTo(map);
+
+    const updateInputs = (newLat, newLng) => {
+      latInput.value = Number(newLat).toFixed(6);
+      lngInput.value = Number(newLng).toFixed(6);
+    };
+    updateInputs(lat, lng);
+
+    map.on("click", (event) => {
+      const { lat: newLat, lng: newLng } = event.latlng;
+      marker.setLatLng([newLat, newLng]);
+      updateInputs(newLat, newLng);
+    });
+  });
+</script>
+{% if recaptcha_site_key %}
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+{% endif %}
+{% endblock %}

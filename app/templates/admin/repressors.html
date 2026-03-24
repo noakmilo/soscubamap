@@ -1,0 +1,119 @@
+{% extends "shared/base.html" %}
+{% block title %} | Admin · Represores{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="admin-toolbar">
+    <h1>Admin · Represores</h1>
+    <a class="btn-secondary" href="{{ url_for('admin.dashboard') }}">← Volver a admin</a>
+  </div>
+
+  <div class="admin-grid">
+    <article class="admin-card">
+      <h2>Catálogo local</h2>
+      <div class="admin-kpi">
+        <span class="admin-kpi-value">{{ total }}</span>
+        <span class="admin-kpi-label">registros filtrados</span>
+      </div>
+      <div class="admin-meta">
+        {% if latest_run %}
+          Última corrida #{{ latest_run.id }} · {{ latest_run.status }} · {{ latest_run.started_at_utc }}
+          <br />
+          stored={{ latest_run.stored_items }} updated={{ latest_run.updated_items }} unchanged={{ latest_run.unchanged_items }} missing={{ latest_run.missing_items }} errors={{ latest_run.errors_count }}
+        {% else %}
+          Aún no hay corridas de ingesta.
+        {% endif %}
+      </div>
+      <form method="post" action="{{ url_for('admin.repressors_manual_ingestion') }}">
+        <input type="hidden" name="next" value="{{ url_for('admin.repressors_catalog') }}" />
+        <button type="submit" class="btn-primary">Correr ingesta manual</button>
+      </form>
+    </article>
+
+    <article class="admin-card">
+      <h2>Revisión de viviendas</h2>
+      <div class="admin-kpi">
+        <span class="admin-kpi-value">{{ pending_reports }}</span>
+        <span class="admin-kpi-label">pendientes</span>
+      </div>
+      <div class="admin-actions">
+        <a class="btn-secondary" href="{{ url_for('admin.repressor_residence_reports', status='pending') }}">Pendientes</a>
+        <a class="btn-secondary" href="{{ url_for('admin.repressor_residence_reports', status='approved') }}">Aprobados</a>
+        <a class="btn-secondary" href="{{ url_for('admin.repressor_residence_reports', status='rejected') }}">Rechazados</a>
+      </div>
+    </article>
+  </div>
+
+  <form method="get" class="filter-controls" style="margin-top:18px;">
+    <label>
+      Buscar
+      <input type="text" name="q" value="{{ q }}" placeholder="Nombre, institución o ID externo" />
+    </label>
+    <label>
+      Provincia
+      <input type="text" name="provincia" value="{{ province }}" placeholder="Provincia exacta" />
+    </label>
+    <label>
+      Municipio
+      <input type="text" name="municipio" value="{{ municipality }}" placeholder="Municipio exacto" />
+    </label>
+    <button class="btn-primary" type="submit">Filtrar</button>
+  </form>
+</section>
+
+<section class="panel">
+  {% if rows %}
+    <div class="table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Foto</th>
+            <th>ID ext</th>
+            <th>Nombre</th>
+            <th>Institución</th>
+            <th>Provincia</th>
+            <th>Municipio</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in rows %}
+            <tr>
+              <td>
+                {% if item.image_url %}
+                  <img src="{{ item.image_url }}" alt="{{ item.full_name }}" style="width:44px;height:44px;border-radius:8px;object-fit:cover;" />
+                {% else %}
+                  <span class="muted">N/D</span>
+                {% endif %}
+              </td>
+              <td>{{ item.external_id }}</td>
+              <td>
+                <strong>{{ item.full_name }}</strong>
+                {% if item.nickname %}<div class="muted">Seudónimo: {{ item.nickname }}</div>{% endif %}
+              </td>
+              <td>{{ item.institution_name or "N/D" }}</td>
+              <td>{{ item.province_name or "N/D" }}</td>
+              <td>{{ item.municipality_name or "N/D" }}</td>
+              <td>
+                <a class="btn-secondary" href="{{ url_for('map.repressor_detail', repressor_id=item.id) }}" target="_blank" rel="noopener">Ver ficha</a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if pages > 1 %}
+      <div class="admin-links" style="margin-top:12px;">
+        {% if page > 1 %}
+          <a href="{{ url_for('admin.repressors_catalog', q=q, provincia=province, municipio=municipality, page=page-1) }}">← Anterior</a>
+        {% endif %}
+        <span>Página {{ page }} de {{ pages }}</span>
+        {% if page < pages %}
+          <a href="{{ url_for('admin.repressors_catalog', q=q, provincia=province, municipio=municipality, page=page+1) }}">Siguiente →</a>
+        {% endif %}
+      </div>
+    {% endif %}
+  {% else %}
+    <div class="muted">No hay represores para los filtros seleccionados.</div>
+  {% endif %}
+</section>
+{% endblock %}

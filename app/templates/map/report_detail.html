@@ -22,6 +22,31 @@
       {% if post.province or post.municipality %}
         <div class="muted">Provincia: {{ post.province or 'N/D' }} · Municipio: {{ post.municipality or 'N/D' }}</div>
       {% endif %}
+      {% if post.repressor %}
+        <div class="report-repressor-card">
+          <div class="report-repressor-head">
+            {% if post.repressor.image_url %}
+              <img src="{{ post.repressor.image_url }}" alt="{{ post.repressor.full_name }}" class="report-repressor-image" />
+            {% endif %}
+            <div>
+              <div class="report-repressor-title">{{ post.repressor.full_name }}</div>
+              {% if post.repressor.nickname %}
+                <div class="report-repressor-meta">Seudónimo: {{ post.repressor.nickname }}</div>
+              {% endif %}
+              {% if post.repressor.types %}
+                <div class="report-repressor-meta">Tipo: {{ post.repressor.types|map(attribute='name')|join(', ') }}</div>
+              {% endif %}
+            </div>
+          </div>
+          {% if post.repressor.institution_name %}
+            <div class="report-repressor-meta">Institución: {{ post.repressor.institution_name }}</div>
+          {% endif %}
+          {% if post.repressor.campus_name %}
+            <div class="report-repressor-meta">Centro laboral: {{ post.repressor.campus_name }}</div>
+          {% endif %}
+          <a class="btn-secondary" href="{{ url_for('map.repressor_detail', repressor_id=post.repressor.id) }}">Ver ficha del represor</a>
+        </div>
+      {% endif %}
       <p>{{ post.description }}</p>
 
       {% if links and links|length %}

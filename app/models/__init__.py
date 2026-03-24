@@ -23,6 +23,13 @@ from .connectivity_province_status import ConnectivityProvinceStatus
 from .protest_ingestion_run import ProtestIngestionRun
 from .protest_event import ProtestEvent
 from .protest_feed_source import ProtestFeedSource
+from .repressor import (
+    Repressor,
+    RepressorCrime,
+    RepressorType,
+    RepressorIngestionRun,
+    RepressorResidenceReport,
+)
 
 __all__ = [
     "User",
@@ -51,4 +58,9 @@ __all__ = [
     "ProtestIngestionRun",
     "ProtestEvent",
     "ProtestFeedSource",
+    "Repressor",
+    "RepressorCrime",
+    "RepressorType",
+    "RepressorIngestionRun",
+    "RepressorResidenceReport",
 ]

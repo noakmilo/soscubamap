@@ -1,0 +1,107 @@
+{% extends "shared/base.html" %}
+{% block title %} | Admin · Reportes de residencia{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="admin-toolbar">
+    <h1>Admin · Reportes de residencia</h1>
+    <a class="btn-secondary" href="{{ url_for('admin.repressors_catalog') }}">← Volver a represores</a>
+  </div>
+
+  <div class="admin-links" style="margin-top:10px;">
+    <a href="{{ url_for('admin.repressor_residence_reports', status='pending') }}">Pendientes</a>
+    <a href="{{ url_for('admin.repressor_residence_reports', status='approved') }}">Aprobados</a>
+    <a href="{{ url_for('admin.repressor_residence_reports', status='rejected') }}">Rechazados</a>
+    <a href="{{ url_for('admin.repressor_residence_reports', status='all') }}">Todos</a>
+  </div>
+</section>
+
+<section class="panel">
+  {% if rows %}
+    <div class="table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Represor</th>
+            <th>Ubicación</th>
+            <th>Mensaje</th>
+            <th>Estado</th>
+            <th>Reporte mapa</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            <tr>
+              <td>{{ row.created_at }}</td>
+              <td>
+                {% if row.repressor %}
+                  <a href="{{ url_for('map.repressor_detail', repressor_id=row.repressor.id) }}" target="_blank" rel="noopener">
+                    {{ row.repressor.full_name }}
+                  </a>
+                  <div class="muted">ID ext: {{ row.repressor.external_id }}</div>
+                {% else %}
+                  N/D
+                {% endif %}
+              </td>
+              <td>
+                {{ row.province or "N/D" }} · {{ row.municipality or "N/D" }}
+                <div class="muted">{{ row.latitude }}, {{ row.longitude }}</div>
+                {% if row.address %}
+                  <div class="muted">{{ row.address }}</div>
+                {% endif %}
+              </td>
+              <td>
+                {{ row.message }}
+                {% if row.evidence_links_json %}
+                  <details>
+                    <summary>Evidencias</summary>
+                    <div class="muted">{{ row.evidence_links_json }}</div>
+                  </details>
+                {% endif %}
+                {% if row.rejection_reason %}
+                  <div class="flash error" style="margin-top:6px;">Rechazo: {{ row.rejection_reason }}</div>
+                {% endif %}
+              </td>
+              <td>
+                {{ row.status }}
+                {% if row.reviewer %}
+                  <div class="muted">Revisor: {{ row.reviewer.email }}</div>
+                {% endif %}
+                {% if row.reviewed_at %}
+                  <div class="muted">{{ row.reviewed_at }}</div>
+                {% endif %}
+              </td>
+              <td>
+                {% if row.created_post %}
+                  <a class="btn-secondary" href="{{ url_for('map.report_detail', post_id=row.created_post.id) }}" target="_blank" rel="noopener">Ver reporte</a>
+                  <div class="muted">Estado: {{ row.created_post.status }}</div>
+                {% else %}
+                  <span class="muted">N/D</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if row.status == 'pending' %}
+                  <form method="post" action="{{ url_for('admin.approve_repressor_residence_report', report_id=row.id) }}" style="margin-bottom:8px;">
+                    <input type="hidden" name="next" value="{{ url_for('admin.repressor_residence_reports', status=status) }}" />
+                    <button class="btn-primary" type="submit">Aprobar</button>
+                  </form>
+                  <form method="post" action="{{ url_for('admin.reject_repressor_residence_report', report_id=row.id) }}">
+                    <input type="hidden" name="next" value="{{ url_for('admin.repressor_residence_reports', status=status) }}" />
+                    <input type="text" name="reason" placeholder="Motivo rechazo" required style="width:100%;margin-bottom:6px;" />
+                    <button class="btn-secondary" type="submit">Rechazar</button>
+                  </form>
+                {% else %}
+                  <span class="muted">Sin acciones</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="muted">No hay reportes para este estado.</div>
+  {% endif %}
+</section>
+{% endblock %}

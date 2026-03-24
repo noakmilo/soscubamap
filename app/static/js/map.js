@@ -1438,6 +1438,79 @@ function reportDetailHtmlForPost(post) {
   const safeAnon = escapeHtml(post.anon || "Anon");
   const safeDescription = escapeHtml(post.description || "");
   const safeAddress = escapeHtml(post.address || "");
+  const repressor = post && post.repressor ? post.repressor : null;
+  const repressorName = repressor ? escapeHtml(repressor.full_name || "") : "";
+  const repressorNick = repressor ? escapeHtml(repressor.nickname || "") : "";
+  const repressorInstitution = repressor
+    ? escapeHtml(repressor.institution_name || "")
+    : "";
+  const repressorCampus = repressor ? escapeHtml(repressor.campus_name || "") : "";
+  const repressorProvince = repressor ? escapeHtml(repressor.province_name || "") : "";
+  const repressorMunicipality = repressor
+    ? escapeHtml(repressor.municipality_name || "")
+    : "";
+  const repressorImage = repressor ? safeUrl(repressor.image_url || "") : "";
+  const repressorDetailUrl =
+    repressor && Number.isFinite(Number(repressor.id))
+      ? `/represores/${Number(repressor.id)}`
+      : "";
+  const repressorTypes = repressor && Array.isArray(repressor.types) ? repressor.types : [];
+  const repressorCrimes = repressor && Array.isArray(repressor.crimes) ? repressor.crimes : [];
+  const repressorBlock = repressor
+    ? `
+      <div class="report-repressor-card">
+        <div class="report-repressor-head">
+          ${
+            repressorImage
+              ? `<img src="${repressorImage}" alt="${repressorName}" class="report-repressor-image" />`
+              : ""
+          }
+          <div>
+            <div class="report-repressor-title">${repressorName || "Represor"}</div>
+            ${
+              repressorNick
+                ? `<div class="report-repressor-meta">Seudonimo: ${repressorNick}</div>`
+                : ""
+            }
+            ${
+              repressorTypes.length
+                ? `<div class="report-repressor-meta">Tipo: ${escapeHtml(repressorTypes.join(", "))}</div>`
+                : ""
+            }
+          </div>
+        </div>
+        ${
+          repressorInstitution
+            ? `<div class="report-repressor-meta">Institucion: ${repressorInstitution}</div>`
+            : ""
+        }
+        ${
+          repressorCampus
+            ? `<div class="report-repressor-meta">Centro laboral: ${repressorCampus}</div>`
+            : ""
+        }
+        ${
+          repressorProvince || repressorMunicipality
+            ? `<div class="report-repressor-meta">Provincia: ${
+                repressorProvince || "N/D"
+              } · Municipio: ${repressorMunicipality || "N/D"}</div>`
+            : ""
+        }
+        ${
+          repressorCrimes.length
+            ? `<div class="report-repressor-meta">Delitos: ${escapeHtml(
+                repressorCrimes.slice(0, 3).join(" · ")
+              )}${repressorCrimes.length > 3 ? " ..." : ""}</div>`
+            : ""
+        }
+        ${
+          repressorDetailUrl
+            ? `<div class="report-repressor-actions"><a class="info-btn info-btn-outline" href="${repressorDetailUrl}">Ver ficha del represor</a></div>`
+            : ""
+        }
+      </div>
+    `
+    : "";
   const mediaItems = Array.isArray(post.media) ? post.media : [];
   const mediaHtml = mediaItems.length
     ? `<div class="info-media">
@@ -1469,6 +1542,7 @@ function reportDetailHtmlForPost(post) {
       <div class="report-detail-meta">${safeAnon}</div>
       ${createdText ? `<div class="report-detail-meta">${createdText}</div>` : ""}
       <p class="report-detail-description">${safeDescription || "Sin descripcion."}</p>
+      ${repressorBlock}
       ${mediaHtml}
       ${
         post.links && post.links.length

@@ -20,6 +20,7 @@ from flask import (
     url_for,
 )
 from flask_login import current_user
+from sqlalchemy import func, or_
 from sqlalchemy.orm import selectinload
 
 from app.extensions import db, limiter
@@ -30,6 +31,7 @@ from app.models.media import Media
 from app.models.post import Post
 from app.models.post_edit_request import PostEditRequest
 from app.models.post_revision import PostRevision
+from app.models.repressor import Repressor, RepressorResidenceReport
 from app.models.role import Role
 from app.models.site_setting import SiteSetting
 from app.models.user import User
@@ -55,6 +57,11 @@ from app.services.media_upload import (
 )
 from app.services.push_notifications import push_enabled, send_alert_notification
 from app.services.recaptcha import recaptcha_enabled, verify_recaptcha
+from app.services.repressors import (
+    build_residence_post_description,
+    build_residence_post_title,
+    serialize_repressor,
+)
 from app.services.vote_identity import get_voter_hash
 from app.services.map_providers import get_map_provider_forms, get_map_provider_main
 
@@ -136,6 +143,27 @@ def _clean_captions(raw, count):
             value = value[:255]
         captions.append(value)
     return captions
+
+
+def _residence_category():
+    return Category.query.filter_by(slug="residencia-represor").first()
+
+
+def _serialize_residence_report(report: RepressorResidenceReport):
+    return {
+        "id": report.id,
+        "repressor_id": report.repressor_id,
+        "status": report.status,
+        "latitude": float(report.latitude) if report.latitude is not None else None,
+        "longitude": float(report.longitude) if report.longitude is not None else None,
+        "address": report.address,
+        "province": report.province,
+        "municipality": report.municipality,
+        "message": report.message,
+        "source_image_url": report.source_image_url,
+        "created_post_id": report.created_post_id,
+        "created_at": report.created_at.isoformat() if report.created_at else None,
+    }
 
 
 @map_bp.route("/")
@@ -1111,7 +1139,14 @@ def edit_report_public(post_id):
 
 @map_bp.route("/reporte/<int:post_id>")
 def report_detail(post_id):
-    post = Post.query.get_or_404(post_id)
+    post = (
+        Post.query.options(
+            selectinload(Post.repressor).selectinload(Repressor.crimes),
+            selectinload(Post.repressor).selectinload(Repressor.types),
+        )
+        .filter_by(id=post_id)
+        .first_or_404()
+    )
     if post.status != "approved":
         allowed = current_user.is_authenticated and (
             current_user.has_role("moderador") or current_user.has_role("administrador")
@@ -1245,4 +1280,306 @@ def reports():
         selected_province=selected_province,
         selected_municipality=selected_municipality,
         municipalities_map=municipalities_map(),
+    )
+
+
+@map_bp.route("/represores")
+def repressors():
+    q = request.args.get("q", "").strip()
+    selected_province = request.args.get("provincia", "").strip()
+    selected_municipality = request.args.get("municipio", "").strip()
+    try:
+        page = max(int(request.args.get("page", "1")), 1)
+    except Exception:
+        page = 1
+
+    per_page = 40
+    query = Repressor.query.options(
+        selectinload(Repressor.crimes),
+        selectinload(Repressor.types),
+    )
+
+    if q:
+        token = f"%{q}%"
+        filters = [
+            Repressor.name.ilike(token),
+            Repressor.lastname.ilike(token),
+            Repressor.nickname.ilike(token),
+            Repressor.institution_name.ilike(token),
+            Repressor.campus_name.ilike(token),
+        ]
+        if q.isdigit():
+            filters.append(Repressor.external_id == int(q))
+        query = query.filter(or_(*filters))
+
+    if selected_province:
+        query = query.filter(Repressor.province_name == selected_province)
+    if selected_municipality:
+        query = query.filter(Repressor.municipality_name == selected_municipality)
+
+    total = query.count()
+    pages = max((total + per_page - 1) // per_page, 1)
+    rows = (
+        query.order_by(Repressor.updated_at.desc(), Repressor.id.desc())
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
+
+    stats_query = db.session.query(
+        Repressor.province_name,
+        Repressor.municipality_name,
+        func.count(Repressor.id),
+    )
+    if selected_province:
+        stats_query = stats_query.filter(Repressor.province_name == selected_province)
+    if selected_municipality:
+        stats_query = stats_query.filter(
+            Repressor.municipality_name == selected_municipality
+        )
+    stats_rows = (
+        stats_query.group_by(
+            Repressor.province_name,
+            Repressor.municipality_name,
+        )
+        .order_by(func.count(Repressor.id).desc())
+        .limit(300)
+        .all()
+    )
+
+    provinces = list_provinces()
+    if selected_province:
+        municipalities = list_municipalities(selected_province)
+    else:
+        municipalities = list_municipalities()
+
+    return render_template(
+        "map/repressors.html",
+        repressors=rows,
+        total=total,
+        page=page,
+        pages=pages,
+        per_page=per_page,
+        q=q,
+        provinces=provinces,
+        municipalities=municipalities,
+        selected_province=selected_province,
+        selected_municipality=selected_municipality,
+        municipalities_map=municipalities_map(),
+        stats_rows=stats_rows,
+    )
+
+
+@map_bp.route("/represores/<int:repressor_id>")
+def repressor_detail(repressor_id):
+    repressor = (
+        Repressor.query.options(
+            selectinload(Repressor.crimes),
+            selectinload(Repressor.types),
+        )
+        .filter_by(id=repressor_id)
+        .first_or_404()
+    )
+
+    approved_residence_reports = (
+        RepressorResidenceReport.query.filter_by(
+            repressor_id=repressor.id,
+            status="approved",
+        )
+        .order_by(RepressorResidenceReport.created_at.desc())
+        .limit(100)
+        .all()
+    )
+    linked_posts = (
+        Post.query.filter_by(repressor_id=repressor.id, status="approved")
+        .order_by(Post.created_at.desc())
+        .limit(100)
+        .all()
+    )
+
+    return render_template(
+        "map/repressor_detail.html",
+        repressor=repressor,
+        repressor_payload=serialize_repressor(repressor, include_relationships=True),
+        approved_residence_reports=approved_residence_reports,
+        linked_posts=linked_posts,
+    )
+
+
+@map_bp.route("/represores/<int:repressor_id>/reportar-residencia", methods=["GET", "POST"])
+@limiter.limit("3/minute; 30/day", methods=["POST"])
+def report_repressor_residence(repressor_id):
+    repressor = Repressor.query.filter_by(id=repressor_id).first_or_404()
+    category = _residence_category()
+    if not category:
+        abort(500, "No existe la categoría residencia-represor")
+
+    errors = {}
+    submitted = False
+    form_data = {
+        "message": "",
+        "address": "",
+        "province": repressor.province_name or "",
+        "municipality": repressor.municipality_name or "",
+        "latitude": "",
+        "longitude": "",
+        "links": [""],
+    }
+
+    if request.method == "POST":
+        links = request.form.getlist("links[]")
+        links = [item.strip() for item in links if item.strip()]
+        form_data = {
+            "message": request.form.get("message", "").strip(),
+            "address": request.form.get("address", "").strip(),
+            "province": request.form.get("province", "").strip(),
+            "municipality": request.form.get("municipality", "").strip(),
+            "latitude": request.form.get("latitude", "").strip(),
+            "longitude": request.form.get("longitude", "").strip(),
+            "links": links if links else [""],
+        }
+
+        if recaptcha_enabled():
+            token = request.form.get("g-recaptcha-response", "")
+            if not verify_recaptcha(token, request.remote_addr):
+                errors["recaptcha"] = "Verificación reCAPTCHA falló."
+
+        if not form_data["message"]:
+            errors["message"] = "El mensaje es obligatorio."
+        elif len(form_data["message"]) < 30:
+            errors["message"] = "El mensaje debe tener al menos 30 caracteres."
+
+        if has_malicious_input(
+            [
+                form_data["message"],
+                form_data["address"],
+                form_data["province"],
+                form_data["municipality"],
+            ]
+            + links
+        ):
+            errors["form"] = "Se detectó contenido sospechoso."
+
+        lat = None
+        lng = None
+        if not form_data["latitude"]:
+            errors["latitude"] = "La latitud es obligatoria."
+        if not form_data["longitude"]:
+            errors["longitude"] = "La longitud es obligatoria."
+
+        if "latitude" not in errors and "longitude" not in errors:
+            try:
+                lat = Decimal(form_data["latitude"])
+                lng = Decimal(form_data["longitude"])
+            except Exception:
+                errors["latitude"] = "Latitud inválida."
+                errors["longitude"] = "Longitud inválida."
+
+        if lat is not None and lng is not None:
+            if not is_within_cuba_bounds(lat, lng):
+                errors["latitude"] = "La ubicación debe estar dentro de Cuba."
+                errors["longitude"] = "La ubicación debe estar dentro de Cuba."
+            else:
+                auto_prov, auto_mun = _resolve_geo_location(
+                    lat,
+                    lng,
+                    form_data["province"],
+                    form_data["municipality"],
+                )
+                form_data["province"] = auto_prov or ""
+                form_data["municipality"] = auto_mun or ""
+
+        if not form_data["province"]:
+            errors["province"] = "Provincia obligatoria."
+        if not form_data["municipality"]:
+            errors["municipality"] = "Municipio obligatorio."
+
+        if not errors:
+            reporter = _get_or_create_anon_editor()
+            auto_approve = bool(current_app.config.get("REPRESSOR_RESIDENCE_AUTO_APPROVE", False))
+            post_status = "approved" if auto_approve else "pending"
+            report_status = "approved" if auto_approve else "pending"
+
+            post = Post(
+                title=build_residence_post_title(repressor),
+                description=build_residence_post_description(repressor, form_data["message"]),
+                category_id=category.id,
+                latitude=lat,
+                longitude=lng,
+                address=form_data["address"] or None,
+                province=form_data["province"] or None,
+                municipality=form_data["municipality"] or None,
+                repressor_name=repressor.full_name,
+                repressor_id=repressor.id,
+                links_json=json.dumps(links, ensure_ascii=False) if links else None,
+                status=post_status,
+                author_id=reporter.id,
+            )
+            db.session.add(post)
+            db.session.flush()
+
+            if repressor.image_url:
+                db.session.add(
+                    Media(
+                        post_id=post.id,
+                        file_url=repressor.image_url,
+                        caption=f"Represor: {repressor.full_name}",
+                    )
+                )
+
+            residence_report = RepressorResidenceReport(
+                repressor_id=repressor.id,
+                status=report_status,
+                reporter_id=reporter.id,
+                latitude=lat,
+                longitude=lng,
+                address=form_data["address"] or None,
+                province=form_data["province"] or None,
+                municipality=form_data["municipality"] or None,
+                message=form_data["message"],
+                evidence_links_json=json.dumps(links, ensure_ascii=False) if links else None,
+                source_image_url=repressor.image_url,
+                created_post_id=post.id,
+                reviewed_at=datetime.utcnow() if auto_approve else None,
+            )
+            db.session.add(residence_report)
+            db.session.commit()
+            submitted = True
+
+            if request.args.get("modal") != "1":
+                if post.status == "approved":
+                    flash("Reporte de residencia publicado.", "success")
+                else:
+                    flash("Reporte de residencia enviado a moderación.", "success")
+
+            if request.args.get("modal") == "1":
+                return render_template(
+                    "map/report_success.html",
+                    payload={
+                        "id": post.id,
+                        "status": post.status,
+                        "title": post.title,
+                        "description": post.description,
+                        "latitude": float(post.latitude),
+                        "longitude": float(post.longitude),
+                        "address": post.address,
+                        "category": {"name": category.name, "slug": category.slug},
+                        "verify_count": post.verify_count or 0,
+                        "created_at": post.created_at.isoformat() if post.created_at else None,
+                        "movement_at": None,
+                    },
+                )
+
+    return render_template(
+        "map/repressor_report_residence.html",
+        repressor=repressor,
+        repressor_payload=serialize_repressor(repressor, include_relationships=True),
+        form_data=form_data,
+        errors=errors,
+        submitted=submitted,
+        provinces=list_provinces(),
+        municipalities_map=municipalities_map(),
+        map_provider_forms=get_map_provider_forms(),
+        google_maps_api_key=_google_maps_api_key(),
+        recaptcha_site_key=current_app.config.get("RECAPTCHA_V2_SITE_KEY"),
     )

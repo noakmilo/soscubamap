@@ -82,6 +82,33 @@
         <a class="btn-secondary" href="{{ url_for('admin.protests_feeds_settings') }}">Feeds RSS</a>
       </div>
     </article>
+
+    <article class="admin-card">
+      <h2>Ingesta de Represores</h2>
+      <div class="admin-kpi">
+        <span class="admin-kpi-value">{{ repressors_count }}</span>
+        <span class="admin-kpi-label">represores locales</span>
+      </div>
+      <div class="admin-meta">
+        {% if latest_repressor_run %}
+          Última corrida: #{{ latest_repressor_run.id }} · {{ latest_repressor_run.status }} · {{ latest_repressor_run.started_at_utc }}
+          <br />
+          stored={{ latest_repressor_run.stored_items }} updated={{ latest_repressor_run.updated_items }} unchanged={{ latest_repressor_run.unchanged_items }} missing={{ latest_repressor_run.missing_items }} errors={{ latest_repressor_run.errors_count }}
+        {% else %}
+          Aún no hay corridas registradas.
+        {% endif %}
+        <br />
+        Reportes de vivienda pendientes: {{ pending_repressor_residence_reports }}
+      </div>
+      <form method="post" action="{{ url_for('admin.repressors_manual_ingestion') }}">
+        <input type="hidden" name="next" value="{{ url_for('admin.dashboard') }}" />
+        <button type="submit" class="btn-primary">Correr ingesta manual</button>
+      </form>
+      <div class="admin-actions">
+        <a class="btn-secondary" href="{{ url_for('admin.repressors_catalog') }}">Catálogo represores</a>
+        <a class="btn-secondary" href="{{ url_for('admin.repressor_residence_reports', status='pending') }}">Revisión viviendas</a>
+      </div>
+    </article>
   </div>
 
   <div class="admin-section">
@@ -95,6 +122,8 @@
       <a href="{{ url_for('admin.location_reports') }}">Ubicaciones reportadas</a>
       <a href="{{ url_for('admin.discussions') }}">Discusiones</a>
       <a href="{{ url_for('admin.donations') }}">Donaciones</a>
+      <a href="{{ url_for('admin.repressors_catalog') }}">Represores</a>
+      <a href="{{ url_for('admin.repressor_residence_reports', status='pending') }}">Viviendas represores</a>
       <a href="{{ url_for('api.protests_debug') }}" target="_blank" rel="noopener noreferrer">Debug Protestas API</a>
     </div>
   </div>

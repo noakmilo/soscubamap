@@ -37,6 +37,7 @@
         {% if current_user.is_authenticated %}
           <button class="btn-secondary" type="button" data-open-report data-url="{{ url_for('map.new_post') }}">Nuevo reporte</button>
           <a href="{{ url_for('map.reports') }}">Reportes</a>
+          <a href="{{ url_for('map.repressors') }}">Represores</a>
           <a href="{{ url_for('map.export_data') }}">Exportar</a>
           <a href="{{ url_for('map.analytics') }}">Analíticas</a>
           <a href="{{ url_for('map.about') }}">Acerca de</a>
@@ -56,6 +57,7 @@
           <a href="{{ url_for('auth.logout') }}">Salir</a>
         {% else %}
           <a href="{{ url_for('map.reports') }}">Reportes</a>
+          <a href="{{ url_for('map.repressors') }}">Represores</a>
           <a href="{{ url_for('map.export_data') }}">Exportar</a>
           <a href="{{ url_for('map.analytics') }}">Analíticas</a>
           <a href="{{ url_for('map.about') }}">Acerca de</a>

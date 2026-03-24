@@ -23,6 +23,7 @@ from app.models.category import Category
 from app.models.donation_log import DonationLog
 from app.models.protest_event import ProtestEvent
 from app.models.protest_ingestion_run import ProtestIngestionRun
+from app.models.repressor import Repressor, RepressorIngestionRun, RepressorResidenceReport
 from app.extensions import db
 from app.models.media import Media
 from app.services.media_upload import media_json_from_post, parse_media_json, get_media_payload
@@ -35,7 +36,8 @@ from flask_login import current_user
 import json
 from datetime import datetime
 from decimal import Decimal
-from sqlalchemy import func
+from sqlalchemy import func, or_
+from sqlalchemy.orm import selectinload
 from app.services.markdown_utils import render_markdown
 from app.services.discussion_tags import upsert_tags
 from app.services.protests import get_rss_feed_urls
@@ -85,7 +87,19 @@ def dashboard():
         .limit(1)
         .first()
     )
+    latest_repressor_run = (
+        RepressorIngestionRun.query.order_by(
+            RepressorIngestionRun.started_at_utc.desc(),
+            RepressorIngestionRun.id.desc(),
+        )
+        .limit(1)
+        .first()
+    )
     protest_feed_count = len(get_rss_feed_urls())
+    repressors_count = Repressor.query.count()
+    pending_repressor_residence_reports = RepressorResidenceReport.query.filter_by(
+        status="pending"
+    ).count()
     return render_template(
         "admin/dashboard.html",
         moderation_enabled=moderation_enabled,
@@ -97,6 +111,9 @@ def dashboard():
         location_reports=location_reports,
         protest_feed_count=protest_feed_count,
         latest_protest_run=latest_protest_run,
+        latest_repressor_run=latest_repressor_run,
+        repressors_count=repressors_count,
+        pending_repressor_residence_reports=pending_repressor_residence_reports,
     )
 
 
@@ -390,6 +407,183 @@ def protests_manual_ingestion():
     except Exception as exc:
         flash(f"No se pudo enviar la ingesta manual a Celery: {exc}", "error")
 
+    return redirect(next_url)
+
+
+@admin_bp.route("/represores")
+@login_required
+@role_required("administrador")
+def repressors_catalog():
+    q = (request.args.get("q") or "").strip()
+    province = (request.args.get("provincia") or "").strip()
+    municipality = (request.args.get("municipio") or "").strip()
+    try:
+        page = max(int(request.args.get("page", "1")), 1)
+    except Exception:
+        page = 1
+    per_page = 50
+
+    query = Repressor.query
+    if q:
+        token = f"%{q}%"
+        filters = [
+            Repressor.name.ilike(token),
+            Repressor.lastname.ilike(token),
+            Repressor.nickname.ilike(token),
+            Repressor.institution_name.ilike(token),
+            Repressor.campus_name.ilike(token),
+        ]
+        if q.isdigit():
+            filters.append(Repressor.external_id == int(q))
+        query = query.filter(or_(*filters))
+    if province:
+        query = query.filter(Repressor.province_name == province)
+    if municipality:
+        query = query.filter(Repressor.municipality_name == municipality)
+
+    total = query.count()
+    rows = (
+        query.order_by(Repressor.updated_at.desc(), Repressor.id.desc())
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
+    latest_run = (
+        RepressorIngestionRun.query.order_by(
+            RepressorIngestionRun.started_at_utc.desc(),
+            RepressorIngestionRun.id.desc(),
+        )
+        .first()
+    )
+    pending_reports = RepressorResidenceReport.query.filter_by(status="pending").count()
+    pages = max((total + per_page - 1) // per_page, 1)
+
+    return render_template(
+        "admin/repressors.html",
+        rows=rows,
+        q=q,
+        province=province,
+        municipality=municipality,
+        page=page,
+        pages=pages,
+        per_page=per_page,
+        total=total,
+        latest_run=latest_run,
+        pending_reports=pending_reports,
+    )
+
+
+@admin_bp.route("/represores/ingesta-manual", methods=["POST"])
+@login_required
+@role_required("administrador")
+def repressors_manual_ingestion():
+    next_url = (request.form.get("next") or "").strip()
+    if not next_url.startswith("/admin"):
+        next_url = url_for("admin.repressors_catalog")
+
+    queue_name = (
+        current_app.config.get("CELERY_REPRESSOR_QUEUE") or "ingestion"
+    ).strip() or "ingestion"
+    try:
+        from app.celery_app import REPRESSOR_INGESTION_TASK, celery
+
+        result = celery.send_task(
+            REPRESSOR_INGESTION_TASK,
+            kwargs={},
+            queue=queue_name,
+        )
+        flash(
+            f"Ingesta manual de represores enviada a Celery (task_id={result.id}, queue={queue_name}).",
+            "success",
+        )
+    except Exception as exc:
+        flash(f"No se pudo enviar la ingesta de represores: {exc}", "error")
+
+    return redirect(next_url)
+
+
+@admin_bp.route("/represores/reportes-residencia")
+@login_required
+@role_required("administrador")
+def repressor_residence_reports():
+    status = (request.args.get("status") or "pending").strip().lower()
+    if status not in {"pending", "approved", "rejected", "all"}:
+        status = "pending"
+
+    query = RepressorResidenceReport.query.options(
+        selectinload(RepressorResidenceReport.repressor),
+        selectinload(RepressorResidenceReport.created_post),
+        selectinload(RepressorResidenceReport.reporter),
+        selectinload(RepressorResidenceReport.reviewer),
+    )
+    if status != "all":
+        query = query.filter(RepressorResidenceReport.status == status)
+
+    rows = query.order_by(
+        RepressorResidenceReport.created_at.desc(),
+        RepressorResidenceReport.id.desc(),
+    ).all()
+    return render_template(
+        "admin/repressor_residence_reports.html",
+        rows=rows,
+        status=status,
+    )
+
+
+@admin_bp.route("/represores/reportes-residencia/<int:report_id>/aprobar", methods=["POST"])
+@login_required
+@role_required("administrador")
+def approve_repressor_residence_report(report_id):
+    report = RepressorResidenceReport.query.get_or_404(report_id)
+    next_url = (request.form.get("next") or "").strip()
+    if not next_url.startswith("/admin"):
+        next_url = url_for("admin.repressor_residence_reports", status="pending")
+
+    if report.status == "approved":
+        flash("El reporte ya estaba aprobado.", "warning")
+        return redirect(next_url)
+
+    report.status = "approved"
+    report.reviewed_at = datetime.utcnow()
+    report.reviewer_id = current_user.id if current_user.is_authenticated else None
+    report.rejection_reason = None
+
+    if report.created_post_id:
+        post = Post.query.get(report.created_post_id)
+        if post:
+            post.status = "approved"
+
+    db.session.commit()
+    flash("Reporte de residencia aprobado y publicado en mapa.", "success")
+    return redirect(next_url)
+
+
+@admin_bp.route("/represores/reportes-residencia/<int:report_id>/rechazar", methods=["POST"])
+@login_required
+@role_required("administrador")
+def reject_repressor_residence_report(report_id):
+    report = RepressorResidenceReport.query.get_or_404(report_id)
+    next_url = (request.form.get("next") or "").strip()
+    if not next_url.startswith("/admin"):
+        next_url = url_for("admin.repressor_residence_reports", status="pending")
+
+    reason = request.form.get("reason", "").strip()
+    if not reason:
+        flash("Debes indicar motivo de rechazo.", "error")
+        return redirect(next_url)
+
+    report.status = "rejected"
+    report.reviewed_at = datetime.utcnow()
+    report.reviewer_id = current_user.id if current_user.is_authenticated else None
+    report.rejection_reason = reason
+
+    if report.created_post_id:
+        post = Post.query.get(report.created_post_id)
+        if post and post.status == "pending":
+            post.status = "rejected"
+
+    db.session.commit()
+    flash("Reporte de residencia rechazado.", "success")
     return redirect(next_url)
 
 
