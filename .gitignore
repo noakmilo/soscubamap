@@ -8,3 +8,4 @@ instance/
 .idea/
 /.coverage
 .DS_Store
+scripts/scrape_palsaco_opresores.py

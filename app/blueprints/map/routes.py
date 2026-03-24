@@ -1428,6 +1428,11 @@ def add_repressor():
     allowed_type_names = get_repressor_type_names()
     existing_crime_names = list_existing_repressor_crime_names()
     existing_crime_name_set = set(existing_crime_names)
+    cloudinary_enabled = bool(
+        (current_app.config.get("CLOUDINARY_CLOUD_NAME") or "").strip()
+        and (current_app.config.get("CLOUDINARY_API_KEY") or "").strip()
+        and (current_app.config.get("CLOUDINARY_API_SECRET") or "").strip()
+    )
 
     errors = {}
     form_data = {
@@ -1438,7 +1443,6 @@ def add_repressor():
         "campus_name": "",
         "province_name": "",
         "municipality_name": "",
-        "photo_url": "",
         "note": "",
         "custom_crimes": "",
         "selected_crime_names": [],
@@ -1457,12 +1461,16 @@ def add_repressor():
             "campus_name": request.form.get("campus_name", "").strip(),
             "province_name": request.form.get("province_name", "").strip(),
             "municipality_name": request.form.get("municipality_name", "").strip(),
-            "photo_url": request.form.get("photo_url", "").strip(),
             "note": request.form.get("note", "").strip(),
             "custom_crimes": custom_crimes_text,
             "selected_crime_names": selected_crime_names,
             "selected_type_names": selected_type_names,
         }
+        photo_files = [
+            file
+            for file in request.files.getlist("photo")
+            if file and (file.filename or "").strip()
+        ]
         filtered_selected_crimes = [
             value for value in selected_crime_names if value in existing_crime_name_set
         ]
@@ -1487,10 +1495,16 @@ def add_repressor():
             if not verify_recaptcha(token, request.remote_addr):
                 errors["recaptcha"] = "Verificación reCAPTCHA falló."
 
-        if not form_data["photo_url"]:
-            errors["photo_url"] = "La foto es obligatoria."
-        elif not form_data["photo_url"].startswith(("http://", "https://")):
-            errors["photo_url"] = "La foto debe ser una URL válida."
+        if not photo_files:
+            errors["photo"] = "La foto es obligatoria."
+        elif len(photo_files) > 1:
+            errors["photo"] = "Solo puedes subir una foto por envío."
+        elif not cloudinary_enabled:
+            errors["photo"] = "Subida de imagen no disponible: falta configuración de Cloudinary."
+        else:
+            ok, error = validate_files(photo_files)
+            if not ok:
+                errors["photo"] = error
 
         if not form_data["name"]:
             errors["name"] = "El nombre es obligatorio."
@@ -1515,12 +1529,22 @@ def add_repressor():
             form_data["campus_name"],
             form_data["province_name"],
             form_data["municipality_name"],
-            form_data["photo_url"],
             form_data["note"],
             form_data["custom_crimes"],
         ] + filtered_selected_types + all_crime_names
         if has_malicious_input(malicious_values):
             errors["form"] = "Se detectó contenido sospechoso en el formulario."
+
+        photo_url = None
+        if not errors:
+            try:
+                uploaded_urls = upload_files(photo_files)
+                photo_url = uploaded_urls[0] if uploaded_urls else None
+            except Exception:
+                current_app.logger.exception("Error al subir foto de represor a Cloudinary")
+                errors["photo"] = "No se pudo subir la foto a Cloudinary."
+            if not photo_url and "photo" not in errors:
+                errors["photo"] = "No se pudo subir la foto a Cloudinary."
 
         if not errors:
             try:
@@ -1531,7 +1555,7 @@ def add_repressor():
                     status=status,
                     submitter_id=submitter.id if submitter else None,
                     reviewer_id=reviewer_id if not moderation_enabled else None,
-                    photo_url=form_data["photo_url"],
+                    photo_url=photo_url,
                     name=form_data["name"],
                     lastname=form_data["lastname"] or None,
                     nickname=form_data["nickname"] or None,

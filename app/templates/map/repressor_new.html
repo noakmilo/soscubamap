@@ -20,19 +20,19 @@
     <div class="flash error">{{ errors.get("form") }}</div>
   {% endif %}
 
-  <form method="post" class="form-grid" id="addRepressorForm">
+  <form method="post" class="form-grid" id="addRepressorForm" enctype="multipart/form-data">
     <label>
-      Foto (URL) *
+      Foto *
       <input
-        type="url"
-        name="photo_url"
-        value="{{ form_data.photo_url }}"
-        placeholder="https://..."
-        class="{{ 'field-error' if errors.get('photo_url') else '' }}"
+        type="file"
+        name="photo"
+        accept=".jpg,.jpeg,.png,.webp,.heic,image/heic,image/heif"
+        class="{{ 'field-error' if errors.get('photo') else '' }}"
         required
       />
-      {% if errors.get("photo_url") %}
-        <div class="field-error-msg">{{ errors.get("photo_url") }}</div>
+      <div class="muted">Se sube directamente desde tu dispositivo a Cloudinary.</div>
+      {% if errors.get("photo") %}
+        <div class="field-error-msg">{{ errors.get("photo") }}</div>
       {% endif %}
     </label>
 
