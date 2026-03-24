@@ -4021,35 +4021,84 @@ textarea {
   text-align: center;
 }
 
+.repressor-type-fieldset {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #0b1116;
+  display: grid;
+  gap: 10px;
+}
+
+.repressor-type-fieldset legend {
+  color: var(--text);
+  font-weight: 700;
+  padding: 0 4px;
+}
+
+.repressor-type-fieldset.is-error {
+  border: 3px solid var(--danger);
+}
+
+.repressor-type-help {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
 .repressor-type-grid {
   display: grid;
   gap: 10px;
-  margin-top: 8px;
-}
-
-.repressor-type-grid.field-error {
-  border: 3px solid var(--danger);
-  border-radius: 8px;
-  padding: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
 .repressor-type-option {
-  display: grid;
-  gap: 6px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: #0d141a;
   padding: 10px 12px;
+  cursor: pointer;
+  min-height: 100%;
+  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
 }
 
-.repressor-type-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.repressor-type-option:hover {
+  border-color: rgba(110, 231, 183, 0.4);
+  background: #0f1820;
 }
 
-.repressor-type-head input {
-  margin: 0;
+.repressor-type-check {
+  margin: 2px 0 0;
+  flex-shrink: 0;
+  accent-color: #62f5c2;
+}
+
+.repressor-type-copy {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.repressor-type-title {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.25;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.repressor-type-option:has(.repressor-type-check:checked) {
+  border-color: rgba(110, 231, 183, 0.82);
+  background: rgba(98, 245, 194, 0.1);
+  box-shadow: 0 0 0 1px rgba(110, 231, 183, 0.35);
 }
 
 .repressor-type-desc {
@@ -4065,6 +4114,18 @@ textarea {
 }
 
 @media (max-width: 720px) {
+  .repressor-type-fieldset {
+    padding: 10px;
+  }
+
+  .repressor-type-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .repressor-type-option {
+    padding: 9px 10px;
+  }
+
   .repressors-table {
     min-width: 880px;
   }
