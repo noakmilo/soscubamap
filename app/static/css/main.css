@@ -4124,8 +4124,10 @@ textarea {
 }
 
 .repressor-duel-card {
-  width: min(100%, 760px);
-  border-radius: 18px;
+  width: min(2.25in, calc(100vw - 28px));
+  aspect-ratio: 2.25 / 3.25;
+  height: auto;
+  border-radius: 12px;
   border: 1px solid #8f764a;
   background:
     radial-gradient(circle at 14% 8%, rgba(255, 224, 157, 0.24) 0%, rgba(255, 224, 157, 0) 28%),
@@ -4134,49 +4136,54 @@ textarea {
   box-shadow:
     0 20px 40px rgba(0, 0, 0, 0.32),
     inset 0 0 0 1px rgba(255, 241, 206, 0.34);
-  padding: 14px;
+  padding: 8px;
   color: #2b1b07;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .repressor-duel-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 6px;
 }
 
 .repressor-duel-name {
   margin: 0;
-  font-size: 26px;
-  line-height: 1.2;
+  font-size: 11px;
+  line-height: 1.25;
   color: #2b1600;
-  text-wrap: balance;
+  text-wrap: pretty;
 }
 
 .repressor-duel-code {
   color: #5d431a;
   font-weight: 700;
-  font-size: 12px;
-  letter-spacing: 0.8px;
+  font-size: 8px;
+  letter-spacing: 0.3px;
   text-transform: uppercase;
   text-align: right;
 }
 
 .repressor-duel-type-row {
-  margin-top: 10px;
+  margin-top: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 4px;
 }
 
 .repressor-duel-type-chip {
   border: 1px solid transparent;
   border-radius: 999px;
-  padding: 5px 11px;
-  font-size: 11px;
+  padding: 2px 6px;
+  font-size: 8px;
   font-weight: 800;
   line-height: 1.2;
-  letter-spacing: 0.35px;
+  letter-spacing: 0.2px;
   text-transform: uppercase;
 }
 
@@ -4187,9 +4194,7 @@ textarea {
 }
 
 .repressor-duel-type-legend {
-  margin-top: 8px;
-  display: grid;
-  gap: 8px;
+  display: none;
 }
 
 .repressor-duel-type-legend-item {
@@ -4211,42 +4216,44 @@ textarea {
 }
 
 .repressor-duel-art-frame {
-  margin-top: 12px;
-  border-radius: 12px;
+  margin-top: 0;
+  border-radius: 8px;
   border: 1px solid #7a643f;
   background: #262324;
   overflow: hidden;
-  min-height: 360px;
+  min-height: 0;
+  height: 1.1in;
+  flex: 0 0 auto;
   display: grid;
   place-items: center;
 }
 
 .repressor-duel-art {
   width: 100%;
-  height: min(70vh, 620px);
-  min-height: 360px;
+  height: 100%;
+  min-height: 0;
   object-fit: cover;
   display: block;
 }
 
 .repressor-duel-art-empty {
-  padding: 40px 20px;
+  padding: 10px 8px;
   text-align: center;
   color: #cabfa8;
   text-transform: uppercase;
-  letter-spacing: 0.6px;
-  font-size: 12px;
+  letter-spacing: 0.4px;
+  font-size: 8px;
 }
 
 .repressor-duel-grid {
-  margin-top: 12px;
+  margin-top: 0;
   border: 1px solid #896d3e;
-  border-radius: 10px;
+  border-radius: 8px;
   background: rgba(255, 244, 220, 0.7);
-  padding: 10px;
+  padding: 6px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 9px 10px;
+  grid-template-columns: 1fr;
+  gap: 4px;
 }
 
 .repressor-duel-item {
@@ -4257,40 +4264,45 @@ textarea {
 
 .repressor-duel-item strong {
   color: #201304;
-  font-size: 14px;
+  font-size: 9px;
   text-transform: none;
   letter-spacing: 0;
-  line-height: 1.35;
+  line-height: 1.2;
   overflow-wrap: anywhere;
 }
 
 .repressor-duel-label {
-  font-size: 10px;
+  font-size: 7px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.4px;
   color: #664b21;
 }
 
 .repressor-duel-crimes {
-  margin-top: 12px;
+  margin-top: 0;
   border: 1px solid #7f673d;
-  border-radius: 10px;
+  border-radius: 8px;
   background: rgba(255, 245, 225, 0.72);
-  padding: 10px;
+  padding: 6px;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
 }
 
 .repressor-duel-crimes h3 {
-  margin: 0 0 8px;
-  font-size: 13px;
+  margin: 0 0 4px;
+  font-size: 8px;
   color: #3e2b0f;
+  text-transform: uppercase;
+  letter-spacing: 0.35px;
 }
 
 .repressor-duel-crimes p {
   margin: 0;
   color: #2b1f0f;
-  font-size: 13px;
-  line-height: 1.4;
+  font-size: 8px;
+  line-height: 1.25;
   text-transform: none;
   letter-spacing: 0;
   overflow-wrap: anywhere;
@@ -4298,25 +4310,36 @@ textarea {
 
 .repressor-duel-crimes-list {
   margin: 0;
-  padding: 0 0 0 18px;
+  padding: 0 0 0 14px;
   display: grid;
-  gap: 6px;
+  gap: 3px;
 }
 
 .repressor-duel-crimes-list li {
   color: #2b1f0f;
-  font-size: 13px;
-  line-height: 1.35;
+  font-size: 8px;
+  line-height: 1.2;
   text-transform: none;
   letter-spacing: 0;
   overflow-wrap: anywhere;
 }
 
 .repressor-duel-actions {
-  margin-top: 12px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  margin-top: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.repressor-duel-actions .btn-primary,
+.repressor-duel-actions .btn-secondary {
+  font-size: 8px;
+  line-height: 1.2;
+  padding: 4px 6px;
+  border-radius: 5px;
+  text-align: center;
+  letter-spacing: 0.2px;
 }
 
 .repressor-type-legend-grid {
@@ -4479,38 +4502,20 @@ textarea {
   }
 
   .repressor-duel-card {
-    padding: 11px;
+    width: min(2.25in, calc(100vw - 16px));
   }
 
   .repressor-duel-head {
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
   }
 
   .repressor-duel-name {
-    font-size: 22px;
+    font-size: 10px;
   }
 
   .repressor-duel-code {
     text-align: left;
-  }
-
-  .repressor-duel-art-frame {
-    min-height: 270px;
-  }
-
-  .repressor-duel-art {
-    min-height: 270px;
-    height: min(54vh, 480px);
-  }
-
-  .repressor-duel-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .repressor-duel-actions {
-    display: grid;
-    grid-template-columns: 1fr;
   }
 
   .repressor-type-legend-grid {

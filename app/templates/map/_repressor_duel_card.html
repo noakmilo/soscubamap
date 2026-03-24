@@ -1,6 +1,12 @@
 {% if repressor and repressor_payload %}
   {% set crimes = repressor_payload.crimes or [] %}
-  <article class="repressor-duel-card">
+  <article
+    class="repressor-duel-card"
+    data-repressor-card
+    data-repressor-name="{{ repressor_payload.full_name }}"
+    data-repressor-types="{{ (repressor_payload.types or [])|join(', ') }}"
+    data-repressor-url="{{ url_for('map.repressor_detail', repressor_id=repressor.id) }}"
+  >
     <div class="repressor-duel-head">
       <h2 class="repressor-duel-name">{{ repressor_payload.full_name }}</h2>
       <div class="repressor-duel-code">Ficha #{{ repressor_payload.external_id }}</div>
@@ -42,6 +48,8 @@
           src="{{ repressor_payload.image_url }}"
           alt="{{ repressor_payload.full_name }}"
           class="repressor-duel-art"
+          crossorigin="anonymous"
+          referrerpolicy="no-referrer"
         />
       {% else %}
         <div class="repressor-duel-art-empty">Sin fotografía disponible</div>
@@ -115,6 +123,12 @@
           Ver fuente original
         </a>
       {% endif %}
+      <button class="btn-secondary" type="button" data-repressor-download-btn>
+        Descargar ficha PNG
+      </button>
+      <button class="btn-primary" type="button" data-repressor-share-btn>
+        Compartir en X
+      </button>
     </div>
   </article>
 {% endif %}
