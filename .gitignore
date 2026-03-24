@@ -9,3 +9,4 @@ instance/
 /.coverage
 .DS_Store
 scripts/scrape_palsaco_opresores.py
+scripts/build_palsaco_catalog_json.py

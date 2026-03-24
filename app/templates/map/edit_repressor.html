@@ -1,18 +1,22 @@
 {% extends "shared/base.html" %}
-{% block title %} | Agregar represor{% endblock %}
-{% block meta_description %}Formulario para proponer un nuevo represor con foto, tipo, delitos y nota opcional.{% endblock %}
+{% block title %} | {{ "Reportar ficha de represor" if is_report_mode else "Editar ficha de represor" }}{% endblock %}
+{% block meta_description %}Edición comunitaria de fichas de represores con moderación y trazabilidad pública.{% endblock %}
 {% block content %}
 <section class="panel">
   <div class="admin-toolbar">
-    <h1>Agregar represor</h1>
-    <a class="btn-secondary" href="{{ url_for('map.repressors') }}">← Volver al catálogo</a>
+    <h1>{{ "Reportar ficha" if is_report_mode else "Editar ficha" }}</h1>
+    <a class="btn-secondary" href="{{ url_for('map.repressor_detail', repressor_id=repressor.id) }}">← Volver a la ficha</a>
   </div>
   <p class="muted">
-    Completa los datos principales del represor. Los campos marcados con * son obligatorios.
-    {% if moderation_enabled %}
-      Este envío pasará por moderación antes de publicarse.
+    {% if is_report_mode %}
+      Reporta errores o contexto adicional sobre esta ficha. También puedes proponer correcciones.
     {% else %}
-      La moderación está desactivada: se publicará directamente.
+      Propón cambios en la ficha del represor.
+    {% endif %}
+    {% if moderation_enabled %}
+      La propuesta pasará por moderación.
+    {% else %}
+      La moderación está desactivada: los cambios se aplicarán de inmediato.
     {% endif %}
   </p>
 
@@ -20,19 +24,18 @@
     <div class="flash error">{{ errors.get("form") }}</div>
   {% endif %}
 
-  <form method="post" class="form-grid" id="addRepressorForm" enctype="multipart/form-data">
+  <form method="post" class="form-grid" id="editRepressorForm">
     <label>
-      Foto *
-      <input
-        type="file"
-        name="photo"
-        accept=".jpg,.jpeg,.png,.webp,.heic,image/heic,image/heif"
-        class="{{ 'field-error' if errors.get('photo') else '' }}"
+      Motivo de la propuesta *
+      <textarea
+        name="reason"
+        rows="3"
+        placeholder="¿Qué se debe corregir o reportar en esta ficha?"
+        class="{{ 'field-error' if errors.get('reason') else '' }}"
         required
-      />
-      <div class="muted">Se sube directamente desde tu dispositivo a Cloudinary.</div>
-      {% if errors.get("photo") %}
-        <div class="field-error-msg">{{ errors.get("photo") }}</div>
+      >{{ form_data.reason }}</textarea>
+      {% if errors.get("reason") %}
+        <div class="field-error-msg">{{ errors.get("reason") }}</div>
       {% endif %}
     </label>
 
@@ -85,7 +88,7 @@
 
     <label>
       Municipio
-      <select name="municipality_name" id="repressorMunicipalitySelect">
+      <select name="municipality_name" id="editRepressorMunicipalitySelect">
         <option value="">Seleccionar</option>
       </select>
     </label>
@@ -144,28 +147,28 @@
     </label>
 
     <label>
-      Nota (opcional)
-      <textarea
-        name="note"
-        rows="4"
-        placeholder="Detalle adicional sobre el caso..."
-        class="{{ 'field-error' if errors.get('note') else '' }}"
-      >{{ form_data.note }}</textarea>
-      {% if errors.get("note") %}
-        <div class="field-error-msg">{{ errors.get("note") }}</div>
-      {% endif %}
-    </label>
-
-    <label>
-      Testimonio (opcional)
+      Testimonio
       <textarea
         name="testimony"
         rows="6"
-        placeholder="Texto de testimonio asociado al represor..."
+        placeholder="Texto de testimonio asociado a esta ficha..."
         class="{{ 'field-error' if errors.get('testimony') else '' }}"
       >{{ form_data.testimony }}</textarea>
       {% if errors.get("testimony") %}
         <div class="field-error-msg">{{ errors.get("testimony") }}</div>
+      {% endif %}
+    </label>
+
+    <label>
+      Nota adicional
+      <textarea
+        name="note"
+        rows="4"
+        placeholder="Contexto extra para moderación/transparencia..."
+        class="{{ 'field-error' if errors.get('note') else '' }}"
+      >{{ form_data.note }}</textarea>
+      {% if errors.get("note") %}
+        <div class="field-error-msg">{{ errors.get("note") }}</div>
       {% endif %}
     </label>
 
@@ -179,7 +182,13 @@
     {% endif %}
 
     <button type="submit" class="btn-primary">
-      {{ "Enviar a moderación" if moderation_enabled else "Publicar represor" }}
+      {% if moderation_enabled %}
+        Enviar propuesta a moderación
+      {% elif is_report_mode %}
+        Guardar reporte
+      {% else %}
+        Guardar edición
+      {% endif %}
     </button>
   </form>
 </section>
@@ -189,10 +198,10 @@
 </script>
 <script>
   document.addEventListener("DOMContentLoaded", () => {
-    const form = document.getElementById("addRepressorForm");
+    const form = document.getElementById("editRepressorForm");
     if (!form || !window.CUBA_MUNICIPALITIES) return;
     const provinceSelect = form.querySelector('select[name="province_name"]');
-    const municipalitySelect = document.getElementById("repressorMunicipalitySelect");
+    const municipalitySelect = document.getElementById("editRepressorMunicipalitySelect");
     if (!provinceSelect || !municipalitySelect) return;
     const initialMunicipality = {{ form_data.municipality_name|tojson }};
 

@@ -426,6 +426,7 @@ def _upsert_repressor(
         "municipality_name",
         municipality_name,
     )
+    changed |= _set_field(repressor, "testimony", _clean_text(base_row.get("testimony")))
     changed |= _set_field(repressor, "country_name", _clean_text(base_row.get("country_name")))
     changed |= _set_field(repressor, "image_source_url", source_image_url)
     changed |= _set_field(repressor, "image_cached_url", desired_cached_image)
@@ -480,6 +481,7 @@ def serialize_repressor(repressor: Repressor, include_relationships: bool = True
         "province_name": province_name,
         "municipality_name": municipality_name,
         "country_name": repressor.country_name,
+        "testimony": repressor.testimony,
         "image_url": repressor.image_url,
         "image_source_url": repressor.image_source_url,
         "source_detail_url": repressor.source_detail_url,

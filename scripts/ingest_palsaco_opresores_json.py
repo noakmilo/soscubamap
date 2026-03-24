@@ -170,12 +170,19 @@ def get_or_create_repressor(source_url: str) -> tuple[str, Repressor]:
 
 
 def ingest_item(item: dict[str, Any]) -> str:
-    source_url = clean_text(item.get("canonical_url")) or clean_text(item.get("source_url"))
+    source_url = (
+        clean_text(item.get("canonical_url"))
+        or clean_text(item.get("source_url"))
+        or clean_text(item.get("source_detail_url"))
+    )
     if not source_url:
         raise ValueError("item sin source_url/canonical_url")
 
     action, repressor = get_or_create_repressor(source_url)
+    source_payload = item.get("source_payload") if isinstance(item.get("source_payload"), dict) else {}
     fields_raw = item.get("fields") if isinstance(item.get("fields"), dict) else {}
+    if not fields_raw and isinstance(source_payload.get("fields"), dict):
+        fields_raw = source_payload.get("fields")
     fields = {str(k): str(v) for k, v in fields_raw.items()}
 
     display_name = normalize_display_name(item.get("name")) or extract_field_value(
@@ -183,32 +190,53 @@ def ingest_item(item: dict[str, Any]) -> str:
         ("nombre", "name"),
     )
     name, lastname = split_person_name(display_name)
-    alias = extract_field_value(fields, ("alias", "seudonimo", "apodo", "nick"))
+    alias = clean_text(item.get("nickname")) or extract_field_value(
+        fields,
+        ("alias", "seudonimo", "apodo", "nick"),
+    )
     institution = extract_field_value(
         fields,
         ("institucion", "ministerio", "organizacion", "entidad"),
+    ) or clean_text(item.get("institution_name"))
+    campus = extract_field_value(fields, ("centro laboral", "unidad", "laboral")) or clean_text(
+        item.get("campus_name")
     )
-    campus = extract_field_value(fields, ("centro laboral", "unidad", "laboral"))
-    province = extract_field_value(fields, ("provincia",))
-    municipality = extract_field_value(fields, ("municipio",))
+    province = extract_field_value(fields, ("provincia",)) or clean_text(item.get("province_name"))
+    municipality = extract_field_value(fields, ("municipio",)) or clean_text(
+        item.get("municipality_name")
+    )
     canonical_province, canonical_municipality = canonicalize_location_names(
         province,
         municipality,
     )
 
     crimes = extract_field_values(fields, ("delito", "cargo", "acusacion", "acusación"))
+    if not crimes and isinstance(item.get("crimes"), list):
+        crimes = normalize_list([str(value) for value in item.get("crimes", [])])
     types = extract_field_values(fields, ("tipo", "clasificacion", "categoria", "categoría"))
+    if not types and isinstance(item.get("types"), list):
+        types = normalize_list([str(value) for value in item.get("types", [])])
 
-    image_url = clean_text(item.get("image_url"))
-    summary = clean_text(item.get("summary"))
+    image_url = (
+        clean_text(item.get("image_url"))
+        or clean_text(item.get("image_source_url"))
+        or clean_text(item.get("image_cached_url"))
+    )
+    summary = clean_text(item.get("summary")) or clean_text(source_payload.get("summary"))
+    testimony = (
+        clean_text(item.get("testimony"))
+        or clean_text(source_payload.get("testimony"))
+        or extract_field_value(fields, ("testimonio",))
+    )
 
-    repressor.name = name or (clean_text(display_name) or "N/D")
-    repressor.lastname = lastname
+    repressor.name = name or (clean_text(display_name) or clean_text(item.get("name")) or "N/D")
+    repressor.lastname = lastname or (clean_text(item.get("lastname")) or "")
     repressor.nickname = alias
     repressor.institution_name = institution
     repressor.campus_name = campus
     repressor.province_name = canonical_province
     repressor.municipality_name = canonical_municipality
+    repressor.testimony = testimony
     repressor.image_source_url = image_url
     repressor.image_cached_url = image_url
     repressor.source_detail_url = source_url
@@ -218,6 +246,7 @@ def ingest_item(item: dict[str, Any]) -> str:
         {
             "source": "palsaco_scrape",
             "summary": summary,
+            "testimony": testimony,
             "fields": fields,
             "image_urls": item.get("image_urls") or [],
         },

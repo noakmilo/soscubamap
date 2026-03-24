@@ -113,4 +113,47 @@
     {% endif %}
   </div>
 </section>
+
+<section class="panel">
+  <h2>Ediciones de fichas de represores</h2>
+  <div class="pending-list">
+    {% if pending_repressor_edits %}
+      {% for edit in pending_repressor_edits %}
+        <div class="pending-card">
+          <div>
+            <h3>
+              <button
+                type="button"
+                class="pending-link"
+                data-open-report
+                data-url="{{ url_for('moderation.repressor_edit_detail', edit_id=edit.id) }}"
+              >
+                {{ edit.full_name }}
+              </button>
+            </h3>
+            <div class="muted">Represor #{{ edit.repressor_id }} · {{ edit.edit_kind }}</div>
+            <div class="muted">{{ edit.editor_label or 'Anon' }} · {{ edit.created_at }}</div>
+            <div class="muted"><strong>Motivo:</strong> {{ edit.reason }}</div>
+            <div class="muted">Tipo: {{ edit.types_list|join(", ") if edit.types_list else "N/D" }}</div>
+            <div class="muted">Delitos: {{ edit.crimes_list|length }}</div>
+            {% if edit.note %}
+              <p>{{ edit.note }}</p>
+            {% endif %}
+          </div>
+          <div class="actions">
+            <form method="post" action="{{ url_for('moderation.approve_repressor_edit', edit_id=edit.id) }}">
+              <button class="btn-primary" type="submit">Aprobar edición</button>
+            </form>
+            <form method="post" action="{{ url_for('moderation.reject_repressor_edit', edit_id=edit.id) }}">
+              <input type="text" name="rejection_reason" placeholder="Motivo rechazo" required />
+              <button class="btn-secondary" type="submit">Rechazar</button>
+            </form>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="muted">No hay ediciones de fichas pendientes.</div>
+    {% endif %}
+  </div>
+</section>
 {% endblock %}

@@ -19,6 +19,7 @@ class Repressor(db.Model):
     province_name = db.Column(db.String(120), index=True)
     municipality_name = db.Column(db.String(120), index=True)
     country_name = db.Column(db.String(120))
+    testimony = db.Column(db.Text)
 
     image_source_url = db.Column(db.String(1000))
     image_cached_url = db.Column(db.String(1000))
@@ -69,6 +70,18 @@ class Repressor(db.Model):
         "RepressorSubmission",
         back_populates="repressor",
         order_by="RepressorSubmission.created_at.desc()",
+    )
+    edit_requests = db.relationship(
+        "RepressorEditRequest",
+        back_populates="repressor",
+        cascade="all, delete-orphan",
+        order_by="RepressorEditRequest.created_at.desc()",
+    )
+    revisions = db.relationship(
+        "RepressorRevision",
+        back_populates="repressor",
+        cascade="all, delete-orphan",
+        order_by="RepressorRevision.created_at.desc()",
     )
     posts = db.relationship("Post", back_populates="repressor")
 
@@ -223,6 +236,7 @@ class RepressorSubmission(db.Model):
     campus_name = db.Column(db.String(200))
     province_name = db.Column(db.String(120), index=True)
     municipality_name = db.Column(db.String(120), index=True)
+    testimony = db.Column(db.Text)
 
     crimes_json = db.Column(db.Text, nullable=False, default="[]")
     types_json = db.Column(db.Text, nullable=False, default="[]")
@@ -279,3 +293,155 @@ class RepressorSubmission(db.Model):
 
     def __repr__(self):
         return f"<RepressorSubmission {self.id} {self.status}>"
+
+
+class RepressorEditRequest(db.Model):
+    __tablename__ = "repressor_edit_requests"
+
+    id = db.Column(db.Integer, primary_key=True)
+    repressor_id = db.Column(
+        db.Integer,
+        db.ForeignKey("repressors.id"),
+        nullable=False,
+        index=True,
+    )
+    status = db.Column(db.String(20), nullable=False, default="pending", index=True)
+    edit_kind = db.Column(db.String(20), nullable=False, default="edit", index=True)
+
+    editor_id = db.Column(db.Integer, db.ForeignKey("users.id"), index=True)
+    reviewer_id = db.Column(db.Integer, db.ForeignKey("users.id"), index=True)
+    editor_label = db.Column(db.String(120))
+
+    reason = db.Column(db.Text, nullable=False)
+    note = db.Column(db.Text)
+    name = db.Column(db.String(160), nullable=False, default="")
+    lastname = db.Column(db.String(200))
+    nickname = db.Column(db.String(160))
+    institution_name = db.Column(db.String(200))
+    campus_name = db.Column(db.String(200))
+    province_name = db.Column(db.String(120), index=True)
+    municipality_name = db.Column(db.String(120), index=True)
+    testimony = db.Column(db.Text)
+    image_url = db.Column(db.String(1000))
+    crimes_json = db.Column(db.Text, nullable=False, default="[]")
+    types_json = db.Column(db.Text, nullable=False, default="[]")
+    payload_json = db.Column(db.Text)
+
+    rejection_reason = db.Column(db.Text)
+    reviewed_at = db.Column(db.DateTime, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    updated_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        index=True,
+    )
+
+    repressor = db.relationship("Repressor", back_populates="edit_requests")
+    editor = db.relationship("User", foreign_keys=[editor_id])
+    reviewer = db.relationship("User", foreign_keys=[reviewer_id])
+
+    @staticmethod
+    def _parse_json_items(raw_value):
+        if not raw_value:
+            return []
+        try:
+            parsed = json.loads(raw_value)
+        except Exception:
+            return []
+        if not isinstance(parsed, list):
+            return []
+        items = []
+        seen = set()
+        for item in parsed:
+            text = str(item or "").strip()
+            if not text or text in seen:
+                continue
+            seen.add(text)
+            items.append(text)
+        return items
+
+    @property
+    def crimes_list(self):
+        return self._parse_json_items(self.crimes_json)
+
+    @property
+    def types_list(self):
+        return self._parse_json_items(self.types_json)
+
+    @property
+    def full_name(self):
+        value = f"{self.name or ''} {self.lastname or ''}".strip()
+        return value or "Represor sin nombre"
+
+    def __repr__(self):
+        return f"<RepressorEditRequest {self.id} repressor={self.repressor_id} {self.status}>"
+
+
+class RepressorRevision(db.Model):
+    __tablename__ = "repressor_revisions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    repressor_id = db.Column(
+        db.Integer,
+        db.ForeignKey("repressors.id"),
+        nullable=False,
+        index=True,
+    )
+    editor_id = db.Column(db.Integer, db.ForeignKey("users.id"), index=True)
+    editor_label = db.Column(db.String(120))
+    reason = db.Column(db.Text)
+
+    name = db.Column(db.String(160), nullable=False, default="")
+    lastname = db.Column(db.String(200))
+    nickname = db.Column(db.String(160))
+    institution_name = db.Column(db.String(200))
+    campus_name = db.Column(db.String(200))
+    province_name = db.Column(db.String(120), index=True)
+    municipality_name = db.Column(db.String(120), index=True)
+    testimony = db.Column(db.Text)
+    image_url = db.Column(db.String(1000))
+    crimes_json = db.Column(db.Text, nullable=False, default="[]")
+    types_json = db.Column(db.Text, nullable=False, default="[]")
+    payload_json = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+    repressor = db.relationship("Repressor", back_populates="revisions")
+    editor = db.relationship("User", foreign_keys=[editor_id])
+
+    @staticmethod
+    def _parse_json_items(raw_value):
+        if not raw_value:
+            return []
+        try:
+            parsed = json.loads(raw_value)
+        except Exception:
+            return []
+        if not isinstance(parsed, list):
+            return []
+        items = []
+        seen = set()
+        for item in parsed:
+            text = str(item or "").strip()
+            if not text or text in seen:
+                continue
+            seen.add(text)
+            items.append(text)
+        return items
+
+    @property
+    def crimes_list(self):
+        return self._parse_json_items(self.crimes_json)
+
+    @property
+    def types_list(self):
+        return self._parse_json_items(self.types_json)
+
+    @property
+    def full_name(self):
+        value = f"{self.name or ''} {self.lastname or ''}".strip()
+        return value or "Represor sin nombre"
+
+    def __repr__(self):
+        return f"<RepressorRevision {self.id} repressor={self.repressor_id}>"

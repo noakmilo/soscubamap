@@ -40,15 +40,19 @@ def create_app(config_object="config.settings.Config"):
             if current_user.is_authenticated and current_user.has_role("administrador"):
                 from app.models.post import Post
                 from app.models.post_edit_request import PostEditRequest
-                from app.models.repressor import RepressorSubmission
+                from app.models.repressor import RepressorEditRequest, RepressorSubmission
 
                 pending_posts = Post.query.filter_by(status="pending").count()
                 pending_edits = PostEditRequest.query.filter_by(status="pending").count()
                 pending_repressors = RepressorSubmission.query.filter_by(status="pending").count()
+                pending_repressor_edits = RepressorEditRequest.query.filter_by(
+                    status="pending"
+                ).count()
                 pending_count = (
                     int(pending_posts or 0)
                     + int(pending_edits or 0)
                     + int(pending_repressors or 0)
+                    + int(pending_repressor_edits or 0)
                 )
         except Exception:
             pending_count = 0

@@ -1,0 +1,113 @@
+{% extends "shared/base.html" %}
+{% block title %} | Historial de ficha{% endblock %}
+{% block meta_description %}Historial público de ediciones y reportes de fichas de represores para máxima transparencia.{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="admin-toolbar">
+    <h1>Historial de ficha de represor</h1>
+    <a class="btn-secondary" href="{{ url_for('map.repressor_detail', repressor_id=repressor.id) }}">← Volver a la ficha</a>
+  </div>
+  <p>Represor: <strong>{{ repressor.full_name }}</strong></p>
+
+  <div class="history-section">
+    <h2>Versión actual</h2>
+    <div class="history-card">
+      <div class="muted">Actual</div>
+      {% if latest_reason %}<div class="muted"><strong>Motivo última edición:</strong> {{ latest_reason }}</div>{% endif %}
+      <div><strong>Nombre:</strong> {{ repressor_payload.full_name }}</div>
+      <div><strong>Seudónimo:</strong> {{ repressor_payload.nickname or "N/D" }}</div>
+      <div><strong>Institución:</strong> {{ repressor_payload.institution_name or "N/D" }}</div>
+      <div><strong>Centro laboral:</strong> {{ repressor_payload.campus_name or "N/D" }}</div>
+      <div><strong>Provincia:</strong> {{ repressor_payload.province_name or "N/D" }} · <strong>Municipio:</strong> {{ repressor_payload.municipality_name or "N/D" }}</div>
+      <div><strong>Tipo:</strong> {{ repressor_payload.types|join(", ") if repressor_payload.types else "N/D" }}</div>
+      <div><strong>Delitos:</strong> {{ repressor_payload.crimes|join(", ") if repressor_payload.crimes else "N/D" }}</div>
+      {% if repressor_payload.testimony %}
+        <div><strong>Testimonio:</strong> {{ repressor_payload.testimony }}</div>
+      {% endif %}
+      {% if repressor_payload.image_url %}
+        <div class="history-media">
+          <img src="{{ repressor_payload.image_url }}" alt="{{ repressor_payload.full_name }}" />
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="history-section">
+    <h2>Ediciones anteriores</h2>
+    {% if revisions %}
+      <div class="history-list">
+        {% for rev in revisions %}
+          <div class="history-card" id="rev-{{ rev.id }}">
+            <div class="muted">{{ rev.created_at }} · {{ rev.editor_label or 'Anon' }}</div>
+            {% if rev.reason %}<div class="muted"><strong>Motivo:</strong> {{ rev.reason }}</div>{% endif %}
+            <div><strong>Nombre:</strong> {{ rev.full_name }}</div>
+            <div><strong>Seudónimo:</strong> {{ rev.nickname or "N/D" }}</div>
+            <div><strong>Institución:</strong> {{ rev.institution_name or "N/D" }}</div>
+            <div><strong>Centro laboral:</strong> {{ rev.campus_name or "N/D" }}</div>
+            <div><strong>Provincia:</strong> {{ rev.province_name or "N/D" }} · <strong>Municipio:</strong> {{ rev.municipality_name or "N/D" }}</div>
+            <div><strong>Tipo:</strong> {{ rev.types_list|join(", ") if rev.types_list else "N/D" }}</div>
+            <div><strong>Delitos:</strong> {{ rev.crimes_list|join(", ") if rev.crimes_list else "N/D" }}</div>
+            {% if rev.testimony %}
+              <div><strong>Testimonio:</strong> {{ rev.testimony }}</div>
+            {% endif %}
+            {% if rev.image_url %}
+              <div class="history-media">
+                <img src="{{ rev.image_url }}" alt="{{ rev.full_name }}" />
+              </div>
+            {% endif %}
+            {% if current_user.is_authenticated and current_user.has_role('administrador') %}
+              <form method="post" action="{{ url_for('admin.restore_repressor_revision', repressor_id=repressor.id, revision_id=rev.id) }}">
+                <button class="btn-secondary" type="submit">Restaurar esta versión</button>
+              </form>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="muted">No hay revisiones anteriores registradas.</div>
+    {% endif %}
+  </div>
+
+  <div class="history-section">
+    <h2>Intentos de edición rechazados</h2>
+    {% if rejected_edits %}
+      <div class="history-list">
+        {% for edit in rejected_edits %}
+          <div class="history-card rejected" id="rejected-{{ edit.id }}">
+            <div class="muted">{{ edit.created_at }} · {{ edit.editor_label or 'Anon' }}</div>
+            {% if edit.rejection_reason %}
+              <div class="muted"><em>Intento rechazado por: {{ edit.rejection_reason }}</em></div>
+            {% else %}
+              <div class="muted"><em>Intento rechazado.</em></div>
+            {% endif %}
+            <div><strong>Tipo de propuesta:</strong> {{ edit.edit_kind }}</div>
+            {% if edit.reason %}
+              <div><strong>Motivo del editor:</strong> {{ edit.reason }}</div>
+            {% endif %}
+            <div><strong>Nombre propuesto:</strong> {{ edit.full_name }}</div>
+            <div><strong>Seudónimo:</strong> {{ edit.nickname or "N/D" }}</div>
+            <div><strong>Institución:</strong> {{ edit.institution_name or "N/D" }}</div>
+            <div><strong>Centro laboral:</strong> {{ edit.campus_name or "N/D" }}</div>
+            <div><strong>Provincia:</strong> {{ edit.province_name or "N/D" }} · <strong>Municipio:</strong> {{ edit.municipality_name or "N/D" }}</div>
+            <div><strong>Tipo:</strong> {{ edit.types_list|join(", ") if edit.types_list else "N/D" }}</div>
+            <div><strong>Delitos:</strong> {{ edit.crimes_list|join(", ") if edit.crimes_list else "N/D" }}</div>
+            {% if edit.testimony %}
+              <div><strong>Testimonio:</strong> {{ edit.testimony }}</div>
+            {% endif %}
+            {% if edit.note %}
+              <div><strong>Nota:</strong> {{ edit.note }}</div>
+            {% endif %}
+            {% if edit.image_url %}
+              <div class="history-media">
+                <img src="{{ edit.image_url }}" alt="{{ edit.full_name }}" />
+              </div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="muted">No hay intentos rechazados registrados.</div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

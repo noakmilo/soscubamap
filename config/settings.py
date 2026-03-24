@@ -115,6 +115,18 @@ class Config:
         os.getenv("CELERY_REPRESSOR_INGESTION_ENABLED", "1") == "1"
     )
     CELERY_REPRESSOR_QUEUE = os.getenv("CELERY_REPRESSOR_QUEUE", "ingestion")
+    CELERY_POST_EXPIRATION_ENABLED = (
+        os.getenv("CELERY_POST_EXPIRATION_ENABLED", "1") == "1"
+    )
+    CELERY_POST_EXPIRATION_INTERVAL_SECONDS = int(
+        os.getenv("CELERY_POST_EXPIRATION_INTERVAL_SECONDS", "86400")
+    )
+    CELERY_POST_EXPIRATION_QUEUE = os.getenv("CELERY_POST_EXPIRATION_QUEUE", "ingestion")
+    POST_EXPIRATION_DAYS = int(os.getenv("POST_EXPIRATION_DAYS", "7"))
+    POST_EXPIRATION_CATEGORY_SLUGS = os.getenv(
+        "POST_EXPIRATION_CATEGORY_SLUGS",
+        "accion-represiva,accion-represiva-del-gobierno,movimiento-tropas,movimiento-militar",
+    )
     AUTO_CONNECTIVITY_REPORTS_ENABLED = (
         os.getenv("AUTO_CONNECTIVITY_REPORTS_ENABLED", "1") == "1"
     )

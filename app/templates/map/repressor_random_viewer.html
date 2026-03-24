@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>#SOSCuba Represores</title>
+    <meta
+      name="description"
+      content="Visor aleatorio de fichas de represores con código de color por tipo y accesos directos al mapa y fuente."
+    />
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favico.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}?v={{ config.ASSET_VERSION }}" />
+  </head>
+  <body class="repressor-viewer-page">
+    <header class="repressor-viewer-header">
+      <a class="repressor-viewer-brand" href="{{ url_for('map.repressors_viewer') }}">
+        <img src="{{ url_for('static', filename='img/favico.png') }}" alt="#SOSCuba" />
+        <span>#SOSCuba Represores</span>
+      </a>
+      <div class="repressor-viewer-controls">
+        {% if has_prev %}
+          <a class="btn-secondary" href="{{ url_for('map.repressors_viewer', nav='prev') }}">← Anterior</a>
+        {% else %}
+          <span class="btn-secondary is-disabled" aria-disabled="true">← Anterior</span>
+        {% endif %}
+        {% if has_next %}
+          <a class="btn-primary" href="{{ url_for('map.repressors_viewer', nav='next') }}">Siguiente aleatoria →</a>
+        {% else %}
+          <span class="btn-primary is-disabled" aria-disabled="true">Siguiente aleatoria →</span>
+        {% endif %}
+      </div>
+    </header>
+
+    <main class="repressor-viewer-content">
+      {% if repressor and repressor_payload %}
+        <div class="repressor-viewer-meta">
+          <span>Vistas en sesión: {{ viewer_total_seen }}</span>
+          <span>Posición: {{ viewer_position }}</span>
+          <span>Total catálogo: {{ total_repressors }}</span>
+          <a href="{{ url_for('map.repressor_detail', repressor_id=repressor.id) }}">Abrir ficha completa</a>
+          <a href="{{ url_for('map.repressors') }}">Ir al catálogo</a>
+        </div>
+        <div class="repressor-duel-shell repressor-duel-shell-viewer">
+          {% include "map/_repressor_duel_card.html" %}
+        </div>
+      {% else %}
+        <section class="panel">
+          <h1>Sin represores disponibles</h1>
+          <p class="muted">No hay registros cargados para mostrar en el visor aleatorio.</p>
+          <a class="btn-secondary" href="{{ url_for('map.repressors') }}">Volver al catálogo</a>
+        </section>
+      {% endif %}
+
+      <section class="panel">
+        <h2>Leyenda de tipos</h2>
+        <div class="repressor-type-legend-grid">
+          {% for item in type_legend %}
+            <article class="repressor-type-legend-item">
+              <div
+                class="repressor-type-legend-chip"
+                style="background: {{ item.bg }}; border-color: {{ item.border }}; color: {{ item.text }};"
+              >
+                {{ item.name }}
+              </div>
+              <p>{{ item.description }}</p>
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

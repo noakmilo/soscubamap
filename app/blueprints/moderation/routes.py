@@ -9,9 +9,11 @@ from app.models.category import Category
 from app.models.post_revision import PostRevision
 from app.models.post_edit_request import PostEditRequest
 from app.models.media import Media
-from app.models.repressor import RepressorSubmission
+from app.models.repressor import Repressor, RepressorEditRequest, RepressorSubmission
 from app.services.media_upload import media_json_from_post, parse_media_json
 from app.services.repressor_submissions import materialize_repressor_submission
+from app.services.repressor_edits import apply_repressor_edit_request, snapshot_repressor
+from app.services.location_names import canonicalize_location_names
 from app.services.authz import role_required
 from . import moderation_bp
 
@@ -27,12 +29,52 @@ def dashboard():
         .order_by(RepressorSubmission.created_at.desc())
         .all()
     )
+    pending_repressor_edits = (
+        RepressorEditRequest.query.filter_by(status="pending")
+        .order_by(RepressorEditRequest.created_at.desc())
+        .all()
+    )
     return render_template(
         "moderation/dashboard.html",
         pending=pending,
         pending_edits=pending_edits,
         pending_repressor_submissions=pending_repressor_submissions,
+        pending_repressor_edits=pending_repressor_edits,
     )
+
+
+def _has_repressor_changes(repressor: Repressor, edit: RepressorEditRequest) -> bool:
+    current_province, current_municipality = canonicalize_location_names(
+        repressor.province_name,
+        repressor.municipality_name,
+    )
+    candidate_province, candidate_municipality = canonicalize_location_names(
+        edit.province_name,
+        edit.municipality_name,
+    )
+    if (repressor.name or "") != (edit.name or ""):
+        return True
+    if (repressor.lastname or "") != (edit.lastname or ""):
+        return True
+    if (repressor.nickname or "") != (edit.nickname or ""):
+        return True
+    if (repressor.institution_name or "") != (edit.institution_name or ""):
+        return True
+    if (repressor.campus_name or "") != (edit.campus_name or ""):
+        return True
+    if (current_province or "") != (candidate_province or ""):
+        return True
+    if (current_municipality or "") != (candidate_municipality or ""):
+        return True
+    if (repressor.testimony or "") != (edit.testimony or ""):
+        return True
+    if (repressor.image_url or "") != (edit.image_url or ""):
+        return True
+    if sorted([item.name for item in repressor.crimes if item.name]) != sorted(edit.crimes_list):
+        return True
+    if sorted([item.name for item in repressor.types if item.name]) != sorted(edit.types_list):
+        return True
+    return False
 
 
 @moderation_bp.route("/aprobar/<int:post_id>", methods=["POST"])
@@ -209,4 +251,74 @@ def reject_repressor_submission(submission_id):
     submission.rejection_reason = request.form.get("reason", "").strip() or None
     db.session.commit()
     flash("Propuesta de represor rechazada.", "success")
+    return redirect(url_for("moderation.dashboard"))
+
+
+@moderation_bp.route("/represores/ediciones/<int:edit_id>")
+@login_required
+@role_required("moderador", "administrador")
+def repressor_edit_detail(edit_id):
+    edit = RepressorEditRequest.query.get_or_404(edit_id)
+    repressor = Repressor.query.get_or_404(edit.repressor_id)
+    return render_template(
+        "moderation/repressor_edit_detail.html",
+        edit=edit,
+        repressor=repressor,
+    )
+
+
+@moderation_bp.route("/represores/ediciones/<int:edit_id>/aprobar", methods=["POST"])
+@login_required
+@role_required("moderador", "administrador")
+def approve_repressor_edit(edit_id):
+    edit = RepressorEditRequest.query.get_or_404(edit_id)
+    repressor = Repressor.query.get_or_404(edit.repressor_id)
+    if edit.status == "approved":
+        flash("La edición de represor ya estaba aprobada.", "warning")
+        return redirect(url_for("moderation.dashboard"))
+
+    try:
+        has_changes = _has_repressor_changes(repressor, edit)
+        if has_changes:
+            snapshot_repressor(
+                repressor,
+                reason=edit.reason or "Aprobación de edición",
+                editor_id=edit.editor_id,
+                editor_label=edit.editor_label,
+                payload={
+                    "edit_request_id": edit.id,
+                    "edit_kind": edit.edit_kind,
+                    "source": "moderation_approved",
+                },
+            )
+            apply_repressor_edit_request(repressor, edit)
+
+        edit.status = "approved"
+        edit.reviewed_at = datetime.utcnow()
+        edit.reviewer_id = current_user.id if current_user.is_authenticated else None
+        edit.rejection_reason = None
+        db.session.commit()
+        flash("Edición de represor aprobada.", "success")
+    except Exception:
+        db.session.rollback()
+        flash("No se pudo aprobar la edición de represor.", "error")
+    return redirect(url_for("moderation.dashboard"))
+
+
+@moderation_bp.route("/represores/ediciones/<int:edit_id>/rechazar", methods=["POST"])
+@login_required
+@role_required("moderador", "administrador")
+def reject_repressor_edit(edit_id):
+    edit = RepressorEditRequest.query.get_or_404(edit_id)
+    rejection_reason = request.form.get("rejection_reason", "").strip()
+    if not rejection_reason:
+        flash("Debes indicar un motivo de rechazo.", "error")
+        return redirect(url_for("moderation.repressor_edit_detail", edit_id=edit.id))
+
+    edit.status = "rejected"
+    edit.reviewed_at = datetime.utcnow()
+    edit.reviewer_id = current_user.id if current_user.is_authenticated else None
+    edit.rejection_reason = rejection_reason
+    db.session.commit()
+    flash("Edición de represor rechazada.", "success")
     return redirect(url_for("moderation.dashboard"))

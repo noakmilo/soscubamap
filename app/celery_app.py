@@ -6,6 +6,7 @@ from app import create_app
 PROTEST_INGESTION_TASK = "app.tasks.protests.ingest_protests_feeds"
 CONNECTIVITY_POLL_TASK = "app.tasks.connectivity.poll_connectivity_and_create_reports"
 REPRESSOR_INGESTION_TASK = "app.tasks.repressors.ingest_repressors_catalog"
+POST_EXPIRATION_TASK = "app.tasks.posts.expire_map_alert_posts"
 
 
 def _build_beat_schedule(flask_app):
@@ -84,6 +85,27 @@ def _build_beat_schedule(flask_app):
             "options": {"queue": queue_name},
         }
 
+    post_expiration_enabled = bool(
+        flask_app.config.get("CELERY_POST_EXPIRATION_ENABLED", True)
+    )
+    if post_expiration_enabled:
+        interval_raw = flask_app.config.get("CELERY_POST_EXPIRATION_INTERVAL_SECONDS", 86400)
+        try:
+            interval_seconds = int(interval_raw)
+        except Exception:
+            interval_seconds = 86400
+        interval_seconds = max(3600, interval_seconds)
+
+        queue_name = (flask_app.config.get("CELERY_POST_EXPIRATION_QUEUE") or "ingestion").strip()
+        if not queue_name:
+            queue_name = "ingestion"
+
+        schedule["post-map-expiration"] = {
+            "task": POST_EXPIRATION_TASK,
+            "schedule": interval_seconds,
+            "options": {"queue": queue_name},
+        }
+
     return schedule
 
 
@@ -130,3 +152,4 @@ celery = create_celery()
 import app.tasks.protests  # noqa: E402,F401
 import app.tasks.connectivity  # noqa: E402,F401
 import app.tasks.repressors  # noqa: E402,F401
+import app.tasks.posts  # noqa: E402,F401

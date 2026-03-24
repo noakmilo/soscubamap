@@ -4113,6 +4113,334 @@ textarea {
   min-height: 180px;
 }
 
+.repressor-duel-shell {
+  display: grid;
+  place-items: center;
+  margin-top: 6px;
+}
+
+.repressor-duel-shell-viewer {
+  margin-top: 0;
+}
+
+.repressor-duel-card {
+  width: min(100%, 760px);
+  border-radius: 18px;
+  border: 1px solid #8f764a;
+  background:
+    radial-gradient(circle at 14% 8%, rgba(255, 224, 157, 0.24) 0%, rgba(255, 224, 157, 0) 28%),
+    radial-gradient(circle at 86% 92%, rgba(239, 160, 90, 0.2) 0%, rgba(239, 160, 90, 0) 26%),
+    linear-gradient(160deg, #c1a56c 0%, #e4cb94 42%, #b18b51 100%);
+  box-shadow:
+    0 20px 40px rgba(0, 0, 0, 0.32),
+    inset 0 0 0 1px rgba(255, 241, 206, 0.34);
+  padding: 14px;
+  color: #2b1b07;
+}
+
+.repressor-duel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.repressor-duel-name {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.2;
+  color: #2b1600;
+  text-wrap: balance;
+}
+
+.repressor-duel-code {
+  color: #5d431a;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  text-align: right;
+}
+
+.repressor-duel-type-row {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.repressor-duel-type-chip {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.35px;
+  text-transform: uppercase;
+}
+
+.repressor-duel-type-chip-empty {
+  background: #ecdfc6;
+  border-color: #b9a075;
+  color: #4f3c1d;
+}
+
+.repressor-duel-type-legend {
+  margin-top: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.repressor-duel-type-legend-item {
+  border: 1px solid rgba(90, 67, 31, 0.3);
+  border-radius: 10px;
+  background: rgba(255, 246, 226, 0.68);
+  padding: 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.repressor-duel-type-legend-item p {
+  margin: 0;
+  color: #3e2d13;
+  font-size: 12px;
+  line-height: 1.42;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.repressor-duel-art-frame {
+  margin-top: 12px;
+  border-radius: 12px;
+  border: 1px solid #7a643f;
+  background: #262324;
+  overflow: hidden;
+  min-height: 360px;
+  display: grid;
+  place-items: center;
+}
+
+.repressor-duel-art {
+  width: 100%;
+  height: min(70vh, 620px);
+  min-height: 360px;
+  object-fit: cover;
+  display: block;
+}
+
+.repressor-duel-art-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: #cabfa8;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font-size: 12px;
+}
+
+.repressor-duel-grid {
+  margin-top: 12px;
+  border: 1px solid #896d3e;
+  border-radius: 10px;
+  background: rgba(255, 244, 220, 0.7);
+  padding: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px 10px;
+}
+
+.repressor-duel-item {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.repressor-duel-item strong {
+  color: #201304;
+  font-size: 14px;
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.repressor-duel-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #664b21;
+}
+
+.repressor-duel-crimes {
+  margin-top: 12px;
+  border: 1px solid #7f673d;
+  border-radius: 10px;
+  background: rgba(255, 245, 225, 0.72);
+  padding: 10px;
+}
+
+.repressor-duel-crimes h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #3e2b0f;
+}
+
+.repressor-duel-crimes p {
+  margin: 0;
+  color: #2b1f0f;
+  font-size: 13px;
+  line-height: 1.4;
+  text-transform: none;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.repressor-duel-crimes-list {
+  margin: 0;
+  padding: 0 0 0 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.repressor-duel-crimes-list li {
+  color: #2b1f0f;
+  font-size: 13px;
+  line-height: 1.35;
+  text-transform: none;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.repressor-duel-actions {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.repressor-type-legend-grid {
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.repressor-type-legend-item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  background: #0f171e;
+  display: grid;
+  gap: 8px;
+}
+
+.repressor-type-legend-chip {
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.35px;
+}
+
+.repressor-type-legend-item p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.42;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.repressor-viewer-page {
+  margin: 0;
+  min-height: 100dvh;
+  background:
+    radial-gradient(circle at 6% 8%, rgba(98, 245, 194, 0.11) 0%, rgba(98, 245, 194, 0) 22%),
+    radial-gradient(circle at 92% 92%, rgba(255, 174, 94, 0.14) 0%, rgba(255, 174, 94, 0) 24%),
+    #0a1015;
+  color: var(--text);
+}
+
+.repressor-viewer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(10, 16, 22, 0.92);
+  backdrop-filter: blur(8px);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.repressor-viewer-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.3px;
+}
+
+.repressor-viewer-brand img {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+
+.repressor-viewer-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.btn-primary.is-disabled,
+.btn-secondary.is-disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.repressor-viewer-content {
+  width: min(1120px, calc(100% - 24px));
+  margin: 14px auto 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.repressor-viewer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.repressor-viewer-meta span,
+.repressor-viewer-meta a {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 10px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.repressor-viewer-meta a:hover {
+  color: var(--text);
+  border-color: rgba(110, 231, 183, 0.55);
+}
+
 @media (max-width: 720px) {
   .repressor-type-fieldset {
     padding: 10px;
@@ -4148,6 +4476,73 @@ textarea {
 
   .repressor-crimes-select {
     min-height: 140px;
+  }
+
+  .repressor-duel-card {
+    padding: 11px;
+  }
+
+  .repressor-duel-head {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .repressor-duel-name {
+    font-size: 22px;
+  }
+
+  .repressor-duel-code {
+    text-align: left;
+  }
+
+  .repressor-duel-art-frame {
+    min-height: 270px;
+  }
+
+  .repressor-duel-art {
+    min-height: 270px;
+    height: min(54vh, 480px);
+  }
+
+  .repressor-duel-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .repressor-duel-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .repressor-type-legend-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .repressor-viewer-header {
+    padding: 10px 12px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .repressor-viewer-brand {
+    justify-content: center;
+  }
+
+  .repressor-viewer-controls {
+    justify-content: stretch;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .repressor-viewer-controls .btn-primary,
+  .repressor-viewer-controls .btn-secondary {
+    text-align: center;
+    padding: 9px 10px;
+    font-size: 11px;
+  }
+
+  .repressor-viewer-content {
+    width: min(1120px, calc(100% - 12px));
+    margin-top: 10px;
   }
 }
 

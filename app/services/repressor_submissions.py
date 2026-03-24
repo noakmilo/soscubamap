@@ -165,6 +165,7 @@ def materialize_repressor_submission(
     repressor.campus_name = submission.campus_name or None
     repressor.province_name = province_name
     repressor.municipality_name = municipality_name
+    repressor.testimony = submission.testimony or None
     repressor.image_source_url = submission.photo_url
     repressor.image_cached_url = submission.photo_url
     repressor.source_detail_url = None
@@ -176,6 +177,7 @@ def materialize_repressor_submission(
         {
             "submission_id": submission.id,
             "note": submission.note,
+            "testimony": submission.testimony,
             "payload_json": submission.payload_json,
             "submitted_by_user_id": submission.submitter_id,
         },

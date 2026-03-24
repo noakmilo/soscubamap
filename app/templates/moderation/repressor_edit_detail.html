@@ -1,0 +1,67 @@
+{% extends "shared/base.html" %}
+{% block title %} | Revisión ficha de represor{% endblock %}
+{% block content %}
+<section class="panel">
+  <h1>Edición de ficha pendiente</h1>
+  <p class="muted">Revisa la propuesta comunitaria antes de aprobar o rechazar.</p>
+
+  <div class="report-card">
+    <div class="report-main">
+      <h2>{{ edit.full_name }}</h2>
+      <div class="muted">Represor #{{ edit.repressor_id }} · {{ edit.edit_kind }}</div>
+      <div class="muted">{{ edit.editor_label or 'Anon' }} · {{ edit.created_at }}</div>
+      <div class="muted"><strong>Motivo:</strong> {{ edit.reason }}</div>
+      {% if edit.note %}
+        <div class="muted"><strong>Nota:</strong> {{ edit.note }}</div>
+      {% endif %}
+
+      <h3>Propuesta</h3>
+      <div class="muted">Seudónimo: {{ edit.nickname or "N/D" }}</div>
+      <div class="muted">Institución: {{ edit.institution_name or "N/D" }}</div>
+      <div class="muted">Centro laboral: {{ edit.campus_name or "N/D" }}</div>
+      <div class="muted">Provincia: {{ edit.province_name or "N/D" }} · Municipio: {{ edit.municipality_name or "N/D" }}</div>
+      <div class="muted">Tipo: {{ edit.types_list|join(", ") if edit.types_list else "N/D" }}</div>
+      <div class="muted">Delitos: {{ edit.crimes_list|join(", ") if edit.crimes_list else "N/D" }}</div>
+      {% if edit.testimony %}
+        <p><strong>Testimonio:</strong> {{ edit.testimony }}</p>
+      {% endif %}
+      {% if edit.image_url %}
+        <div class="history-media">
+          <img src="{{ edit.image_url }}" alt="{{ edit.full_name }}" />
+        </div>
+      {% endif %}
+
+      <h3 style="margin-top: 12px;">Ficha actual</h3>
+      <div class="muted">Nombre: {{ repressor.full_name }}</div>
+      <div class="muted">Seudónimo: {{ repressor.nickname or "N/D" }}</div>
+      <div class="muted">Institución: {{ repressor.institution_name or "N/D" }}</div>
+      <div class="muted">Centro laboral: {{ repressor.campus_name or "N/D" }}</div>
+      <div class="muted">Provincia: {{ repressor.province_name or "N/D" }} · Municipio: {{ repressor.municipality_name or "N/D" }}</div>
+      <div class="muted">Tipo: {{ repressor.types|map(attribute='name')|join(", ") if repressor.types else "N/D" }}</div>
+      <div class="muted">Delitos: {{ repressor.crimes|map(attribute='name')|join(", ") if repressor.crimes else "N/D" }}</div>
+      {% if repressor.testimony %}
+        <p><strong>Testimonio:</strong> {{ repressor.testimony }}</p>
+      {% endif %}
+      {% if repressor.image_url %}
+        <div class="history-media">
+          <img src="{{ repressor.image_url }}" alt="{{ repressor.full_name }}" />
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="report-actions">
+      <form method="post" action="{{ url_for('moderation.approve_repressor_edit', edit_id=edit.id) }}">
+        <button class="btn-primary" type="submit">Aprobar edición</button>
+      </form>
+      <form method="post" action="{{ url_for('moderation.reject_repressor_edit', edit_id=edit.id) }}">
+        <label>
+          Motivo de rechazo
+          <textarea name="rejection_reason" rows="3" required placeholder="Explica por qué se rechaza esta propuesta."></textarea>
+        </label>
+        <button class="btn-secondary" type="submit">Rechazar edición</button>
+      </form>
+      <a class="btn-secondary" href="{{ url_for('map.repressor_detail', repressor_id=repressor.id) }}">Ver ficha actual</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

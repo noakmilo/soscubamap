@@ -2,10 +2,13 @@ import csv
 import html
 import io
 import json
+import re
 import secrets
 import textwrap
+import unicodedata
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
 from flask import (
     abort,
@@ -31,7 +34,13 @@ from app.models.media import Media
 from app.models.post import Post
 from app.models.post_edit_request import PostEditRequest
 from app.models.post_revision import PostRevision
-from app.models.repressor import Repressor, RepressorResidenceReport, RepressorSubmission
+from app.models.repressor import (
+    Repressor,
+    RepressorEditRequest,
+    RepressorResidenceReport,
+    RepressorRevision,
+    RepressorSubmission,
+)
 from app.models.role import Role
 from app.models.site_setting import SiteSetting
 from app.models.user import User
@@ -75,6 +84,10 @@ from app.services.repressor_submissions import (
     normalize_list_items,
     parse_custom_crimes,
 )
+from app.services.repressor_edits import (
+    apply_repressor_edit_request,
+    snapshot_repressor,
+)
 from app.services.vote_identity import get_voter_hash
 from app.services.map_providers import get_map_provider_forms, get_map_provider_main
 
@@ -86,6 +99,42 @@ URGENT_CATEGORY_SLUGS = {
     "movimiento-tropas",
     "movimiento-militar",
     "desconexion-internet",
+}
+
+_REPRESSOR_VIEWER_STACK_KEY = "repressors_viewer_stack"
+_REPRESSOR_VIEWER_INDEX_KEY = "repressors_viewer_index"
+_TOKEN_SANITIZE_RE = re.compile(r"[^a-z0-9]+")
+_REPRESSOR_TYPE_PALETTES = {
+    "batablanca": {
+        "bg": "linear-gradient(145deg, #d8f0ff 0%, #b8dfff 100%)",
+        "border": "#75b7ef",
+        "text": "#11314a",
+    },
+    "exportacion": {
+        "bg": "linear-gradient(145deg, #ffe2a8 0%, #ffc969 100%)",
+        "border": "#da9f36",
+        "text": "#4a2b00",
+    },
+    "economico": {
+        "bg": "linear-gradient(145deg, #c9f5c7 0%, #8de08a 100%)",
+        "border": "#4faa55",
+        "text": "#133f16",
+    },
+    "cuelloblanco": {
+        "bg": "linear-gradient(145deg, #f2f4f7 0%, #dce3ea 100%)",
+        "border": "#9eb2c7",
+        "text": "#1f2b38",
+    },
+    "violento": {
+        "bg": "linear-gradient(145deg, #ffc0b5 0%, #ff8f77 100%)",
+        "border": "#d85a47",
+        "text": "#4a1109",
+    },
+    "default": {
+        "bg": "linear-gradient(145deg, #d5dcff 0%, #aeb9ff 100%)",
+        "border": "#7787e2",
+        "text": "#1a2150",
+    },
 }
 
 
@@ -203,6 +252,112 @@ def _is_moderation_enabled() -> bool:
     if moderation_setting is None:
         return True
     return moderation_setting.value == "true"
+
+
+def _normalize_token(value: str) -> str:
+    text = str(value or "").strip().lower()
+    if not text:
+        return ""
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    return _TOKEN_SANITIZE_RE.sub("", text)
+
+
+def _palette_for_type_name(type_name: str) -> dict[str, str]:
+    key = _normalize_token(type_name)
+    return _REPRESSOR_TYPE_PALETTES.get(key) or _REPRESSOR_TYPE_PALETTES["default"]
+
+
+def _build_repressor_type_legend():
+    legend: list[dict[str, str]] = []
+    for item in get_repressor_type_options():
+        name = (item.get("name") or "").strip()
+        if not name:
+            continue
+        palette = _palette_for_type_name(name)
+        legend.append(
+            {
+                "name": name,
+                "description": (item.get("description") or "").strip(),
+                "bg": palette["bg"],
+                "border": palette["border"],
+                "text": palette["text"],
+            }
+        )
+    return legend
+
+
+def _build_repressor_type_badges(repressor: Repressor):
+    options_by_key = {
+        _normalize_token(item.get("name")): (item.get("description") or "").strip()
+        for item in get_repressor_type_options()
+        if (item.get("name") or "").strip()
+    }
+    badges: list[dict[str, str]] = []
+    for item in repressor.types:
+        name = (item.name or "").strip()
+        if not name:
+            continue
+        palette = _palette_for_type_name(name)
+        description = options_by_key.get(_normalize_token(name)) or "Sin descripción disponible."
+        badges.append(
+            {
+                "name": name,
+                "bg": palette["bg"],
+                "border": palette["border"],
+                "text": palette["text"],
+                "description": description,
+            }
+        )
+    return badges
+
+
+def _load_viewer_history_state() -> tuple[list[int], int]:
+    raw_stack = session.get(_REPRESSOR_VIEWER_STACK_KEY, [])
+    stack: list[int] = []
+    if isinstance(raw_stack, list):
+        for raw in raw_stack:
+            try:
+                value = int(raw)
+            except Exception:
+                continue
+            if value > 0:
+                stack.append(value)
+    if len(stack) > 300:
+        stack = stack[-300:]
+
+    try:
+        index = int(session.get(_REPRESSOR_VIEWER_INDEX_KEY, len(stack) - 1))
+    except Exception:
+        index = len(stack) - 1
+    if not stack:
+        index = -1
+    if index < 0:
+        index = 0
+    if stack and index >= len(stack):
+        index = len(stack) - 1
+    return stack, index
+
+
+def _save_viewer_history_state(stack: list[int], index: int) -> None:
+    if len(stack) > 300:
+        stack = stack[-300:]
+        index = min(index, len(stack) - 1)
+    session[_REPRESSOR_VIEWER_STACK_KEY] = stack
+    session[_REPRESSOR_VIEWER_INDEX_KEY] = index
+
+
+def _pick_random_repressor_id(exclude_id: int | None = None) -> int | None:
+    query = db.session.query(Repressor.id)
+    if exclude_id is not None:
+        query = query.filter(Repressor.id != exclude_id)
+    row = query.order_by(func.random()).first()
+    if not row:
+        return None
+    try:
+        return int(row[0])
+    except Exception:
+        return None
 
 
 def _serialize_residence_report(report: RepressorResidenceReport):
@@ -798,6 +953,15 @@ def _is_admin_user():
 
 def _is_edit_locked(post: Post) -> bool:
     return (post.verify_count or 0) >= 10 and not _is_admin_user()
+
+
+def _get_editor_identity():
+    editor = _get_or_create_anon_editor()
+    if editor and editor.anon_code:
+        return editor, f"Anon-{editor.anon_code}"
+    if editor and editor.email:
+        return editor, editor.email
+    return editor, "Anon"
 
 
 @map_bp.route("/reporte/<int:post_id>/ia/optimizar", methods=["POST"])
@@ -1443,6 +1607,7 @@ def add_repressor():
         "campus_name": "",
         "province_name": "",
         "municipality_name": "",
+        "testimony": "",
         "note": "",
         "custom_crimes": "",
         "selected_crime_names": [],
@@ -1461,6 +1626,7 @@ def add_repressor():
             "campus_name": request.form.get("campus_name", "").strip(),
             "province_name": request.form.get("province_name", "").strip(),
             "municipality_name": request.form.get("municipality_name", "").strip(),
+            "testimony": request.form.get("testimony", "").strip(),
             "note": request.form.get("note", "").strip(),
             "custom_crimes": custom_crimes_text,
             "selected_crime_names": selected_crime_names,
@@ -1520,6 +1686,8 @@ def add_repressor():
 
         if len(form_data["note"]) > 4000:
             errors["note"] = "La nota no puede exceder 4000 caracteres."
+        if len(form_data["testimony"]) > 12000:
+            errors["testimony"] = "El testimonio no puede exceder 12000 caracteres."
 
         malicious_values = [
             form_data["name"],
@@ -1529,6 +1697,7 @@ def add_repressor():
             form_data["campus_name"],
             form_data["province_name"],
             form_data["municipality_name"],
+            form_data["testimony"],
             form_data["note"],
             form_data["custom_crimes"],
         ] + filtered_selected_types + all_crime_names
@@ -1563,6 +1732,7 @@ def add_repressor():
                     campus_name=form_data["campus_name"] or None,
                     province_name=form_data["province_name"] or None,
                     municipality_name=form_data["municipality_name"] or None,
+                    testimony=form_data["testimony"] or None,
                     crimes_json=json.dumps(all_crime_names, ensure_ascii=False),
                     types_json=json.dumps(filtered_selected_types, ensure_ascii=False),
                     note=form_data["note"] or None,
@@ -1623,28 +1793,391 @@ def repressor_detail(repressor_id):
         .first_or_404()
     )
 
-    approved_residence_reports = (
-        RepressorResidenceReport.query.filter_by(
-            repressor_id=repressor.id,
-            status="approved",
-        )
-        .order_by(RepressorResidenceReport.created_at.desc())
-        .limit(100)
-        .all()
-    )
-    linked_posts = (
-        Post.query.filter_by(repressor_id=repressor.id, status="approved")
-        .order_by(Post.created_at.desc())
-        .limit(100)
-        .all()
-    )
-
     return render_template(
         "map/repressor_detail.html",
         repressor=repressor,
         repressor_payload=serialize_repressor(repressor, include_relationships=True),
-        approved_residence_reports=approved_residence_reports,
-        linked_posts=linked_posts,
+        type_badges=_build_repressor_type_badges(repressor),
+        type_legend=_build_repressor_type_legend(),
+        show_profile_actions=True,
+    )
+
+
+def _repressor_form_defaults(repressor: Repressor) -> dict[str, Any]:
+    return {
+        "name": repressor.name or "",
+        "lastname": repressor.lastname or "",
+        "nickname": repressor.nickname or "",
+        "institution_name": repressor.institution_name or "",
+        "campus_name": repressor.campus_name or "",
+        "province_name": repressor.province_name or "",
+        "municipality_name": repressor.municipality_name or "",
+        "testimony": repressor.testimony or "",
+        "note": "",
+        "reason": "",
+        "custom_crimes": "",
+        "selected_crime_names": [item.name for item in repressor.crimes if item.name],
+        "selected_type_names": [item.name for item in repressor.types if item.name],
+    }
+
+
+def _has_repressor_changes(
+    repressor: Repressor,
+    form_data: dict[str, Any],
+    crimes: list[str],
+    types: list[str],
+) -> bool:
+    current_province, current_municipality = canonicalize_location_names(
+        repressor.province_name,
+        repressor.municipality_name,
+    )
+    candidate_province, candidate_municipality = canonicalize_location_names(
+        form_data.get("province_name"),
+        form_data.get("municipality_name"),
+    )
+
+    if (repressor.name or "") != (form_data.get("name") or ""):
+        return True
+    if (repressor.lastname or "") != (form_data.get("lastname") or ""):
+        return True
+    if (repressor.nickname or "") != (form_data.get("nickname") or ""):
+        return True
+    if (repressor.institution_name or "") != (form_data.get("institution_name") or ""):
+        return True
+    if (repressor.campus_name or "") != (form_data.get("campus_name") or ""):
+        return True
+    if (current_province or "") != (candidate_province or ""):
+        return True
+    if (current_municipality or "") != (candidate_municipality or ""):
+        return True
+    if (repressor.testimony or "") != (form_data.get("testimony") or ""):
+        return True
+
+    current_crimes = sorted([item.name for item in repressor.crimes if item.name])
+    current_types = sorted([item.name for item in repressor.types if item.name])
+    if current_crimes != sorted(crimes):
+        return True
+    if current_types != sorted(types):
+        return True
+    return False
+
+
+def _handle_repressor_edit_form(repressor_id: int, edit_kind: str):
+    repressor = (
+        Repressor.query.options(
+            selectinload(Repressor.crimes),
+            selectinload(Repressor.types),
+        )
+        .filter_by(id=repressor_id)
+        .first_or_404()
+    )
+    moderation_enabled = _is_moderation_enabled()
+    type_options = get_repressor_type_options()
+    allowed_type_names = get_repressor_type_names()
+    existing_crime_names = list_existing_repressor_crime_names()
+    existing_crime_name_set = set(existing_crime_names)
+    errors = {}
+    form_data = _repressor_form_defaults(repressor)
+    is_report_mode = edit_kind == "report"
+
+    if request.method == "POST":
+        selected_crime_names = normalize_list_items(request.form.getlist("crime_names[]"))
+        selected_type_names = normalize_list_items(request.form.getlist("type_names[]"))
+        custom_crimes_text = request.form.get("custom_crimes", "").strip()
+        form_data = {
+            "name": request.form.get("name", "").strip(),
+            "lastname": request.form.get("lastname", "").strip(),
+            "nickname": request.form.get("nickname", "").strip(),
+            "institution_name": request.form.get("institution_name", "").strip(),
+            "campus_name": request.form.get("campus_name", "").strip(),
+            "province_name": request.form.get("province_name", "").strip(),
+            "municipality_name": request.form.get("municipality_name", "").strip(),
+            "testimony": request.form.get("testimony", "").strip(),
+            "note": request.form.get("note", "").strip(),
+            "reason": request.form.get("reason", "").strip(),
+            "custom_crimes": custom_crimes_text,
+            "selected_crime_names": selected_crime_names,
+            "selected_type_names": selected_type_names,
+        }
+
+        filtered_selected_crimes = [
+            value for value in selected_crime_names if value in existing_crime_name_set
+        ]
+        filtered_selected_types = [
+            value for value in selected_type_names if value in allowed_type_names
+        ]
+        all_crime_names = normalize_list_items(
+            filtered_selected_crimes + parse_custom_crimes(custom_crimes_text)
+        )
+
+        province_name, municipality_name = canonicalize_location_names(
+            form_data["province_name"],
+            form_data["municipality_name"],
+        )
+        form_data["province_name"] = province_name or ""
+        form_data["municipality_name"] = municipality_name or ""
+        form_data["selected_crime_names"] = filtered_selected_crimes
+        form_data["selected_type_names"] = filtered_selected_types
+
+        if recaptcha_enabled():
+            token = request.form.get("g-recaptcha-response", "")
+            if not verify_recaptcha(token, request.remote_addr):
+                errors["recaptcha"] = "Verificación reCAPTCHA falló."
+
+        if not form_data["reason"]:
+            errors["reason"] = "Debes explicar el motivo de la edición/reporte."
+        if len(form_data["reason"]) > 2000:
+            errors["reason"] = "El motivo no puede exceder 2000 caracteres."
+        if len(form_data["note"]) > 4000:
+            errors["note"] = "La nota no puede exceder 4000 caracteres."
+        if len(form_data["testimony"]) > 12000:
+            errors["testimony"] = "El testimonio no puede exceder 12000 caracteres."
+
+        if not form_data["name"]:
+            errors["name"] = "El nombre es obligatorio."
+        if not filtered_selected_types:
+            errors["types"] = "Selecciona al menos un tipo de represor."
+        if not all_crime_names:
+            errors["crimes"] = "Selecciona al menos un delito o agrega uno nuevo."
+        if len(all_crime_names) > 100:
+            errors["crimes"] = "Máximo 100 delitos por edición."
+
+        malicious_values = [
+            form_data["name"],
+            form_data["lastname"],
+            form_data["nickname"],
+            form_data["institution_name"],
+            form_data["campus_name"],
+            form_data["province_name"],
+            form_data["municipality_name"],
+            form_data["testimony"],
+            form_data["note"],
+            form_data["reason"],
+            form_data["custom_crimes"],
+        ] + filtered_selected_types + all_crime_names
+        if has_malicious_input(malicious_values):
+            errors["form"] = "Se detectó contenido sospechoso en el formulario."
+
+        has_changes = _has_repressor_changes(
+            repressor,
+            form_data=form_data,
+            crimes=all_crime_names,
+            types=filtered_selected_types,
+        )
+        if not has_changes and not is_report_mode:
+            errors["form"] = "No se detectaron cambios en la ficha."
+
+        if not errors:
+            try:
+                editor, editor_label = _get_editor_identity()
+                reviewer_id = current_user.id if current_user.is_authenticated else None
+                status = "pending" if moderation_enabled else "approved"
+
+                edit_request = RepressorEditRequest(
+                    repressor_id=repressor.id,
+                    status=status,
+                    edit_kind="report" if is_report_mode else "edit",
+                    editor_id=editor.id if editor else None,
+                    reviewer_id=reviewer_id if not moderation_enabled else None,
+                    editor_label=editor_label,
+                    reason=form_data["reason"],
+                    note=form_data["note"] or None,
+                    name=form_data["name"],
+                    lastname=form_data["lastname"] or None,
+                    nickname=form_data["nickname"] or None,
+                    institution_name=form_data["institution_name"] or None,
+                    campus_name=form_data["campus_name"] or None,
+                    province_name=form_data["province_name"] or None,
+                    municipality_name=form_data["municipality_name"] or None,
+                    testimony=form_data["testimony"] or None,
+                    image_url=repressor.image_url,
+                    crimes_json=json.dumps(all_crime_names, ensure_ascii=False),
+                    types_json=json.dumps(filtered_selected_types, ensure_ascii=False),
+                    payload_json=json.dumps(
+                        {
+                            "custom_crimes_raw": custom_crimes_text,
+                            "selected_crimes": filtered_selected_crimes,
+                            "selected_types": filtered_selected_types,
+                            "source": "community_repressor_edit",
+                        },
+                        ensure_ascii=False,
+                    ),
+                    reviewed_at=datetime.utcnow() if not moderation_enabled else None,
+                )
+                db.session.add(edit_request)
+                db.session.flush()
+
+                if not moderation_enabled and has_changes:
+                    snapshot_repressor(
+                        repressor,
+                        reason=form_data["reason"],
+                        editor_id=editor.id if editor else None,
+                        editor_label=editor_label,
+                        payload={
+                            "edit_request_id": edit_request.id,
+                            "edit_kind": edit_request.edit_kind,
+                            "mode": "direct_apply_without_moderation",
+                        },
+                    )
+                    apply_repressor_edit_request(repressor, edit_request)
+
+                db.session.commit()
+                if moderation_enabled:
+                    flash("Propuesta de ficha enviada a moderación.", "success")
+                elif has_changes:
+                    flash("Ficha de represor actualizada.", "success")
+                else:
+                    flash("Reporte de ficha registrado.", "success")
+                return redirect(url_for("map.repressor_detail", repressor_id=repressor.id))
+            except Exception:
+                db.session.rollback()
+                current_app.logger.exception("Error al guardar edición de represor")
+                errors["form"] = "No se pudo guardar la edición/reporte. Inténtalo nuevamente."
+
+    return render_template(
+        "map/edit_repressor.html",
+        repressor=repressor,
+        form_data=form_data,
+        errors=errors,
+        moderation_enabled=moderation_enabled,
+        type_options=type_options,
+        existing_crime_names=existing_crime_names,
+        provinces=list_provinces(),
+        municipalities_map=municipalities_map(),
+        recaptcha_site_key=current_app.config.get("RECAPTCHA_V2_SITE_KEY"),
+        is_report_mode=is_report_mode,
+    )
+
+
+@map_bp.route("/represores/<int:repressor_id>/editar", methods=["GET", "POST"])
+@limiter.limit("3/minute; 20/day", methods=["POST"])
+def edit_repressor_public(repressor_id):
+    return _handle_repressor_edit_form(repressor_id, edit_kind="edit")
+
+
+@map_bp.route("/represores/<int:repressor_id>/reportar", methods=["GET", "POST"])
+@limiter.limit("3/minute; 20/day", methods=["POST"])
+def report_repressor_profile(repressor_id):
+    return _handle_repressor_edit_form(repressor_id, edit_kind="report")
+
+
+@map_bp.route("/represores/<int:repressor_id>/historial")
+def repressor_history(repressor_id):
+    repressor = (
+        Repressor.query.options(
+            selectinload(Repressor.crimes),
+            selectinload(Repressor.types),
+        )
+        .filter_by(id=repressor_id)
+        .first_or_404()
+    )
+
+    revisions = (
+        RepressorRevision.query.filter_by(repressor_id=repressor.id)
+        .order_by(RepressorRevision.created_at.desc())
+        .all()
+    )
+    rejected_edits = (
+        RepressorEditRequest.query.filter_by(repressor_id=repressor.id, status="rejected")
+        .order_by(RepressorEditRequest.created_at.desc())
+        .all()
+    )
+    latest_reason = revisions[0].reason if revisions else None
+
+    return render_template(
+        "map/repressor_history.html",
+        repressor=repressor,
+        repressor_payload=serialize_repressor(repressor, include_relationships=True),
+        type_badges=_build_repressor_type_badges(repressor),
+        revisions=revisions,
+        rejected_edits=rejected_edits,
+        latest_reason=latest_reason,
+    )
+
+
+@map_bp.route("/represores/visor")
+def repressors_viewer():
+    total_repressors = int(db.session.query(func.count(Repressor.id)).scalar() or 0)
+    nav_action = (request.args.get("nav") or "").strip().lower()
+    stack, index = _load_viewer_history_state()
+
+    if total_repressors <= 0:
+        stack = []
+        index = -1
+        _save_viewer_history_state(stack, index)
+        return render_template(
+            "map/repressor_random_viewer.html",
+            repressor=None,
+            repressor_payload=None,
+            type_badges=[],
+            type_legend=_build_repressor_type_legend(),
+            has_prev=False,
+            has_next=False,
+            viewer_total_seen=0,
+            viewer_position=0,
+            total_repressors=0,
+        )
+
+    if not stack:
+        random_id = _pick_random_repressor_id()
+        if random_id is not None:
+            stack = [random_id]
+            index = 0
+
+    if nav_action == "prev" and stack:
+        index = max(0, index - 1)
+    elif nav_action == "next" and stack:
+        current_id = stack[index]
+        next_id = _pick_random_repressor_id(
+            exclude_id=current_id if total_repressors > 1 else None
+        )
+        if next_id is not None:
+            stack = stack[: index + 1]
+            stack.append(next_id)
+            index += 1
+
+    selected_id = stack[index] if stack else None
+    repressor = None
+    if selected_id is not None:
+        repressor = (
+            Repressor.query.options(
+                selectinload(Repressor.crimes),
+                selectinload(Repressor.types),
+            )
+            .filter_by(id=selected_id)
+            .first()
+        )
+
+    if repressor is None:
+        random_id = _pick_random_repressor_id()
+        if random_id is not None:
+            stack = [random_id]
+            index = 0
+            repressor = (
+                Repressor.query.options(
+                    selectinload(Repressor.crimes),
+                    selectinload(Repressor.types),
+                )
+                .filter_by(id=random_id)
+                .first()
+            )
+
+    _save_viewer_history_state(stack, index)
+
+    return render_template(
+        "map/repressor_random_viewer.html",
+        repressor=repressor,
+        repressor_payload=serialize_repressor(repressor, include_relationships=True)
+        if repressor
+        else None,
+        type_badges=_build_repressor_type_badges(repressor) if repressor else [],
+        type_legend=_build_repressor_type_legend(),
+        show_profile_actions=False,
+        has_prev=index > 0,
+        has_next=total_repressors > 1,
+        viewer_total_seen=len(stack),
+        viewer_position=(index + 1) if index >= 0 else 0,
+        total_repressors=total_repressors,
     )
 
 

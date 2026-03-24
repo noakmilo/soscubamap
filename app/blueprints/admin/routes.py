@@ -23,7 +23,12 @@ from app.models.category import Category
 from app.models.donation_log import DonationLog
 from app.models.protest_event import ProtestEvent
 from app.models.protest_ingestion_run import ProtestIngestionRun
-from app.models.repressor import Repressor, RepressorIngestionRun, RepressorResidenceReport
+from app.models.repressor import (
+    Repressor,
+    RepressorIngestionRun,
+    RepressorResidenceReport,
+    RepressorRevision,
+)
 from app.extensions import db
 from app.models.media import Media
 from app.services.media_upload import media_json_from_post, parse_media_json, get_media_payload
@@ -52,6 +57,7 @@ from app.services.protest_feeds import (
     save_protest_feed_urls,
     validate_protest_feed_urls,
 )
+from app.services.repressor_edits import apply_repressor_revision, snapshot_repressor
 from . import admin_bp
 
 
@@ -1025,3 +1031,34 @@ def restore_revision(post_id, revision_id):
 
     flash("Reporte restaurado a una versión anterior.", "success")
     return redirect(url_for("map.post_history", post_id=post.id))
+
+
+@admin_bp.route(
+    "/represores/<int:repressor_id>/revisiones/<int:revision_id>/restaurar",
+    methods=["POST"],
+)
+@login_required
+@role_required("administrador")
+def restore_repressor_revision(repressor_id, revision_id):
+    repressor = Repressor.query.get_or_404(repressor_id)
+    revision = RepressorRevision.query.get_or_404(revision_id)
+    if revision.repressor_id != repressor.id:
+        flash("Revisión inválida.", "error")
+        return redirect(url_for("map.repressor_history", repressor_id=repressor.id))
+
+    editor_label = current_user.email if current_user.is_authenticated else "Admin"
+    snapshot_repressor(
+        repressor,
+        reason="Restauración de versión anterior",
+        editor_id=current_user.id if current_user.is_authenticated else None,
+        editor_label=editor_label,
+        payload={
+            "restore_from_revision_id": revision.id,
+            "source": "admin_restore",
+        },
+    )
+    apply_repressor_revision(repressor, revision)
+    db.session.commit()
+
+    flash("Ficha de represor restaurada a una versión anterior.", "success")
+    return redirect(url_for("map.repressor_history", repressor_id=repressor.id))
