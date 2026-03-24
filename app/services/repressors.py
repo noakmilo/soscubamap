@@ -237,9 +237,18 @@ def _resolve_scan_start_id(start_id: int | None) -> tuple[int, str]:
     return get_scan_start_id(), "bootstrap_from_config"
 
 
-def _auto_stop_missing_streak(scan_start_strategy: str) -> int:
+def _auto_stop_missing_streak(
+    scan_start_strategy: str,
+    scan_start: int,
+    latest_stored_external_id: int | None,
+) -> int:
+    if scan_start <= 1:
+        return 500
     if scan_start_strategy == "bootstrap_from_config":
         return 500
+    if scan_start_strategy == "incremental_from_last":
+        if latest_stored_external_id is None or latest_stored_external_id < 1000:
+            return 500
     return 25
 
 
@@ -512,8 +521,13 @@ def ingest_repressors_range(
     session = _build_http_session()
     api_base = get_api_base_url().rstrip("/")
 
+    latest_stored_before_scan = _latest_stored_external_id()
     scan_start, scan_start_strategy = _resolve_scan_start_id(start_id)
-    auto_stop_missing = _auto_stop_missing_streak(scan_start_strategy)
+    auto_stop_missing = _auto_stop_missing_streak(
+        scan_start_strategy=scan_start_strategy,
+        scan_start=scan_start,
+        latest_stored_external_id=latest_stored_before_scan,
+    )
     if end_id is not None:
         scan_end = max(int(end_id), 1)
         scan_end_strategy = "explicit"

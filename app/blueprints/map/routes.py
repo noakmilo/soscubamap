@@ -1292,8 +1292,13 @@ def repressors():
         page = max(int(request.args.get("page", "1")), 1)
     except Exception:
         page = 1
+    try:
+        stats_page = max(int(request.args.get("stats_page", "1")), 1)
+    except Exception:
+        stats_page = 1
 
     per_page = 40
+    stats_per_page = 30
     query = Repressor.query.options(
         selectinload(Repressor.crimes),
         selectinload(Repressor.types),
@@ -1326,26 +1331,44 @@ def repressors():
         .all()
     )
 
-    stats_query = db.session.query(
+    stats_grouped_query = db.session.query(
         Repressor.province_name,
         Repressor.municipality_name,
         func.count(Repressor.id),
     )
     if selected_province:
-        stats_query = stats_query.filter(Repressor.province_name == selected_province)
+        stats_grouped_query = stats_grouped_query.filter(
+            Repressor.province_name == selected_province
+        )
     if selected_municipality:
-        stats_query = stats_query.filter(
+        stats_grouped_query = stats_grouped_query.filter(
             Repressor.municipality_name == selected_municipality
         )
+    stats_grouped_query = stats_grouped_query.group_by(
+        Repressor.province_name,
+        Repressor.municipality_name,
+    )
+    stats_sorted = stats_grouped_query.order_by(
+        func.count(Repressor.id).desc(),
+        Repressor.province_name.asc(),
+        Repressor.municipality_name.asc(),
+    )
+
+    stats_total = db.session.query(func.count()).select_from(
+        stats_grouped_query.subquery()
+    ).scalar() or 0
+    stats_pages = max((stats_total + stats_per_page - 1) // stats_per_page, 1)
     stats_rows = (
-        stats_query.group_by(
-            Repressor.province_name,
-            Repressor.municipality_name,
-        )
-        .order_by(func.count(Repressor.id).desc())
-        .limit(300)
+        stats_sorted.offset((stats_page - 1) * stats_per_page)
+        .limit(stats_per_page)
         .all()
     )
+    stats_chart_rows = stats_sorted.limit(20).all()
+    stats_chart_labels = [
+        f"{province or 'N/D'} · {municipality or 'N/D'}"
+        for province, municipality, _count in stats_chart_rows
+    ]
+    stats_chart_values = [int(count or 0) for _province, _municipality, count in stats_chart_rows]
 
     provinces = list_provinces()
     if selected_province:
@@ -1367,6 +1390,12 @@ def repressors():
         selected_municipality=selected_municipality,
         municipalities_map=municipalities_map(),
         stats_rows=stats_rows,
+        stats_total=stats_total,
+        stats_page=stats_page,
+        stats_pages=stats_pages,
+        stats_per_page=stats_per_page,
+        stats_chart_labels=stats_chart_labels,
+        stats_chart_values=stats_chart_values,
     )
 
 

@@ -37,9 +37,15 @@
 </section>
 
 <section class="panel">
-  <h2>Tabla por provincia y municipio</h2>
-  <div class="muted">Total filtrado: {{ total }}</div>
-  <div class="table-wrap">
+  <h2>Analíticas por provincia y municipio</h2>
+  <div class="muted">Top 20 combinaciones por cantidad de represores (según filtros activos).</div>
+  <div class="analytics-card" style="margin-top:12px;">
+    <canvas id="repressorsGeoChart"></canvas>
+  </div>
+
+  <h3 style="margin-top:16px;">Detalle tabular (paginado)</h3>
+  <div class="muted">Filas agrupadas: {{ stats_total }}</div>
+  <div class="table-wrap" style="margin-top:10px;">
     <table class="admin-table">
       <thead>
         <tr>
@@ -65,6 +71,17 @@
       </tbody>
     </table>
   </div>
+  {% if stats_pages > 1 %}
+    <div class="admin-links" style="margin-top:12px;">
+      {% if stats_page > 1 %}
+        <a href="{{ url_for('map.repressors', q=q, provincia=selected_province, municipio=selected_municipality, page=page, stats_page=stats_page-1) }}">← Anterior</a>
+      {% endif %}
+      <span>Página {{ stats_page }} de {{ stats_pages }}</span>
+      {% if stats_page < stats_pages %}
+        <a href="{{ url_for('map.repressors', q=q, provincia=selected_province, municipio=selected_municipality, page=page, stats_page=stats_page+1) }}">Siguiente →</a>
+      {% endif %}
+    </div>
+  {% endif %}
 </section>
 
 <section class="panel">
@@ -75,7 +92,6 @@
         <thead>
           <tr>
             <th>Foto</th>
-            <th>ID</th>
             <th>Nombre</th>
             <th>Institución</th>
             <th>Provincia</th>
@@ -95,7 +111,6 @@
                   <span class="muted">N/D</span>
                 {% endif %}
               </td>
-              <td>{{ item.external_id }}</td>
               <td>
                 <strong>{{ item.full_name }}</strong>
                 {% if item.nickname %}
@@ -132,11 +147,11 @@
     {% if pages > 1 %}
       <div class="admin-links" style="margin-top:12px;">
         {% if page > 1 %}
-          <a href="{{ url_for('map.repressors', q=q, provincia=selected_province, municipio=selected_municipality, page=page-1) }}">← Anterior</a>
+          <a href="{{ url_for('map.repressors', q=q, provincia=selected_province, municipio=selected_municipality, page=page-1, stats_page=stats_page) }}">← Anterior</a>
         {% endif %}
         <span>Página {{ page }} de {{ pages }}</span>
         {% if page < pages %}
-          <a href="{{ url_for('map.repressors', q=q, provincia=selected_province, municipio=selected_municipality, page=page+1) }}">Siguiente →</a>
+          <a href="{{ url_for('map.repressors', q=q, provincia=selected_province, municipio=selected_municipality, page=page+1, stats_page=stats_page) }}">Siguiente →</a>
         {% endif %}
       </div>
     {% endif %}
@@ -145,6 +160,7 @@
   {% endif %}
 </section>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js" crossorigin="anonymous"></script>
 <script>
   window.CUBA_MUNICIPALITIES = {{ municipalities_map|tojson }};
 </script>
@@ -173,6 +189,38 @@
       items
         .map((name) => `<option value="${name}" ${name === selectedMun ? "selected" : ""}>${name}</option>`)
         .join("");
+
+    const chartEl = document.getElementById("repressorsGeoChart");
+    const chartLabels = {{ stats_chart_labels|tojson }};
+    const chartValues = {{ stats_chart_values|tojson }};
+    if (chartEl && window.Chart && Array.isArray(chartLabels) && chartLabels.length) {
+      new Chart(chartEl, {
+        type: "bar",
+        data: {
+          labels: chartLabels,
+          datasets: [
+            {
+              data: chartValues,
+              backgroundColor: "rgba(155, 209, 255, 0.25)",
+              borderColor: "rgba(155, 209, 255, 0.85)",
+              borderWidth: 1,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          indexAxis: "y",
+          scales: {
+            x: { beginAtZero: true },
+          },
+          plugins: {
+            legend: { display: false },
+          },
+        },
+      });
+      chartEl.style.minHeight = "360px";
+    }
   });
 </script>
 {% endblock %}
