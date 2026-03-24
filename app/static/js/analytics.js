@@ -95,6 +95,18 @@ const fetchAnalytics = async () => {
   return res.json();
 };
 
+const fetchRepressorStats = async () => {
+  const province = document.getElementById("analyticsProvince")?.value || "";
+  const params = new URLSearchParams();
+  if (province) params.set("province", province);
+  const suffix = params.toString();
+  const res = await fetch(`/api/v1/repressors/stats${suffix ? `?${suffix}` : ""}`);
+  if (!res.ok) {
+    throw new Error("No se pudo cargar analíticas de represores");
+  }
+  return res.json();
+};
+
 const buildLine = (ctx, label, labels, data, extra = {}) =>
   new Chart(ctx, {
     type: "line",
@@ -336,12 +348,42 @@ const renderConnectivity24hChart = (payload) => {
   ]);
 };
 
-const renderCharts = (payload) => {
+const renderRepressorGeoDistribution = (payload) => {
+  destroyChart("repressorGeoDistribution");
+  const canvasEl = document.getElementById("repressorGeoDistribution");
+  if (!canvasEl) return;
+
+  const rows = Array.isArray(payload?.by_province_municipality)
+    ? payload.by_province_municipality
+    : [];
+  const topRows = rows
+    .filter((item) => item && Number.isFinite(Number(item.count)))
+    .slice(0, 20);
+
+  if (!topRows.length) return;
+
+  const labels = topRows.map((item) => {
+    const province = item.province || "N/D";
+    const municipality = item.municipality || "N/D";
+    return `${province} · ${municipality}`;
+  });
+  const data = topRows.map((item) => Number(item.count) || 0);
+
+  state.charts.repressorGeoDistribution = buildBar(
+    canvasEl,
+    labels,
+    data,
+    true
+  );
+};
+
+const renderCharts = (payload, repressorStats) => {
   destroyChart("reportsOverTime");
   destroyChart("moderationStatus");
   destroyChart("categoryDistribution");
   destroyChart("provinceDistribution");
   destroyChart("municipalityDistribution");
+  destroyChart("repressorGeoDistribution");
   destroyChart("topVerified");
   destroyChart("commentsOverTime");
   destroyChart("editStatus");
@@ -394,6 +436,8 @@ const renderCharts = (payload) => {
     municipalityData,
     true
   );
+
+  renderRepressorGeoDistribution(repressorStats);
 
   const topLabels = payload.top_verified.map((item) =>
     item.title.length > 28 ? `${item.title.slice(0, 28)}…` : item.title
@@ -455,8 +499,11 @@ const attachHandlers = () => {
     refreshBtn.disabled = true;
     refreshBtn.textContent = "Cargando...";
     try {
-      const data = await fetchAnalytics();
-      renderCharts(data);
+      const [analyticsData, repressorStats] = await Promise.all([
+        fetchAnalytics(),
+        fetchRepressorStats(),
+      ]);
+      renderCharts(analyticsData, repressorStats);
     } catch (err) {
       console.error(err);
     } finally {
@@ -470,8 +517,11 @@ const boot = async () => {
   initFilters();
   attachHandlers();
   try {
-    const data = await fetchAnalytics();
-    renderCharts(data);
+    const [analyticsData, repressorStats] = await Promise.all([
+      fetchAnalytics(),
+      fetchRepressorStats(),
+    ]);
+    renderCharts(analyticsData, repressorStats);
   } catch (err) {
     console.error(err);
   }
