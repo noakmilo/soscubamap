@@ -237,6 +237,12 @@ def _resolve_scan_start_id(start_id: int | None) -> tuple[int, str]:
     return get_scan_start_id(), "bootstrap_from_config"
 
 
+def _auto_stop_missing_streak(scan_start_strategy: str) -> int:
+    if scan_start_strategy == "bootstrap_from_config":
+        return 500
+    return 25
+
+
 def _extract_named_items(items: Any) -> list[dict[str, Any]]:
     if not isinstance(items, list):
         return []
@@ -507,17 +513,13 @@ def ingest_repressors_range(
     api_base = get_api_base_url().rstrip("/")
 
     scan_start, scan_start_strategy = _resolve_scan_start_id(start_id)
+    auto_stop_missing = _auto_stop_missing_streak(scan_start_strategy)
     if end_id is not None:
         scan_end = max(int(end_id), 1)
         scan_end_strategy = "explicit"
     else:
-        scan_end = _discover_latest_external_id(
-            session=session,
-            api_base=api_base,
-            timeout_seconds=timeout_seconds,
-            first_probe_id=scan_start,
-        )
-        scan_end_strategy = "auto_discovered_latest_existing"
+        scan_end = scan_start
+        scan_end_strategy = "auto_until_missing_streak"
 
     run = RepressorIngestionRun(
         started_at_utc=datetime.utcnow(),
@@ -527,13 +529,22 @@ def ingest_repressors_range(
     )
     db.session.add(run)
     db.session.commit()
-    current_app.logger.info(
-        "Ingesta represores iniciada. start=%s (%s) end=%s (%s)",
-        scan_start,
-        scan_start_strategy,
-        scan_end,
-        scan_end_strategy,
-    )
+    if scan_end_strategy == "explicit":
+        current_app.logger.info(
+            "Ingesta represores iniciada. start=%s (%s) end=%s (%s)",
+            scan_start,
+            scan_start_strategy,
+            scan_end,
+            scan_end_strategy,
+        )
+    else:
+        current_app.logger.info(
+            "Ingesta represores iniciada. start=%s (%s) end=auto (%s, missing_streak_stop=%s)",
+            scan_start,
+            scan_start_strategy,
+            scan_end_strategy,
+            auto_stop_missing,
+        )
 
     counters = {
         "scanned_ids": 0,
@@ -544,16 +555,32 @@ def ingest_repressors_range(
         "errors_count": 0,
     }
     errors: list[dict[str, Any]] = []
+    last_existing_external_id = scan_start - 1
 
     try:
-        total = max(scan_end - scan_start + 1, 0)
-        if total == 0:
-            current_app.logger.info(
-                "No hay IDs nuevos para ingerir. start=%s end=%s.",
-                scan_start,
-                scan_end,
-            )
-        for index, external_id in enumerate(range(scan_start, scan_end + 1), start=1):
+        if scan_end_strategy == "explicit":
+            total = max(scan_end - scan_start + 1, 0)
+            if total == 0:
+                current_app.logger.info(
+                    "No hay IDs nuevos para ingerir. start=%s end=%s.",
+                    scan_start,
+                    scan_end,
+                )
+        else:
+            total = None
+
+        processed = 0
+        missing_streak = 0
+        external_id = scan_start
+        while True:
+            if scan_end_strategy == "explicit":
+                if external_id > scan_end:
+                    break
+            else:
+                if missing_streak >= auto_stop_missing:
+                    break
+
+            processed += 1
             counters["scanned_ids"] += 1
             try:
                 base_row = _fetch_repressor_row(
@@ -564,7 +591,11 @@ def ingest_repressors_range(
                 )
                 if base_row is None:
                     counters["missing_items"] += 1
+                    missing_streak += 1
                 else:
+                    missing_streak = 0
+                    if external_id > last_existing_external_id:
+                        last_existing_external_id = external_id
                     crimes_payload = _request_json(
                         session,
                         f"{api_base}/repressor/crimes/list/{external_id}",
@@ -600,16 +631,48 @@ def ingest_repressors_range(
             if pause_seconds > 0:
                 time.sleep(pause_seconds)
 
-            if progress_every > 0 and (index % progress_every == 0 or index == total):
+            if progress_every > 0 and (
+                processed % progress_every == 0
+                or (total is not None and processed == total)
+            ):
+                if total is not None:
+                    current_app.logger.info(
+                        "Ingesta represores [%s/%s] stored=%s updated=%s unchanged=%s missing=%s errors=%s",
+                        processed,
+                        total,
+                        counters["stored_items"],
+                        counters["updated_items"],
+                        counters["unchanged_items"],
+                        counters["missing_items"],
+                        counters["errors_count"],
+                    )
+                else:
+                    current_app.logger.info(
+                        "Ingesta represores [%s] stored=%s updated=%s unchanged=%s missing=%s errors=%s missing_streak=%s/%s",
+                        processed,
+                        counters["stored_items"],
+                        counters["updated_items"],
+                        counters["unchanged_items"],
+                        counters["missing_items"],
+                        counters["errors_count"],
+                        missing_streak,
+                        auto_stop_missing,
+                    )
+
+            external_id += 1
+
+        if scan_end_strategy != "explicit":
+            scan_end = max(last_existing_external_id, scan_start - 1)
+            if counters["stored_items"] == 0 and counters["updated_items"] == 0 and counters["unchanged_items"] == 0:
                 current_app.logger.info(
-                    "Ingesta represores [%s/%s] stored=%s updated=%s unchanged=%s missing=%s errors=%s",
-                    index,
-                    total,
-                    counters["stored_items"],
-                    counters["updated_items"],
-                    counters["unchanged_items"],
-                    counters["missing_items"],
-                    counters["errors_count"],
+                    "No se encontraron nuevos represores en modo incremental. start=%s.",
+                    scan_start,
+                )
+            else:
+                current_app.logger.info(
+                    "Ingesta represores auto-finalizada en external_id=%s tras missing_streak=%s.",
+                    scan_end,
+                    auto_stop_missing,
                 )
 
         backup_target = backup_json_path or get_backup_json_path()
@@ -624,6 +687,7 @@ def ingest_repressors_range(
         run.unchanged_items = counters["unchanged_items"]
         run.missing_items = counters["missing_items"]
         run.errors_count = counters["errors_count"]
+        run.scan_end_id = scan_end
         run.error_message = errors[0]["error"] if errors else None
         run.payload_json = json.dumps(
             {
@@ -631,6 +695,7 @@ def ingest_repressors_range(
                 "scan_end_id": scan_end,
                 "scan_start_strategy": scan_start_strategy,
                 "scan_end_strategy": scan_end_strategy,
+                "auto_stop_missing_streak": auto_stop_missing if scan_end_strategy != "explicit" else None,
                 "backup_json_path": backup_target,
                 "counters": counters,
                 "errors_sample": errors[:50],
@@ -647,6 +712,9 @@ def ingest_repressors_range(
             {
                 "scan_start_id": scan_start,
                 "scan_end_id": scan_end,
+                "scan_start_strategy": scan_start_strategy,
+                "scan_end_strategy": scan_end_strategy,
+                "auto_stop_missing_streak": auto_stop_missing if scan_end_strategy != "explicit" else None,
                 "counters": counters,
                 "errors_sample": errors[:50],
             },
@@ -663,6 +731,7 @@ def ingest_repressors_range(
         "scan_end_id": scan_end,
         "scan_start_strategy": scan_start_strategy,
         "scan_end_strategy": scan_end_strategy,
+        "auto_stop_missing_streak": auto_stop_missing if scan_end_strategy != "explicit" else None,
         "next_suggested_start_id": (scan_end + 1) if scan_end >= 1 else 1,
         "backup_json_path": backup_json_path or get_backup_json_path(),
         **counters,

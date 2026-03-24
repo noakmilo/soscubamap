@@ -27,8 +27,8 @@ def parse_args():
         type=int,
         default=None,
         help=(
-            "ID final. Si se omite: detecta automáticamente el último ID "
-            "existente en la API remota."
+            "ID final. Si se omite: la ingesta avanza hasta que se alcanza "
+            "una racha de IDs inexistentes (modo automático incremental)."
         ),
     )
     parser.add_argument(

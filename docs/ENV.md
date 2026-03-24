@@ -146,8 +146,8 @@ Layer de eventos de protesta inferidos automáticamente desde fuentes RSS.
 | `REPRESSOR_RESIDENCE_AUTO_APPROVE`     | `1` publica automático reportes de vivienda; `0` los deja en moderación.    | `0` |
 
 Notas de rango de ingesta:
-- Primera ingesta: escanea desde `REPRESSOR_SCAN_START_ID` hasta el último ID existente en API remota.
-- Ingestas automáticas siguientes: comienzan en `último external_id local + 1` y terminan en el último ID remoto detectado.
+- Primera ingesta: escanea desde `REPRESSOR_SCAN_START_ID` y avanza automáticamente hasta una racha larga de IDs inexistentes.
+- Ingestas automáticas siguientes: comienzan en `último external_id local + 1` y se detienen al alcanzar una racha corta de IDs inexistentes.
 - Si necesitas un rango fijo, usa argumentos explícitos `--start-id/--end-id` en `python -m scripts.fetch_repressors`.
 
 ## Celery (ingesta periódica)
