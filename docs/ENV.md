@@ -141,10 +141,14 @@ Layer de eventos de protesta inferidos automáticamente desde fuentes RSS.
 | `REPRESSOR_FETCH_RETRIES`              | Reintentos HTTP por request de ingesta.                                     | `3` |
 | `REPRESSOR_FETCH_PAUSE_SECONDS`        | Pausa entre IDs durante ingesta para no saturar la fuente.                  | `0` |
 | `REPRESSOR_SCAN_START_ID`              | ID inicial de escaneo.                                                      | `1` |
-| `REPRESSOR_SCAN_END_ID`                | ID final de escaneo.                                                        | `3000` |
 | `REPRESSOR_INGESTION_INTERVAL_SECONDS` | Intervalo de ingesta automática (Celery Beat).                              | `86400` |
 | `REPRESSOR_BACKUP_JSON_PATH`           | Ruta del backup JSON local del catálogo sincronizado.                       | `data/repressors_backup_latest.json` |
 | `REPRESSOR_RESIDENCE_AUTO_APPROVE`     | `1` publica automático reportes de vivienda; `0` los deja en moderación.    | `0` |
+
+Notas de rango de ingesta:
+- Primera ingesta: escanea desde `REPRESSOR_SCAN_START_ID` hasta el último ID existente en API remota.
+- Ingestas automáticas siguientes: comienzan en `último external_id local + 1` y terminan en el último ID remoto detectado.
+- Si necesitas un rango fijo, usa argumentos explícitos `--start-id/--end-id` en `python -m scripts.fetch_repressors`.
 
 ## Celery (ingesta periódica)
 

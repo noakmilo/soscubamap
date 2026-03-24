@@ -10,6 +10,8 @@ import cloudinary.uploader
 import requests
 from flask import current_app
 from requests.adapters import HTTPAdapter
+from sqlalchemy import func
+from sqlalchemy.orm import selectinload
 from urllib3.util.retry import Retry
 
 from app.extensions import db
@@ -79,11 +81,6 @@ def get_scan_start_id() -> int:
     return max(_safe_int(current_app.config.get("REPRESSOR_SCAN_START_ID"), 1), 1)
 
 
-def get_scan_end_id() -> int:
-    end_id = _safe_int(current_app.config.get("REPRESSOR_SCAN_END_ID"), 3000)
-    return max(end_id, get_scan_start_id())
-
-
 def get_ingestion_interval_seconds() -> int:
     raw = _safe_int(current_app.config.get("REPRESSOR_INGESTION_INTERVAL_SECONDS"), 86400)
     return max(raw, 3600)
@@ -128,6 +125,21 @@ def _request_json(session: requests.Session, url: str, timeout_seconds: float) -
     raise ValueError(f"Respuesta JSON inesperada: {url}")
 
 
+def _request_json_or_none_on_404(
+    session: requests.Session,
+    url: str,
+    timeout_seconds: float,
+) -> dict[str, Any] | None:
+    response = session.get(url, timeout=timeout_seconds)
+    if response.status_code == 404:
+        return None
+    response.raise_for_status()
+    payload = response.json()
+    if isinstance(payload, dict):
+        return payload
+    raise ValueError(f"Respuesta JSON inesperada: {url}")
+
+
 def _extract_repressor_row(payload: dict[str, Any]) -> dict[str, Any] | None:
     data = payload.get("data", {})
     if not isinstance(data, dict):
@@ -141,23 +153,108 @@ def _extract_repressor_row(payload: dict[str, Any]) -> dict[str, Any] | None:
     return row
 
 
+def _fetch_repressor_row(
+    session: requests.Session,
+    api_base: str,
+    external_id: int,
+    timeout_seconds: float,
+) -> dict[str, Any] | None:
+    payload = _request_json_or_none_on_404(
+        session,
+        f"{api_base}/repressor/{external_id}",
+        timeout_seconds,
+    )
+    if payload is None:
+        return None
+    return _extract_repressor_row(payload)
+
+
+def _discover_latest_external_id(
+    session: requests.Session,
+    api_base: str,
+    timeout_seconds: float,
+    first_probe_id: int,
+) -> int:
+    start_probe = max(int(first_probe_id), 1)
+    existence_cache: dict[int, bool] = {}
+
+    def _exists(external_id: int) -> bool:
+        cached = existence_cache.get(external_id)
+        if cached is not None:
+            return cached
+        row = _fetch_repressor_row(session, api_base, external_id, timeout_seconds)
+        ok = row is not None
+        existence_cache[external_id] = ok
+        return ok
+
+    if not _exists(start_probe):
+        return start_probe - 1
+
+    max_probe = 1_000_000
+    lo = start_probe
+    hi = max(start_probe + 1, start_probe * 2)
+    hi = min(hi, max_probe)
+
+    while _exists(hi):
+        lo = hi
+        if hi >= max_probe:
+            current_app.logger.warning(
+                "Se alcanzó el techo de detección de IDs (%s).",
+                max_probe,
+            )
+            return hi
+        hi = min(hi * 2, max_probe)
+
+    while lo + 1 < hi:
+        mid = (lo + hi) // 2
+        if _exists(mid):
+            lo = mid
+        else:
+            hi = mid
+
+    return lo
+
+
+def _latest_stored_external_id() -> int | None:
+    value = db.session.query(func.max(Repressor.external_id)).scalar()
+    if value is None:
+        return None
+    try:
+        parsed = int(value)
+    except Exception:
+        return None
+    return parsed if parsed >= 1 else None
+
+
+def _resolve_scan_start_id(start_id: int | None) -> tuple[int, str]:
+    if start_id is not None:
+        return max(int(start_id), 1), "explicit"
+
+    latest_stored_id = _latest_stored_external_id()
+    if latest_stored_id is not None:
+        return latest_stored_id + 1, "incremental_from_last"
+
+    return get_scan_start_id(), "bootstrap_from_config"
+
+
 def _extract_named_items(items: Any) -> list[dict[str, Any]]:
     if not isinstance(items, list):
         return []
-    result: list[dict[str, Any]] = []
+    dedup_by_name: dict[str, dict[str, Any]] = {}
     for item in items:
         if not isinstance(item, dict):
             continue
         name = _clean_text(item.get("name"))
         if not name:
             continue
-        result.append(
-            {
-                "id": _safe_int(item.get("id"), 0) or None,
-                "name": name,
-            }
-        )
-    return result
+        item_id = _safe_int(item.get("id"), 0) or None
+        existing = dedup_by_name.get(name)
+        if existing is None:
+            dedup_by_name[name] = {"id": item_id, "name": name}
+            continue
+        if existing.get("id") is None and item_id is not None:
+            existing["id"] = item_id
+    return list(dedup_by_name.values())
 
 
 def _build_source_image_url(image_raw: Any) -> str | None:
@@ -223,12 +320,12 @@ def _sync_repressor_children(
     for item in crimes:
         obj = current_crimes.get(item["name"])
         if obj is None:
-            repressor.crimes.append(
-                RepressorCrime(
-                    name=item["name"],
-                    source_crime_id=item.get("id"),
-                )
+            obj = RepressorCrime(
+                name=item["name"],
+                source_crime_id=item.get("id"),
             )
+            repressor.crimes.append(obj)
+            current_crimes[item["name"]] = obj
             changed = True
             continue
         if obj.source_crime_id != item.get("id"):
@@ -244,12 +341,12 @@ def _sync_repressor_children(
     for item in types:
         obj = current_types.get(item["name"])
         if obj is None:
-            repressor.types.append(
-                RepressorType(
-                    name=item["name"],
-                    source_type_id=item.get("id"),
-                )
+            obj = RepressorType(
+                name=item["name"],
+                source_type_id=item.get("id"),
             )
+            repressor.types.append(obj)
+            current_types[item["name"]] = obj
             changed = True
             continue
         if obj.source_type_id != item.get("id"):
@@ -386,16 +483,41 @@ def _write_backup_json(path_text: str, rows: list[dict[str, Any]]) -> None:
         json.dump(rows, file_obj, ensure_ascii=False, indent=2)
 
 
+def _serialize_all_repressors_for_backup() -> list[dict[str, Any]]:
+    rows = (
+        Repressor.query.options(
+            selectinload(Repressor.crimes),
+            selectinload(Repressor.types),
+        )
+        .order_by(Repressor.external_id.asc(), Repressor.id.asc())
+        .all()
+    )
+    return [serialize_repressor(item, include_relationships=True) for item in rows]
+
+
 def ingest_repressors_range(
     start_id: int | None = None,
     end_id: int | None = None,
     backup_json_path: str | None = None,
     progress_every: int = 100,
 ) -> dict[str, Any]:
-    scan_start = max(int(start_id or get_scan_start_id()), 1)
-    scan_end = max(int(end_id or get_scan_end_id()), scan_start)
     timeout_seconds = get_fetch_timeout_seconds()
     pause_seconds = get_fetch_pause_seconds()
+    session = _build_http_session()
+    api_base = get_api_base_url().rstrip("/")
+
+    scan_start, scan_start_strategy = _resolve_scan_start_id(start_id)
+    if end_id is not None:
+        scan_end = max(int(end_id), 1)
+        scan_end_strategy = "explicit"
+    else:
+        scan_end = _discover_latest_external_id(
+            session=session,
+            api_base=api_base,
+            timeout_seconds=timeout_seconds,
+            first_probe_id=scan_start,
+        )
+        scan_end_strategy = "auto_discovered_latest_existing"
 
     run = RepressorIngestionRun(
         started_at_utc=datetime.utcnow(),
@@ -405,9 +527,13 @@ def ingest_repressors_range(
     )
     db.session.add(run)
     db.session.commit()
-
-    session = _build_http_session()
-    api_base = get_api_base_url().rstrip("/")
+    current_app.logger.info(
+        "Ingesta represores iniciada. start=%s (%s) end=%s (%s)",
+        scan_start,
+        scan_start_strategy,
+        scan_end,
+        scan_end_strategy,
+    )
 
     counters = {
         "scanned_ids": 0,
@@ -418,19 +544,24 @@ def ingest_repressors_range(
         "errors_count": 0,
     }
     errors: list[dict[str, Any]] = []
-    exported_rows: list[dict[str, Any]] = []
 
     try:
-        total = scan_end - scan_start + 1
+        total = max(scan_end - scan_start + 1, 0)
+        if total == 0:
+            current_app.logger.info(
+                "No hay IDs nuevos para ingerir. start=%s end=%s.",
+                scan_start,
+                scan_end,
+            )
         for index, external_id in enumerate(range(scan_start, scan_end + 1), start=1):
             counters["scanned_ids"] += 1
             try:
-                base_payload = _request_json(
-                    session,
-                    f"{api_base}/repressor/{external_id}",
-                    timeout_seconds,
+                base_row = _fetch_repressor_row(
+                    session=session,
+                    api_base=api_base,
+                    external_id=external_id,
+                    timeout_seconds=timeout_seconds,
                 )
-                base_row = _extract_repressor_row(base_payload)
                 if base_row is None:
                     counters["missing_items"] += 1
                 else:
@@ -456,8 +587,9 @@ def ingest_repressors_range(
                         types=types,
                     )
                     counters[f"{action}_items"] += 1
-                    exported_rows.append(serialize_repressor(repressor))
+                    db.session.commit()
             except Exception as exc:
+                db.session.rollback()
                 counters["errors_count"] += 1
                 errors.append({"external_id": external_id, "error": str(exc)})
                 current_app.logger.exception(
@@ -480,11 +612,9 @@ def ingest_repressors_range(
                     counters["errors_count"],
                 )
 
-        db.session.commit()
-
         backup_target = backup_json_path or get_backup_json_path()
         if backup_target:
-            _write_backup_json(backup_target, exported_rows)
+            _write_backup_json(backup_target, _serialize_all_repressors_for_backup())
 
         run.status = "success"
         run.finished_at_utc = datetime.utcnow()
@@ -499,6 +629,8 @@ def ingest_repressors_range(
             {
                 "scan_start_id": scan_start,
                 "scan_end_id": scan_end,
+                "scan_start_strategy": scan_start_strategy,
+                "scan_end_strategy": scan_end_strategy,
                 "backup_json_path": backup_target,
                 "counters": counters,
                 "errors_sample": errors[:50],
@@ -529,6 +661,9 @@ def ingest_repressors_range(
         "run_id": run.id,
         "scan_start_id": scan_start,
         "scan_end_id": scan_end,
+        "scan_start_strategy": scan_start_strategy,
+        "scan_end_strategy": scan_end_strategy,
+        "next_suggested_start_id": (scan_end + 1) if scan_end >= 1 else 1,
         "backup_json_path": backup_json_path or get_backup_json_path(),
         **counters,
         "errors_sample": errors[:20],

@@ -1,5 +1,7 @@
 import argparse
 import json
+import logging
+import sys
 
 from app import create_app
 from app.services.repressors import (
@@ -15,13 +17,19 @@ def parse_args():
         "--start-id",
         type=int,
         default=None,
-        help="ID inicial (si se omite usa configuracion).",
+        help=(
+            "ID inicial. Si se omite: usa último ID local + 1 "
+            "(o REPRESSOR_SCAN_START_ID en primera ingesta)."
+        ),
     )
     parser.add_argument(
         "--end-id",
         type=int,
         default=None,
-        help="ID final (si se omite usa configuracion).",
+        help=(
+            "ID final. Si se omite: detecta automáticamente el último ID "
+            "existente en la API remota."
+        ),
     )
     parser.add_argument(
         "--progress-every",
@@ -38,9 +46,22 @@ def parse_args():
     return parser.parse_args()
 
 
+def configure_console_logging() -> None:
+    root = logging.getLogger()
+    if not root.handlers:
+        logging.basicConfig(
+            level=logging.INFO,
+            format="[%(asctime)s] %(levelname)s %(name)s: %(message)s",
+            stream=sys.stdout,
+        )
+    root.setLevel(logging.INFO)
+
+
 def main():
     args = parse_args()
+    configure_console_logging()
     app = create_app()
+    app.logger.setLevel(logging.INFO)
     with app.app_context():
         summary = ingest_repressors_range(
             start_id=args.start_id,

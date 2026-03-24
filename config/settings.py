@@ -90,7 +90,6 @@ class Config:
         os.getenv("REPRESSOR_FETCH_PAUSE_SECONDS", "0")
     )
     REPRESSOR_SCAN_START_ID = int(os.getenv("REPRESSOR_SCAN_START_ID", "1"))
-    REPRESSOR_SCAN_END_ID = int(os.getenv("REPRESSOR_SCAN_END_ID", "3000"))
     REPRESSOR_INGESTION_INTERVAL_SECONDS = int(
         os.getenv("REPRESSOR_INGESTION_INTERVAL_SECONDS", "86400")
     )
