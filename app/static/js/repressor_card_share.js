@@ -35,28 +35,76 @@
     return html2CanvasPromise;
   }
 
+  function buildCaptureContainer() {
+    const wrapper = document.createElement("div");
+    wrapper.style.position = "fixed";
+    wrapper.style.left = "-10000px";
+    wrapper.style.top = "0";
+    wrapper.style.zIndex = "-1";
+    wrapper.style.pointerEvents = "none";
+    wrapper.style.opacity = "0";
+    wrapper.style.background = "transparent";
+    return wrapper;
+  }
+
+  async function waitForImages(root) {
+    const images = Array.from(root.querySelectorAll("img"));
+    if (!images.length) return;
+    await Promise.all(
+      images.map((img) => {
+        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+        return new Promise((resolve) => {
+          const done = () => resolve();
+          img.addEventListener("load", done, { once: true });
+          img.addEventListener("error", done, { once: true });
+        });
+      })
+    );
+  }
+
+  function buildCardClone(card) {
+    const rect = card.getBoundingClientRect();
+    const clone = card.cloneNode(true);
+    clone.style.width = `${Math.ceil(rect.width)}px`;
+    clone.style.maxWidth = "none";
+    clone.style.height = "auto";
+    clone.style.minHeight = "0";
+    clone.style.overflow = "visible";
+    clone.style.aspectRatio = "auto";
+    return clone;
+  }
+
   async function cardToPngBlob(card) {
     const html2canvas = await ensureHtml2Canvas();
-    const canvas = await html2canvas(card, {
-      backgroundColor: null,
-      useCORS: true,
-      allowTaint: false,
-      scale: Math.max(2, window.devicePixelRatio || 1),
-      logging: false,
-    });
-    return new Promise((resolve, reject) => {
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) {
-            reject(new Error("No se pudo generar PNG"));
-            return;
-          }
-          resolve(blob);
-        },
-        "image/png",
-        1.0
-      );
-    });
+    const wrapper = buildCaptureContainer();
+    const clone = buildCardClone(card);
+    wrapper.appendChild(clone);
+    document.body.appendChild(wrapper);
+    try {
+      await waitForImages(clone);
+      const canvas = await html2canvas(clone, {
+        backgroundColor: null,
+        useCORS: true,
+        allowTaint: false,
+        scale: Math.max(2, window.devicePixelRatio || 1),
+        logging: false,
+      });
+      return new Promise((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              reject(new Error("No se pudo generar PNG"));
+              return;
+            }
+            resolve(blob);
+          },
+          "image/png",
+          1.0
+        );
+      });
+    } finally {
+      wrapper.remove();
+    }
   }
 
   function sanitizeFileName(name) {

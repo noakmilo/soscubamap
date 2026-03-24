@@ -11,6 +11,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import cloudinary
+import cloudinary.uploader
+from flask import current_app
+from sqlalchemy import func
+
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
@@ -28,8 +33,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--input",
         type=Path,
-        default=Path("palsaco_opresores_scrape.json"),
-        help="Archivo JSON generado por scrape_palsaco_opresores.py",
+        default=Path("data/palsaco_opresores_catalog_ready.json"),
+        help="Archivo JSON final del catálogo listo para ingesta.",
     )
     parser.add_argument(
         "--progress-every",
@@ -41,6 +46,11 @@ def parse_args() -> argparse.Namespace:
         "--dry-run",
         action="store_true",
         help="No hace commit en base de datos.",
+    )
+    parser.add_argument(
+        "--no-cloudinary",
+        action="store_true",
+        help="No espeja imágenes en Cloudinary (solo guarda URL origen).",
     )
     return parser.parse_args()
 
@@ -150,7 +160,73 @@ def sync_types(repressor: Repressor, type_names: list[str]) -> None:
             db.session.delete(obj)
 
 
-def get_or_create_repressor(source_url: str) -> tuple[str, Repressor]:
+def _cloudinary_is_configured() -> bool:
+    return bool(
+        clean_text(current_app.config.get("CLOUDINARY_CLOUD_NAME"))
+        and clean_text(current_app.config.get("CLOUDINARY_API_KEY"))
+        and clean_text(current_app.config.get("CLOUDINARY_API_SECRET"))
+    )
+
+
+def _ensure_cloudinary_configured() -> bool:
+    if not _cloudinary_is_configured():
+        return False
+    cloudinary.config(
+        cloud_name=current_app.config.get("CLOUDINARY_CLOUD_NAME"),
+        api_key=current_app.config.get("CLOUDINARY_API_KEY"),
+        api_secret=current_app.config.get("CLOUDINARY_API_SECRET"),
+        secure=True,
+    )
+    return True
+
+
+def _is_cloudinary_url(url: str | None) -> bool:
+    value = clean_text(url)
+    if not value:
+        return False
+    return "res.cloudinary.com" in value
+
+
+def _cloudinary_public_id_for_repressor(repressor: Repressor) -> str:
+    base = clean_text(repressor.source_detail_url) or f"external-{repressor.external_id}"
+    digest = hashlib.sha1(base.encode("utf-8")).hexdigest()[:14]
+    return f"repressor-palsaco-{abs(int(repressor.external_id))}-{digest}"
+
+
+def mirror_image_to_cloudinary(repressor: Repressor, source_url: str | None) -> str | None:
+    image_source_url = clean_text(source_url)
+    if not image_source_url:
+        return None
+    if not _ensure_cloudinary_configured():
+        return image_source_url
+
+    try:
+        result = cloudinary.uploader.upload(
+            image_source_url,
+            folder="soscubamap/repressors",
+            public_id=_cloudinary_public_id_for_repressor(repressor),
+            overwrite=True,
+            resource_type="image",
+        )
+        return (
+            clean_text(result.get("secure_url"))
+            or clean_text(result.get("url"))
+            or image_source_url
+        )
+    except Exception:
+        current_app.logger.exception(
+            "No se pudo espejar imagen a Cloudinary para repressor external_id=%s",
+            repressor.external_id,
+        )
+        return image_source_url
+
+
+def get_or_create_repressor(
+    source_url: str,
+    canonical_name: str,
+    canonical_lastname: str,
+    canonical_province: str | None,
+) -> tuple[str, Repressor]:
     item = Repressor.query.filter_by(source_detail_url=source_url).first()
     if item is not None:
         return "updated", item
@@ -159,6 +235,19 @@ def get_or_create_repressor(source_url: str) -> tuple[str, Repressor]:
     item = Repressor.query.filter_by(external_id=external_id).first()
     if item is not None:
         return "updated", item
+
+    if canonical_name and canonical_lastname and canonical_province:
+        item = (
+            Repressor.query.filter(
+                func.lower(Repressor.name) == canonical_name.lower(),
+                func.lower(Repressor.lastname) == canonical_lastname.lower(),
+                func.lower(func.coalesce(Repressor.province_name, "")) == canonical_province.lower(),
+            )
+            .order_by(Repressor.id.asc())
+            .first()
+        )
+        if item is not None:
+            return "updated", item
 
     item = Repressor(
         external_id=external_id,
@@ -169,7 +258,7 @@ def get_or_create_repressor(source_url: str) -> tuple[str, Repressor]:
     return "stored", item
 
 
-def ingest_item(item: dict[str, Any]) -> str:
+def ingest_item(item: dict[str, Any], mirror_cloudinary: bool = True) -> str:
     source_url = (
         clean_text(item.get("canonical_url"))
         or clean_text(item.get("source_url"))
@@ -178,7 +267,6 @@ def ingest_item(item: dict[str, Any]) -> str:
     if not source_url:
         raise ValueError("item sin source_url/canonical_url")
 
-    action, repressor = get_or_create_repressor(source_url)
     source_payload = item.get("source_payload") if isinstance(item.get("source_payload"), dict) else {}
     fields_raw = item.get("fields") if isinstance(item.get("fields"), dict) else {}
     if not fields_raw and isinstance(source_payload.get("fields"), dict):
@@ -209,6 +297,15 @@ def ingest_item(item: dict[str, Any]) -> str:
         province,
         municipality,
     )
+    canonical_name = name or (clean_text(display_name) or clean_text(item.get("name")) or "N/D")
+    canonical_lastname = lastname or (clean_text(item.get("lastname")) or "")
+
+    action, repressor = get_or_create_repressor(
+        source_url=source_url,
+        canonical_name=canonical_name,
+        canonical_lastname=canonical_lastname,
+        canonical_province=canonical_province,
+    )
 
     crimes = extract_field_values(fields, ("delito", "cargo", "acusacion", "acusación"))
     if not crimes and isinstance(item.get("crimes"), list):
@@ -229,8 +326,8 @@ def ingest_item(item: dict[str, Any]) -> str:
         or extract_field_value(fields, ("testimonio",))
     )
 
-    repressor.name = name or (clean_text(display_name) or clean_text(item.get("name")) or "N/D")
-    repressor.lastname = lastname or (clean_text(item.get("lastname")) or "")
+    repressor.name = canonical_name
+    repressor.lastname = canonical_lastname
     repressor.nickname = alias
     repressor.institution_name = institution
     repressor.campus_name = campus
@@ -238,7 +335,10 @@ def ingest_item(item: dict[str, Any]) -> str:
     repressor.municipality_name = canonical_municipality
     repressor.testimony = testimony
     repressor.image_source_url = image_url
-    repressor.image_cached_url = image_url
+    if mirror_cloudinary:
+        repressor.image_cached_url = mirror_image_to_cloudinary(repressor, image_url)
+    else:
+        repressor.image_cached_url = image_url
     repressor.source_detail_url = source_url
     repressor.source_status = 1
     repressor.source_is_identifies = "palsaco_scrape"
@@ -284,9 +384,14 @@ def main() -> None:
         counters = {"stored": 0, "updated": 0, "errors": 0}
         errors: list[dict[str, Any]] = []
 
+        mirror_cloudinary = not args.no_cloudinary
+        if mirror_cloudinary and not _cloudinary_is_configured():
+            print(
+                "Aviso: Cloudinary no configurado; se guardará URL original en image_cached_url."
+            )
         for idx, row in enumerate(rows, start=1):
             try:
-                action = ingest_item(row)
+                action = ingest_item(row, mirror_cloudinary=mirror_cloudinary)
                 counters[action] += 1
             except Exception as exc:
                 db.session.rollback()
