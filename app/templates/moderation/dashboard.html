@@ -42,6 +42,44 @@
 </section>
 
 <section class="panel">
+  <h2>Nuevos represores pendientes</h2>
+  <div class="pending-list">
+    {% if pending_repressor_submissions %}
+      {% for item in pending_repressor_submissions %}
+        <div class="pending-card">
+          <div>
+            {% if item.photo_url %}
+              <img src="{{ item.photo_url }}" alt="{{ item.full_name }}" class="repressor-avatar" />
+            {% endif %}
+          </div>
+          <div>
+            <h3>{{ item.full_name }}</h3>
+            <div class="muted">{{ item.province_name or "N/D" }} · {{ item.municipality_name or "N/D" }}</div>
+            <div class="muted">Tipo: {{ item.types_list|join(", ") if item.types_list else "N/D" }}</div>
+            <div class="muted">Delitos: {{ item.crimes_list|length }}</div>
+            {% if item.note %}
+              <p>{{ item.note }}</p>
+            {% endif %}
+            <div class="muted">Enviado: {{ item.created_at }}</div>
+          </div>
+          <div class="actions">
+            <form method="post" action="{{ url_for('moderation.approve_repressor_submission', submission_id=item.id) }}">
+              <button class="btn-primary" type="submit">Aprobar represor</button>
+            </form>
+            <form method="post" action="{{ url_for('moderation.reject_repressor_submission', submission_id=item.id) }}">
+              <input type="text" name="reason" placeholder="Motivo (opcional)" />
+              <button class="btn-secondary" type="submit">Rechazar</button>
+            </form>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="muted">No hay propuestas de represores pendientes.</div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="panel">
   <h2>Ediciones pendientes</h2>
   <div class="pending-list">
     {% if pending_edits %}

@@ -31,7 +31,7 @@ from app.models.media import Media
 from app.models.post import Post
 from app.models.post_edit_request import PostEditRequest
 from app.models.post_revision import PostRevision
-from app.models.repressor import Repressor, RepressorResidenceReport
+from app.models.repressor import Repressor, RepressorResidenceReport, RepressorSubmission
 from app.models.role import Role
 from app.models.site_setting import SiteSetting
 from app.models.user import User
@@ -66,6 +66,14 @@ from app.services.repressors import (
     build_residence_post_description,
     build_residence_post_title,
     serialize_repressor,
+)
+from app.services.repressor_submissions import (
+    get_repressor_type_names,
+    get_repressor_type_options,
+    list_existing_repressor_crime_names,
+    materialize_repressor_submission,
+    normalize_list_items,
+    parse_custom_crimes,
 )
 from app.services.vote_identity import get_voter_hash
 from app.services.map_providers import get_map_provider_forms, get_map_provider_main
@@ -188,6 +196,13 @@ def _clean_captions(raw, count):
 
 def _residence_category():
     return Category.query.filter_by(slug="residencia-represor").first()
+
+
+def _is_moderation_enabled() -> bool:
+    moderation_setting = SiteSetting.query.filter_by(key="moderation_enabled").first()
+    if moderation_setting is None:
+        return True
+    return moderation_setting.value == "true"
 
 
 def _serialize_residence_report(report: RepressorResidenceReport):
@@ -1332,12 +1347,17 @@ def repressors():
     q = request.args.get("q", "").strip()
     selected_province = canonicalize_province_name(request.args.get("provincia", "").strip()) or ""
     selected_municipality = request.args.get("municipio", "").strip()
+    per_page_options = [20, 50, 100, 500]
     try:
         page = max(int(request.args.get("page", "1")), 1)
     except Exception:
         page = 1
+    try:
+        requested_per_page = int(request.args.get("per_page", "20"))
+    except Exception:
+        requested_per_page = 20
 
-    per_page = 40
+    per_page = requested_per_page if requested_per_page in per_page_options else 20
     query = Repressor.query.options(
         selectinload(Repressor.crimes),
         selectinload(Repressor.types),
@@ -1363,12 +1383,17 @@ def repressors():
 
     total = query.count()
     pages = max((total + per_page - 1) // per_page, 1)
+    page = min(page, pages)
     rows = (
         query.order_by(Repressor.updated_at.desc(), Repressor.id.desc())
         .offset((page - 1) * per_page)
         .limit(per_page)
         .all()
     )
+    page_window = 2
+    first_page_in_window = max(1, page - page_window)
+    last_page_in_window = min(pages, page + page_window)
+    page_numbers = list(range(first_page_in_window, last_page_in_window + 1))
 
     provinces = list_provinces()
     if selected_province:
@@ -1382,7 +1407,9 @@ def repressors():
         total=total,
         page=page,
         pages=pages,
+        page_numbers=page_numbers,
         per_page=per_page,
+        per_page_options=per_page_options,
         q=q,
         provinces=provinces,
         municipalities=municipalities,
@@ -1390,6 +1417,174 @@ def repressors():
         selected_municipality=selected_municipality,
         municipalities_map=municipalities_map(),
         canonicalize_location_names=canonicalize_location_names,
+    )
+
+
+@map_bp.route("/represores/agregar", methods=["GET", "POST"])
+@limiter.limit("3/minute; 20/day", methods=["POST"])
+def add_repressor():
+    moderation_enabled = _is_moderation_enabled()
+    type_options = get_repressor_type_options()
+    allowed_type_names = get_repressor_type_names()
+    existing_crime_names = list_existing_repressor_crime_names()
+    existing_crime_name_set = set(existing_crime_names)
+
+    errors = {}
+    form_data = {
+        "name": "",
+        "lastname": "",
+        "nickname": "",
+        "institution_name": "",
+        "campus_name": "",
+        "province_name": "",
+        "municipality_name": "",
+        "photo_url": "",
+        "note": "",
+        "custom_crimes": "",
+        "selected_crime_names": [],
+        "selected_type_names": [],
+    }
+
+    if request.method == "POST":
+        selected_crime_names = normalize_list_items(request.form.getlist("crime_names[]"))
+        selected_type_names = normalize_list_items(request.form.getlist("type_names[]"))
+        custom_crimes_text = request.form.get("custom_crimes", "").strip()
+        form_data = {
+            "name": request.form.get("name", "").strip(),
+            "lastname": request.form.get("lastname", "").strip(),
+            "nickname": request.form.get("nickname", "").strip(),
+            "institution_name": request.form.get("institution_name", "").strip(),
+            "campus_name": request.form.get("campus_name", "").strip(),
+            "province_name": request.form.get("province_name", "").strip(),
+            "municipality_name": request.form.get("municipality_name", "").strip(),
+            "photo_url": request.form.get("photo_url", "").strip(),
+            "note": request.form.get("note", "").strip(),
+            "custom_crimes": custom_crimes_text,
+            "selected_crime_names": selected_crime_names,
+            "selected_type_names": selected_type_names,
+        }
+        filtered_selected_crimes = [
+            value for value in selected_crime_names if value in existing_crime_name_set
+        ]
+        filtered_selected_types = [
+            value for value in selected_type_names if value in allowed_type_names
+        ]
+        all_crime_names = normalize_list_items(
+            filtered_selected_crimes + parse_custom_crimes(custom_crimes_text)
+        )
+
+        province_name, municipality_name = canonicalize_location_names(
+            form_data["province_name"],
+            form_data["municipality_name"],
+        )
+        form_data["province_name"] = province_name or ""
+        form_data["municipality_name"] = municipality_name or ""
+        form_data["selected_crime_names"] = filtered_selected_crimes
+        form_data["selected_type_names"] = filtered_selected_types
+
+        if recaptcha_enabled():
+            token = request.form.get("g-recaptcha-response", "")
+            if not verify_recaptcha(token, request.remote_addr):
+                errors["recaptcha"] = "Verificación reCAPTCHA falló."
+
+        if not form_data["photo_url"]:
+            errors["photo_url"] = "La foto es obligatoria."
+        elif not form_data["photo_url"].startswith(("http://", "https://")):
+            errors["photo_url"] = "La foto debe ser una URL válida."
+
+        if not form_data["name"]:
+            errors["name"] = "El nombre es obligatorio."
+
+        if not filtered_selected_types:
+            errors["types"] = "Selecciona al menos un tipo de represor."
+
+        if not all_crime_names:
+            errors["crimes"] = "Selecciona al menos un delito o agrega uno nuevo."
+
+        if len(all_crime_names) > 100:
+            errors["crimes"] = "Máximo 100 delitos por envío."
+
+        if len(form_data["note"]) > 4000:
+            errors["note"] = "La nota no puede exceder 4000 caracteres."
+
+        malicious_values = [
+            form_data["name"],
+            form_data["lastname"],
+            form_data["nickname"],
+            form_data["institution_name"],
+            form_data["campus_name"],
+            form_data["province_name"],
+            form_data["municipality_name"],
+            form_data["photo_url"],
+            form_data["note"],
+            form_data["custom_crimes"],
+        ] + filtered_selected_types + all_crime_names
+        if has_malicious_input(malicious_values):
+            errors["form"] = "Se detectó contenido sospechoso en el formulario."
+
+        if not errors:
+            try:
+                submitter = _get_or_create_anon_editor()
+                reviewer_id = current_user.id if current_user.is_authenticated else None
+                status = "pending" if moderation_enabled else "approved"
+                submission = RepressorSubmission(
+                    status=status,
+                    submitter_id=submitter.id if submitter else None,
+                    reviewer_id=reviewer_id if not moderation_enabled else None,
+                    photo_url=form_data["photo_url"],
+                    name=form_data["name"],
+                    lastname=form_data["lastname"] or None,
+                    nickname=form_data["nickname"] or None,
+                    institution_name=form_data["institution_name"] or None,
+                    campus_name=form_data["campus_name"] or None,
+                    province_name=form_data["province_name"] or None,
+                    municipality_name=form_data["municipality_name"] or None,
+                    crimes_json=json.dumps(all_crime_names, ensure_ascii=False),
+                    types_json=json.dumps(filtered_selected_types, ensure_ascii=False),
+                    note=form_data["note"] or None,
+                    payload_json=json.dumps(
+                        {
+                            "custom_crimes_raw": custom_crimes_text,
+                            "selected_crimes": filtered_selected_crimes,
+                            "selected_types": filtered_selected_types,
+                        },
+                        ensure_ascii=False,
+                    ),
+                    reviewed_at=datetime.utcnow() if not moderation_enabled else None,
+                )
+                db.session.add(submission)
+                db.session.flush()
+
+                repressor = None
+                if not moderation_enabled:
+                    repressor = materialize_repressor_submission(
+                        submission,
+                        reviewer_id=reviewer_id,
+                    )
+
+                db.session.commit()
+
+                if moderation_enabled:
+                    flash("Propuesta enviada a moderación.", "success")
+                    return redirect(url_for("map.add_repressor"))
+
+                flash("Represor agregado al catálogo.", "success")
+                return redirect(url_for("map.repressor_detail", repressor_id=repressor.id))
+            except Exception:
+                db.session.rollback()
+                current_app.logger.exception("Error al guardar propuesta de represor")
+                errors["form"] = "No se pudo guardar la propuesta. Inténtalo nuevamente."
+
+    return render_template(
+        "map/repressor_new.html",
+        form_data=form_data,
+        errors=errors,
+        moderation_enabled=moderation_enabled,
+        type_options=type_options,
+        existing_crime_names=existing_crime_names,
+        provinces=list_provinces(),
+        municipalities_map=municipalities_map(),
+        recaptcha_site_key=current_app.config.get("RECAPTCHA_V2_SITE_KEY"),
     )
 
 

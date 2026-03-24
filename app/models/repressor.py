@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 
 from app.extensions import db
@@ -63,6 +64,11 @@ class Repressor(db.Model):
         back_populates="repressor",
         cascade="all, delete-orphan",
         order_by="RepressorResidenceReport.created_at.desc()",
+    )
+    submissions = db.relationship(
+        "RepressorSubmission",
+        back_populates="repressor",
+        order_by="RepressorSubmission.created_at.desc()",
     )
     posts = db.relationship("Post", back_populates="repressor")
 
@@ -197,3 +203,79 @@ class RepressorResidenceReport(db.Model):
 
     def __repr__(self):
         return f"<RepressorResidenceReport {self.id} repressor={self.repressor_id} {self.status}>"
+
+
+class RepressorSubmission(db.Model):
+    __tablename__ = "repressor_submissions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    status = db.Column(db.String(20), nullable=False, default="pending", index=True)
+
+    submitter_id = db.Column(db.Integer, db.ForeignKey("users.id"), index=True)
+    reviewer_id = db.Column(db.Integer, db.ForeignKey("users.id"), index=True)
+    repressor_id = db.Column(db.Integer, db.ForeignKey("repressors.id"), index=True)
+
+    photo_url = db.Column(db.String(1000), nullable=False)
+    name = db.Column(db.String(160), nullable=False, default="")
+    lastname = db.Column(db.String(200))
+    nickname = db.Column(db.String(160))
+    institution_name = db.Column(db.String(200))
+    campus_name = db.Column(db.String(200))
+    province_name = db.Column(db.String(120), index=True)
+    municipality_name = db.Column(db.String(120), index=True)
+
+    crimes_json = db.Column(db.Text, nullable=False, default="[]")
+    types_json = db.Column(db.Text, nullable=False, default="[]")
+    note = db.Column(db.Text)
+    payload_json = db.Column(db.Text)
+
+    rejection_reason = db.Column(db.Text)
+    reviewed_at = db.Column(db.DateTime, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    updated_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        index=True,
+    )
+
+    submitter = db.relationship("User", foreign_keys=[submitter_id])
+    reviewer = db.relationship("User", foreign_keys=[reviewer_id])
+    repressor = db.relationship("Repressor", back_populates="submissions")
+
+    @staticmethod
+    def _parse_json_items(raw_value):
+        if not raw_value:
+            return []
+        try:
+            parsed = json.loads(raw_value)
+        except Exception:
+            return []
+        if not isinstance(parsed, list):
+            return []
+        items = []
+        seen = set()
+        for item in parsed:
+            text = str(item or "").strip()
+            if not text or text in seen:
+                continue
+            seen.add(text)
+            items.append(text)
+        return items
+
+    @property
+    def crimes_list(self):
+        return self._parse_json_items(self.crimes_json)
+
+    @property
+    def types_list(self):
+        return self._parse_json_items(self.types_json)
+
+    @property
+    def full_name(self):
+        value = f"{self.name or ''} {self.lastname or ''}".strip()
+        return value or "Represor sin nombre"
+
+    def __repr__(self):
+        return f"<RepressorSubmission {self.id} {self.status}>"

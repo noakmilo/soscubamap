@@ -1,0 +1,211 @@
+{% extends "shared/base.html" %}
+{% block title %} | Agregar represor{% endblock %}
+{% block meta_description %}Formulario para proponer un nuevo represor con foto, tipo, delitos y nota opcional.{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="admin-toolbar">
+    <h1>Agregar represor</h1>
+    <a class="btn-secondary" href="{{ url_for('map.repressors') }}">← Volver al catálogo</a>
+  </div>
+  <p class="muted">
+    Completa los datos principales del represor. Los campos marcados con * son obligatorios.
+    {% if moderation_enabled %}
+      Este envío pasará por moderación antes de publicarse.
+    {% else %}
+      La moderación está desactivada: se publicará directamente.
+    {% endif %}
+  </p>
+
+  {% if errors.get("form") %}
+    <div class="flash error">{{ errors.get("form") }}</div>
+  {% endif %}
+
+  <form method="post" class="form-grid" id="addRepressorForm">
+    <label>
+      Foto (URL) *
+      <input
+        type="url"
+        name="photo_url"
+        value="{{ form_data.photo_url }}"
+        placeholder="https://..."
+        class="{{ 'field-error' if errors.get('photo_url') else '' }}"
+        required
+      />
+      {% if errors.get("photo_url") %}
+        <div class="field-error-msg">{{ errors.get("photo_url") }}</div>
+      {% endif %}
+    </label>
+
+    <div class="two-col">
+      <label>
+        Nombre *
+        <input
+          type="text"
+          name="name"
+          value="{{ form_data.name }}"
+          class="{{ 'field-error' if errors.get('name') else '' }}"
+          required
+        />
+        {% if errors.get("name") %}
+          <div class="field-error-msg">{{ errors.get("name") }}</div>
+        {% endif %}
+      </label>
+      <label>
+        Apellido
+        <input type="text" name="lastname" value="{{ form_data.lastname }}" />
+      </label>
+    </div>
+
+    <div class="two-col">
+      <label>
+        Seudónimo
+        <input type="text" name="nickname" value="{{ form_data.nickname }}" />
+      </label>
+      <label>
+        Institución
+        <input type="text" name="institution_name" value="{{ form_data.institution_name }}" />
+      </label>
+    </div>
+
+    <div class="two-col">
+      <label>
+        Centro laboral
+        <input type="text" name="campus_name" value="{{ form_data.campus_name }}" />
+      </label>
+      <label>
+        Provincia
+        <select name="province_name">
+          <option value="">Seleccionar</option>
+          {% for prov in provinces %}
+            <option value="{{ prov }}" {% if prov == form_data.province_name %}selected{% endif %}>{{ prov }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+
+    <label>
+      Municipio
+      <select name="municipality_name" id="repressorMunicipalitySelect">
+        <option value="">Seleccionar</option>
+      </select>
+    </label>
+
+    <div>
+      <div class="field-label-row">
+        <strong>Tipo de represor *</strong>
+      </div>
+      <div class="repressor-type-grid {{ 'field-error' if errors.get('types') else '' }}">
+        {% for item in type_options %}
+          <label class="repressor-type-option">
+            <span class="repressor-type-head">
+              <input
+                type="checkbox"
+                name="type_names[]"
+                value="{{ item.name }}"
+                {% if item.name in form_data.selected_type_names %}checked{% endif %}
+              />
+              <strong>{{ item.name }}</strong>
+            </span>
+            <span class="repressor-type-desc">{{ item.description }}</span>
+          </label>
+        {% endfor %}
+      </div>
+      {% if errors.get("types") %}
+        <div class="field-error-msg">{{ errors.get("types") }}</div>
+      {% endif %}
+    </div>
+
+    <label>
+      Delitos existentes (puedes elegir uno o varios)
+      <select
+        name="crime_names[]"
+        multiple
+        size="10"
+        class="repressor-crimes-select {{ 'field-error' if errors.get('crimes') else '' }}"
+      >
+        {% for crime_name in existing_crime_names %}
+          <option value="{{ crime_name }}" {% if crime_name in form_data.selected_crime_names %}selected{% endif %}>
+            {{ crime_name }}
+          </option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label>
+      Agregar otros delitos (uno por línea o separados por coma)
+      <textarea
+        name="custom_crimes"
+        rows="4"
+        placeholder="Ejemplo: Coacción Art. 286 CPC"
+      >{{ form_data.custom_crimes }}</textarea>
+      {% if errors.get("crimes") %}
+        <div class="field-error-msg">{{ errors.get("crimes") }}</div>
+      {% endif %}
+    </label>
+
+    <label>
+      Nota (opcional)
+      <textarea
+        name="note"
+        rows="4"
+        placeholder="Detalle adicional sobre el caso..."
+        class="{{ 'field-error' if errors.get('note') else '' }}"
+      >{{ form_data.note }}</textarea>
+      {% if errors.get("note") %}
+        <div class="field-error-msg">{{ errors.get("note") }}</div>
+      {% endif %}
+    </label>
+
+    {% if recaptcha_site_key %}
+      <div class="recaptcha-wrap">
+        <div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div>
+      </div>
+      {% if errors.get("recaptcha") %}
+        <div class="field-error-msg">{{ errors.get("recaptcha") }}</div>
+      {% endif %}
+    {% endif %}
+
+    <button type="submit" class="btn-primary">
+      {{ "Enviar a moderación" if moderation_enabled else "Publicar represor" }}
+    </button>
+  </form>
+</section>
+
+<script>
+  window.CUBA_MUNICIPALITIES = {{ municipalities_map|tojson }};
+</script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const form = document.getElementById("addRepressorForm");
+    if (!form || !window.CUBA_MUNICIPALITIES) return;
+    const provinceSelect = form.querySelector('select[name="province_name"]');
+    const municipalitySelect = document.getElementById("repressorMunicipalitySelect");
+    if (!provinceSelect || !municipalitySelect) return;
+    const initialMunicipality = {{ form_data.municipality_name|tojson }};
+
+    const renderMunicipalities = (preferredMunicipality = "") => {
+      let options = [];
+      if (provinceSelect.value && window.CUBA_MUNICIPALITIES[provinceSelect.value]) {
+        options = window.CUBA_MUNICIPALITIES[provinceSelect.value];
+      } else {
+        Object.values(window.CUBA_MUNICIPALITIES).forEach((items) => {
+          options = options.concat(items || []);
+        });
+      }
+      options = Array.from(new Set(options)).sort();
+      const selected = options.includes(preferredMunicipality) ? preferredMunicipality : "";
+      municipalitySelect.innerHTML =
+        '<option value="">Seleccionar</option>' +
+        options
+          .map((name) => `<option value="${name}" ${name === selected ? "selected" : ""}>${name}</option>`)
+          .join("");
+    };
+
+    renderMunicipalities(initialMunicipality || "");
+    provinceSelect.addEventListener("change", () => renderMunicipalities(""));
+  });
+</script>
+{% if recaptcha_site_key %}
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+{% endif %}
+{% endblock %}

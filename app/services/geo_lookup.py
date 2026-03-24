@@ -265,6 +265,10 @@ def list_provinces():
         if canonical:
             normalized_items.add(canonical)
     if normalized_items:
+        known_catalog = set(PROVINCES)
+        if any(item in known_catalog for item in normalized_items):
+            normalized_items.update(known_catalog)
+    if normalized_items:
         return sorted(normalized_items)
     mun_map = municipalities_map()
     if mun_map:

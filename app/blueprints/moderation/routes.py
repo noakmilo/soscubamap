@@ -1,6 +1,7 @@
 import json
+from datetime import datetime
 from flask import render_template, redirect, url_for, flash, request
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app.extensions import db
 from app.models.post import Post
@@ -8,7 +9,9 @@ from app.models.category import Category
 from app.models.post_revision import PostRevision
 from app.models.post_edit_request import PostEditRequest
 from app.models.media import Media
+from app.models.repressor import RepressorSubmission
 from app.services.media_upload import media_json_from_post, parse_media_json
+from app.services.repressor_submissions import materialize_repressor_submission
 from app.services.authz import role_required
 from . import moderation_bp
 
@@ -19,7 +22,17 @@ from . import moderation_bp
 def dashboard():
     pending = Post.query.filter_by(status="pending").order_by(Post.created_at.desc()).all()
     pending_edits = PostEditRequest.query.filter_by(status="pending").order_by(PostEditRequest.created_at.desc()).all()
-    return render_template("moderation/dashboard.html", pending=pending, pending_edits=pending_edits)
+    pending_repressor_submissions = (
+        RepressorSubmission.query.filter_by(status="pending")
+        .order_by(RepressorSubmission.created_at.desc())
+        .all()
+    )
+    return render_template(
+        "moderation/dashboard.html",
+        pending=pending,
+        pending_edits=pending_edits,
+        pending_repressor_submissions=pending_repressor_submissions,
+    )
 
 
 @moderation_bp.route("/aprobar/<int:post_id>", methods=["POST"])
@@ -157,3 +170,43 @@ def edit_detail(edit_id):
         links=links,
         media_items=media_items,
     )
+
+
+@moderation_bp.route("/represores/<int:submission_id>/aprobar", methods=["POST"])
+@login_required
+@role_required("moderador", "administrador")
+def approve_repressor_submission(submission_id):
+    submission = RepressorSubmission.query.get_or_404(submission_id)
+    if submission.status == "approved":
+        flash("La propuesta ya estaba aprobada.", "warning")
+        return redirect(url_for("moderation.dashboard"))
+    try:
+        reviewer_id = current_user.id if current_user.is_authenticated else None
+        repressor = materialize_repressor_submission(
+            submission,
+            reviewer_id=reviewer_id,
+        )
+        db.session.commit()
+        flash(f"Represor aprobado y agregado al catálogo: {repressor.full_name}.", "success")
+    except Exception:
+        db.session.rollback()
+        flash("No se pudo aprobar la propuesta de represor.", "error")
+    return redirect(url_for("moderation.dashboard"))
+
+
+@moderation_bp.route("/represores/<int:submission_id>/rechazar", methods=["POST"])
+@login_required
+@role_required("moderador", "administrador")
+def reject_repressor_submission(submission_id):
+    submission = RepressorSubmission.query.get_or_404(submission_id)
+    if submission.status == "rejected":
+        flash("La propuesta ya estaba rechazada.", "warning")
+        return redirect(url_for("moderation.dashboard"))
+
+    submission.status = "rejected"
+    submission.reviewed_at = datetime.utcnow()
+    submission.reviewer_id = current_user.id if current_user.is_authenticated else None
+    submission.rejection_reason = request.form.get("reason", "").strip() or None
+    db.session.commit()
+    flash("Propuesta de represor rechazada.", "success")
+    return redirect(url_for("moderation.dashboard"))

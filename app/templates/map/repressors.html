@@ -3,7 +3,10 @@
 {% block meta_description %}Catálogo de represores por provincia y municipio con foto, delitos, tipo e información para reportar residencia.{% endblock %}
 {% block content %}
 <section class="panel">
-  <h1>Catálogo de represores</h1>
+  <div class="admin-toolbar">
+    <h1>Catálogo de represores</h1>
+    <a class="btn-primary" href="{{ url_for('map.add_repressor') }}">Agregar represor</a>
+  </div>
   <p class="muted">
     Datos sincronizados desde <strong>REPRESORESCUBANOS.COM</strong> y almacenados localmente en SOSCuba Map.
     Puedes filtrar por provincia/municipio y abrir la ficha completa.
@@ -29,6 +32,14 @@
         <option value="">Todos</option>
         {% for mun in municipalities %}
           <option value="{{ mun }}" {% if mun == selected_municipality %}selected{% endif %}>{{ mun }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Resultados por página
+      <select name="per_page">
+        {% for option in per_page_options %}
+          <option value="{{ option }}" {% if option == per_page %}selected{% endif %}>{{ option }}</option>
         {% endfor %}
       </select>
     </label>
@@ -102,11 +113,19 @@
     {% if pages > 1 %}
       <div class="admin-links" style="margin-top:12px;">
         {% if page > 1 %}
-          <a href="{{ url_for('map.repressors', q=q, provincia=selected_province, municipio=selected_municipality, page=page-1) }}">← Anterior</a>
+          <a href="{{ url_for('map.repressors', q=q, provincia=selected_province, municipio=selected_municipality, per_page=per_page, page=1) }}">« Primera</a>
+          <a href="{{ url_for('map.repressors', q=q, provincia=selected_province, municipio=selected_municipality, per_page=per_page, page=page-1) }}">← Anterior</a>
         {% endif %}
-        <span>Página {{ page }} de {{ pages }}</span>
+        {% for page_number in page_numbers %}
+          {% if page_number == page %}
+            <span><strong>{{ page_number }}</strong></span>
+          {% else %}
+            <a href="{{ url_for('map.repressors', q=q, provincia=selected_province, municipio=selected_municipality, per_page=per_page, page=page_number) }}">{{ page_number }}</a>
+          {% endif %}
+        {% endfor %}
         {% if page < pages %}
-          <a href="{{ url_for('map.repressors', q=q, provincia=selected_province, municipio=selected_municipality, page=page+1) }}">Siguiente →</a>
+          <a href="{{ url_for('map.repressors', q=q, provincia=selected_province, municipio=selected_municipality, per_page=per_page, page=page+1) }}">Siguiente →</a>
+          <a href="{{ url_for('map.repressors', q=q, provincia=selected_province, municipio=selected_municipality, per_page=per_page, page=pages) }}">Última »</a>
         {% endif %}
       </div>
     {% endif %}
@@ -125,24 +144,30 @@
     const provSelect = filters.querySelector('select[name="provincia"]');
     const munSelect = filters.querySelector('select[name="municipio"]');
     if (!provSelect || !munSelect) return;
-
-    const selectedMun = munSelect.value || "";
     const source = window.CUBA_MUNICIPALITIES;
-    let items = [];
-    if (provSelect.value && source[provSelect.value]) {
-      items = source[provSelect.value];
-    } else {
-      Object.values(source).forEach((list) => {
-        items = items.concat(list || []);
-      });
-      items = Array.from(new Set(items)).sort();
-    }
 
-    munSelect.innerHTML =
-      '<option value="">Todos</option>' +
-      items
-        .map((name) => `<option value="${name}" ${name === selectedMun ? "selected" : ""}>${name}</option>`)
-        .join("");
+    const renderMunicipalities = (preferredMunicipality = "") => {
+      let items = [];
+      if (provSelect.value && source[provSelect.value]) {
+        items = source[provSelect.value];
+      } else {
+        Object.values(source).forEach((list) => {
+          items = items.concat(list || []);
+        });
+      }
+      items = Array.from(new Set(items)).sort();
+      const selectedMun = items.includes(preferredMunicipality) ? preferredMunicipality : "";
+      munSelect.innerHTML =
+        '<option value="">Todos</option>' +
+        items
+          .map((name) => `<option value="${name}" ${name === selectedMun ? "selected" : ""}>${name}</option>`)
+          .join("");
+    };
+
+    renderMunicipalities(munSelect.value || "");
+    provSelect.addEventListener("change", () => {
+      renderMunicipalities("");
+    });
   });
 </script>
 {% endblock %}

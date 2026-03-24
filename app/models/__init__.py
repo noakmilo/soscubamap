@@ -29,6 +29,7 @@ from .repressor import (
     RepressorType,
     RepressorIngestionRun,
     RepressorResidenceReport,
+    RepressorSubmission,
 )
 
 __all__ = [
@@ -63,4 +64,5 @@ __all__ = [
     "RepressorType",
     "RepressorIngestionRun",
     "RepressorResidenceReport",
+    "RepressorSubmission",
 ]
