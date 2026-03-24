@@ -21,6 +21,7 @@ from app.models.repressor import (
     RepressorIngestionRun,
     RepressorType,
 )
+from app.services.location_names import canonicalize_location_names
 
 
 def _clean_text(value: Any) -> str | None:
@@ -404,6 +405,11 @@ def _upsert_repressor(
     if image_changed or not desired_cached_image:
         desired_cached_image = _cache_image_url(source_image_url, external_id)
 
+    province_name, municipality_name = canonicalize_location_names(
+        _clean_text(base_row.get("province_name")),
+        _clean_text(base_row.get("municipality_name")),
+    )
+
     changed = False
     changed |= _set_field(repressor, "name", _clean_text(base_row.get("name")) or "")
     changed |= _set_field(repressor, "lastname", _clean_text(base_row.get("lastname")) or "")
@@ -414,11 +420,11 @@ def _upsert_repressor(
         _clean_text(base_row.get("institution_name")),
     )
     changed |= _set_field(repressor, "campus_name", _clean_text(base_row.get("campus_name")))
-    changed |= _set_field(repressor, "province_name", _clean_text(base_row.get("province_name")))
+    changed |= _set_field(repressor, "province_name", province_name)
     changed |= _set_field(
         repressor,
         "municipality_name",
-        _clean_text(base_row.get("municipality_name")),
+        municipality_name,
     )
     changed |= _set_field(repressor, "country_name", _clean_text(base_row.get("country_name")))
     changed |= _set_field(repressor, "image_source_url", source_image_url)
@@ -458,6 +464,10 @@ def _upsert_repressor(
 
 
 def serialize_repressor(repressor: Repressor, include_relationships: bool = True) -> dict[str, Any]:
+    province_name, municipality_name = canonicalize_location_names(
+        repressor.province_name,
+        repressor.municipality_name,
+    )
     payload = {
         "id": repressor.id,
         "external_id": repressor.external_id,
@@ -467,8 +477,8 @@ def serialize_repressor(repressor: Repressor, include_relationships: bool = True
         "nickname": repressor.nickname,
         "institution_name": repressor.institution_name,
         "campus_name": repressor.campus_name,
-        "province_name": repressor.province_name,
-        "municipality_name": repressor.municipality_name,
+        "province_name": province_name,
+        "municipality_name": municipality_name,
         "country_name": repressor.country_name,
         "image_url": repressor.image_url,
         "image_source_url": repressor.image_source_url,

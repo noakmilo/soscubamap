@@ -3,7 +3,6 @@ import math
 import json
 import os
 import secrets
-import unicodedata
 from decimal import Decimal
 from datetime import datetime, timedelta, date
 from sqlalchemy.exc import IntegrityError
@@ -63,6 +62,11 @@ from app.services.connectivity_geo import (
 )
 from app.services.geo_lookup import is_within_cuba_bounds, list_provinces, lookup_location
 from app.services.cuba_locations import PROVINCES
+from app.services.location_names import (
+    canonicalize_location_names,
+    canonicalize_province_name,
+    normalize_location_key,
+)
 from app.services.protests import (
     display_source_name as protest_display_source_name,
     get_fetch_interval_seconds as protest_fetch_interval_seconds,
@@ -149,20 +153,8 @@ def _mask_secret(value):
     return f"{text[:4]}...{text[-4:]}"
 
 
-def _normalize_text_key(value):
-    text = str(value or "").strip().lower()
-    if not text:
-        return ""
-    normalized = unicodedata.normalize("NFKD", text)
-    return "".join(ch for ch in normalized if not unicodedata.combining(ch))
-
-
 def _canonical_province_name(value):
-    key = _normalize_text_key(value)
-    if not key:
-        return ""
-    canonical_map = {_normalize_text_key(name): name for name in PROVINCES}
-    return canonical_map.get(key, str(value or "").strip())
+    return canonicalize_province_name(value) or str(value or "").strip()
 
 
 def _cf_api_token():
@@ -1870,40 +1862,69 @@ def repressor_detail_v1(repressor_id):
 @api_bp.route("/v1/repressors/stats")
 @limiter.limit("120/minute")
 def repressor_stats_v1():
-    province = (request.args.get("province") or "").strip()
+    requested_province = (request.args.get("province") or "").strip()
+    requested_province = canonicalize_province_name(requested_province) if requested_province else None
 
-    base = Repressor.query
-    if province:
-        base = base.filter(Repressor.province_name.ilike(province))
-
-    total = base.count()
-
-    province_rows = (
+    raw_rows = (
         db.session.query(
             Repressor.province_name,
+            Repressor.municipality_name,
             func.count(Repressor.id),
         )
-        .group_by(Repressor.province_name)
-        .order_by(func.count(Repressor.id).desc())
-        .all()
-    )
-
-    municipality_query = db.session.query(
-        Repressor.province_name,
-        Repressor.municipality_name,
-        func.count(Repressor.id),
-    )
-    if province:
-        municipality_query = municipality_query.filter(
-            Repressor.province_name.ilike(province)
-        )
-    municipality_rows = (
-        municipality_query.group_by(
+        .group_by(
             Repressor.province_name,
             Repressor.municipality_name,
         )
-        .order_by(func.count(Repressor.id).desc())
         .all()
+    )
+
+    total = 0
+    by_province: dict[str, dict[str, int | str | None]] = {}
+    by_province_municipality: dict[str, dict[str, int | str | None]] = {}
+    for raw_province, raw_municipality, raw_count in raw_rows:
+        count = int(raw_count or 0)
+        if count <= 0:
+            continue
+
+        province_name, municipality_name = canonicalize_location_names(
+            raw_province,
+            raw_municipality,
+        )
+        if requested_province and province_name != requested_province:
+            continue
+
+        total += count
+
+        province_key = normalize_location_key(province_name) or "__nd__"
+        province_bucket = by_province.get(province_key)
+        if province_bucket is None:
+            province_bucket = {"province": province_name, "count": 0}
+            by_province[province_key] = province_bucket
+        province_bucket["count"] = int(province_bucket["count"] or 0) + count
+
+        municipality_key = normalize_location_key(municipality_name) or "__nd__"
+        pair_key = f"{province_key}|{municipality_key}"
+        pair_bucket = by_province_municipality.get(pair_key)
+        if pair_bucket is None:
+            pair_bucket = {
+                "province": province_name,
+                "municipality": municipality_name,
+                "count": 0,
+            }
+            by_province_municipality[pair_key] = pair_bucket
+        pair_bucket["count"] = int(pair_bucket["count"] or 0) + count
+
+    province_rows = sorted(
+        by_province.values(),
+        key=lambda item: (-int(item["count"] or 0), str(item["province"] or "")),
+    )
+    municipality_rows = sorted(
+        by_province_municipality.values(),
+        key=lambda item: (
+            -int(item["count"] or 0),
+            str(item["province"] or ""),
+            str(item["municipality"] or ""),
+        ),
     )
 
     return jsonify(
@@ -1911,16 +1932,16 @@ def repressor_stats_v1():
             "total_repressors": total,
             "by_province": [
                 {
-                    "province": row[0],
-                    "count": int(row[1] or 0),
+                    "province": row["province"],
+                    "count": int(row["count"] or 0),
                 }
                 for row in province_rows
             ],
             "by_province_municipality": [
                 {
-                    "province": row[0],
-                    "municipality": row[1],
-                    "count": int(row[2] or 0),
+                    "province": row["province"],
+                    "municipality": row["municipality"],
+                    "count": int(row["count"] or 0),
                 }
                 for row in municipality_rows
             ],

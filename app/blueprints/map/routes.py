@@ -47,6 +47,7 @@ from app.services.geo_lookup import (
     lookup_location,
     municipalities_map,
 )
+from app.services.location_names import canonicalize_location_names
 from app.services.input_safety import has_malicious_input
 from app.services.media_upload import (
     get_media_payload,
@@ -1345,6 +1346,7 @@ def repressors():
         selected_province=selected_province,
         selected_municipality=selected_municipality,
         municipalities_map=municipalities_map(),
+        canonicalize_location_names=canonicalize_location_names,
     )
 
 
