@@ -4130,16 +4130,14 @@ textarea {
   height: auto;
   box-sizing: border-box;
   border-radius: 18px;
-  border: 1px solid #8f764a;
+  border: 1px solid var(--intel-border);
   background:
-    radial-gradient(circle at 14% 8%, rgba(255, 224, 157, 0.24) 0%, rgba(255, 224, 157, 0) 28%),
-    radial-gradient(circle at 86% 92%, rgba(239, 160, 90, 0.2) 0%, rgba(239, 160, 90, 0) 26%),
-    linear-gradient(160deg, #c1a56c 0%, #e4cb94 42%, #b18b51 100%);
-  box-shadow:
-    0 20px 40px rgba(0, 0, 0, 0.32),
-    inset 0 0 0 1px rgba(255, 241, 206, 0.34);
+    radial-gradient(circle at 14% 8%, rgba(110, 231, 183, 0.16) 0%, rgba(110, 231, 183, 0) 30%),
+    radial-gradient(circle at 86% 92%, rgba(90, 216, 255, 0.16) 0%, rgba(90, 216, 255, 0) 28%),
+    linear-gradient(160deg, rgba(10, 16, 20, 0.97) 0%, rgba(11, 18, 23, 0.97) 100%);
+  box-shadow: var(--intel-glow);
   padding: 14px;
-  color: #2b1b07;
+  color: var(--text);
   display: grid;
   gap: 10px;
   overflow: visible;
@@ -4156,13 +4154,13 @@ textarea {
   margin: 0;
   font-size: 24px;
   line-height: 1.2;
-  color: #2b1600;
+  color: var(--text);
   text-wrap: balance;
   overflow-wrap: anywhere;
 }
 
 .repressor-duel-code {
-  color: #5d431a;
+  color: var(--muted);
   font-weight: 700;
   font-size: 12px;
   letter-spacing: 0.8px;
@@ -4219,8 +4217,8 @@ textarea {
 .repressor-duel-art-frame {
   margin-top: 2px;
   border-radius: 12px;
-  border: 1px solid #7a643f;
-  background: #262324;
+  border: 1px solid var(--border);
+  background: #0a1116;
   overflow: hidden;
   min-height: 220px;
   height: clamp(220px, 36vh, 420px);
@@ -4233,6 +4231,7 @@ textarea {
   height: 100%;
   min-height: 220px;
   object-fit: cover;
+  object-position: top center;
   display: block;
 }
 
@@ -4247,9 +4246,9 @@ textarea {
 
 .repressor-duel-grid {
   margin-top: 2px;
-  border: 1px solid #896d3e;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: rgba(255, 244, 220, 0.7);
+  background: rgba(9, 15, 20, 0.7);
   padding: 10px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4263,7 +4262,7 @@ textarea {
 }
 
 .repressor-duel-item strong {
-  color: #201304;
+  color: var(--text);
   font-size: 14px;
   text-transform: none;
   letter-spacing: 0;
@@ -4276,26 +4275,26 @@ textarea {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.6px;
-  color: #664b21;
+  color: var(--muted);
 }
 
 .repressor-duel-crimes {
   margin-top: 2px;
-  border: 1px solid #7f673d;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: rgba(255, 245, 225, 0.72);
+  background: rgba(8, 13, 18, 0.75);
   padding: 10px;
 }
 
 .repressor-duel-crimes h3 {
   margin: 0 0 8px;
   font-size: 13px;
-  color: #3e2b0f;
+  color: var(--text);
 }
 
 .repressor-duel-crimes p {
   margin: 0;
-  color: #2b1f0f;
+  color: var(--text);
   font-size: 13px;
   line-height: 1.4;
   text-transform: none;
@@ -4311,7 +4310,7 @@ textarea {
 }
 
 .repressor-duel-crimes-list li {
-  color: #2b1f0f;
+  color: var(--text);
   font-size: 13px;
   line-height: 1.35;
   text-transform: none;
@@ -4496,8 +4495,8 @@ textarea {
   }
 
   .repressor-duel-card {
-    width: 100%;
-    max-width: 100%;
+    width: 80%;
+    max-width: 80%;
     padding: 11px;
     gap: 8px;
   }

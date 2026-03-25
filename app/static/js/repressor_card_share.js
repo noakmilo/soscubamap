@@ -78,7 +78,7 @@
     }
     clone.querySelectorAll(".repressor-duel-art").forEach((img) => {
       img.style.objectFit = "contain";
-      img.style.objectPosition = "center center";
+      img.style.objectPosition = "top center";
       img.style.background = "#262324";
     });
     return clone;
