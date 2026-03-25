@@ -1330,6 +1330,11 @@ body.map-dashboard-page *::-webkit-scrollbar {
   font-variant-numeric: tabular-nums;
 }
 
+.connectivity-audience-note {
+  color: #9ec4b8;
+  font-size: 10px;
+}
+
 .connectivity-source-credit {
   color: #9ec4b8;
   font-size: 11px;

@@ -794,7 +794,87 @@ def _is_alert_active(alert, now_utc, max_age_hours):
     return True
 
 
-def _build_cloudflare_radar_summary():
+def _extract_radar_payload_from_run(run):
+    if not run or not run.payload_json:
+        return None
+    try:
+        payload = json.loads(run.payload_json)
+    except Exception:
+        return None
+    radar = payload.get("cloudflare_radar") if isinstance(payload, dict) else None
+    return radar if isinstance(radar, dict) else None
+
+
+def _build_windowed_audience_summary(now_utc, window_hours):
+    try:
+        hours = int(window_hours)
+    except Exception:
+        hours = 24
+    hours = max(1, hours)
+    window_start = now_utc - timedelta(hours=hours)
+    runs = (
+        ConnectivityIngestionRun.query.filter(
+            ConnectivityIngestionRun.status == "success",
+            ConnectivityIngestionRun.started_at_utc >= window_start,
+        )
+        .order_by(ConnectivityIngestionRun.id.desc())
+        .limit(120)
+        .all()
+    )
+
+    mobile_values = []
+    desktop_values = []
+    human_values = []
+    bot_values = []
+    latest_sample_at = None
+    sample_count = 0
+
+    for run in runs:
+        radar = _extract_radar_payload_from_run(run)
+        if not isinstance(radar, dict):
+            continue
+        audience_raw = radar.get("audience") if isinstance(radar.get("audience"), dict) else {}
+        mobile = _normalize_percentage(audience_raw.get("device_mobile_pct"))
+        desktop = _normalize_percentage(audience_raw.get("device_desktop_pct"))
+        human = _normalize_percentage(audience_raw.get("human_pct"))
+        bot = _normalize_percentage(audience_raw.get("bot_pct"))
+        if all(value is None for value in (mobile, desktop, human, bot)):
+            continue
+
+        sample_count += 1
+        if mobile is not None:
+            mobile_values.append(mobile)
+        if desktop is not None:
+            desktop_values.append(desktop)
+        if human is not None:
+            human_values.append(human)
+        if bot is not None:
+            bot_values.append(bot)
+
+        sample_at = _parse_radar_datetime(radar.get("fetched_at_utc")) or run.finished_at_utc or run.started_at_utc
+        if sample_at and (latest_sample_at is None or sample_at > latest_sample_at):
+            latest_sample_at = sample_at
+
+    mobile_avg = _normalize_percentage(_average_numeric(mobile_values))
+    desktop_avg = _normalize_percentage(_average_numeric(desktop_values))
+    human_avg = _normalize_percentage(_average_numeric(human_values))
+    bot_avg = _normalize_percentage(_average_numeric(bot_values))
+
+    return {
+        "available": any(value is not None for value in (mobile_avg, desktop_avg, human_avg, bot_avg)),
+        "device_mobile_pct": mobile_avg,
+        "device_desktop_pct": desktop_avg,
+        "human_pct": human_avg,
+        "bot_pct": bot_avg,
+        "window_hours": hours,
+        "sample_count": sample_count,
+        "window_start_utc": serialize_snapshot_time(window_start),
+        "window_end_utc": serialize_snapshot_time(now_utc),
+        "latest_sample_at_utc": serialize_snapshot_time(latest_sample_at),
+    }
+
+
+def _build_cloudflare_radar_summary(window_hours=24):
     now_utc = datetime.utcnow()
     run = _latest_successful_connectivity_run()
     if not run or not run.payload_json:
@@ -855,13 +935,29 @@ def _build_cloudflare_radar_summary():
     desktop_pct = _normalize_percentage(audience_raw.get("device_desktop_pct"))
     human_pct = _normalize_percentage(audience_raw.get("human_pct"))
     bot_pct = _normalize_percentage(audience_raw.get("bot_pct"))
+    try:
+        audience_window_hours = int(window_hours)
+    except Exception:
+        audience_window_hours = 24
+    audience_window_hours = max(1, audience_window_hours)
+    audience_window_start = now_utc - timedelta(hours=audience_window_hours)
     audience = {
         "available": any(value is not None for value in (mobile_pct, desktop_pct, human_pct, bot_pct)),
         "device_mobile_pct": mobile_pct,
         "device_desktop_pct": desktop_pct,
         "human_pct": human_pct,
         "bot_pct": bot_pct,
+        "window_hours": audience_window_hours,
+        "sample_count": 1 if any(value is not None for value in (mobile_pct, desktop_pct, human_pct, bot_pct)) else 0,
+        "window_start_utc": serialize_snapshot_time(audience_window_start),
+        "window_end_utc": serialize_snapshot_time(now_utc),
+        "latest_sample_at_utc": str(radar.get("fetched_at_utc") or "").strip() or None,
+        "is_window_fallback": True,
     }
+    windowed_audience = _build_windowed_audience_summary(now_utc, window_hours)
+    if windowed_audience.get("sample_count", 0) > 0:
+        windowed_audience["is_window_fallback"] = False
+        audience = windowed_audience
 
     speed_raw = radar.get("speed") if isinstance(radar.get("speed"), dict) else {}
     latest_speed_raw = speed_raw.get("latest") if isinstance(speed_raw.get("latest"), dict) else {}
@@ -1473,7 +1569,7 @@ def connectivity_latest():
         if window_hours == 24
         else _build_http_requests_24h_summary()
     )
-    cloudflare_radar = _build_cloudflare_radar_summary()
+    cloudflare_radar = _build_cloudflare_radar_summary(window_hours=window_hours)
 
     return jsonify(
         {
@@ -1603,7 +1699,7 @@ def connectivity_debug():
         "window_probe": {
             "hours": debug_window_hours,
             "http_requests_window": _build_http_requests_window_summary(debug_window_hours),
-            "cloudflare_radar": _build_cloudflare_radar_summary(),
+            "cloudflare_radar": _build_cloudflare_radar_summary(window_hours=debug_window_hours),
         },
         "snapshot": snapshot_payload,
         "ingestion_runs": runs_payload,

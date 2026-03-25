@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import secrets
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import selectinload
 
@@ -244,13 +244,15 @@ def _retire_recovered_auto_reports(category_id, active_alert_provinces, system_u
     name="app.tasks.connectivity.poll_connectivity_and_create_reports",
     bind=True,
     autoretry_for=(Exception,),
-    retry_backoff=True,
+    retry_backoff=300,
+    retry_backoff_max=1800,
     retry_jitter=True,
     retry_kwargs={"max_retries": 2},
 )
 def poll_connectivity_and_create_reports(self):
-    scheduled_for = datetime.utcnow()
-    run_ingestion(single_call=False, scheduled_for=scheduled_for)
+    scheduled_for = datetime.now(timezone.utc).replace(tzinfo=None)
+    single_call = bool(celery.flask_app.config.get("CELERY_CONNECTIVITY_SINGLE_CALL", True))
+    run_ingestion(single_call=single_call, scheduled_for=scheduled_for)
 
     if not bool(celery.flask_app.config.get("AUTO_CONNECTIVITY_REPORTS_ENABLED", True)):
         return {

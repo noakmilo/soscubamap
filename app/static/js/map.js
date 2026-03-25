@@ -55,6 +55,7 @@ let connectivityAudienceMobileValue;
 let connectivityAudienceDesktopValue;
 let connectivityAudienceHumanValue;
 let connectivityAudienceBotValue;
+let connectivityAudienceNote;
 let repressorLayerGroup;
 let repressorLastPayload = null;
 let repressorOverlay;
@@ -2366,10 +2367,18 @@ function renderConnectivityAudiencePanel(payload) {
   const desktopPct = Number(audience?.device_desktop_pct);
   const humanPct = Number(audience?.human_pct);
   const botPct = Number(audience?.bot_pct);
+  const windowHours = Number(audience?.window_hours || payload?.window?.hours);
+  const sampleCount = Number(audience?.sample_count);
+  const hoursLabel = [2, 6, 24].includes(windowHours) ? `${windowHours}h` : "24h";
 
   const applyAudienceValue = (valueEl, barEl, value) => {
     valueEl.textContent = formatPercentCompact(value);
     barEl.style.width = `${clampPercentWidth(value)}%`;
+  };
+
+  const updateAudienceNote = (noteText) => {
+    if (!connectivityAudienceNote) return;
+    connectivityAudienceNote.textContent = noteText;
   };
 
   if (!payload || !audience?.available) {
@@ -2382,6 +2391,8 @@ function renderConnectivityAudiencePanel(payload) {
       valueEl.textContent = "N/D";
       barEl.style.width = "0%";
     });
+    const sampleText = Number.isFinite(sampleCount) ? sampleCount : 0;
+    updateAudienceNote(`Ventana ${hoursLabel} · muestras: ${sampleText}.`);
     return;
   }
 
@@ -2389,6 +2400,9 @@ function renderConnectivityAudiencePanel(payload) {
   applyAudienceValue(connectivityAudienceDesktopValue, connectivityAudienceDesktopBar, desktopPct);
   applyAudienceValue(connectivityAudienceHumanValue, connectivityAudienceHumanBar, humanPct);
   applyAudienceValue(connectivityAudienceBotValue, connectivityAudienceBotBar, botPct);
+  const sampleText = Number.isFinite(sampleCount) ? sampleCount : 1;
+  const fallbackText = audience?.is_window_fallback ? " · fallback al último dato válido." : "";
+  updateAudienceNote(`Ventana ${hoursLabel} · muestras: ${sampleText}${fallbackText}`);
 }
 
 function renderConnectivityRadarPanels(payload) {
@@ -4288,6 +4302,7 @@ async function initMap() {
   connectivityAudienceDesktopValue = document.getElementById("connectivityAudienceDesktopValue");
   connectivityAudienceHumanValue = document.getElementById("connectivityAudienceHumanValue");
   connectivityAudienceBotValue = document.getElementById("connectivityAudienceBotValue");
+  connectivityAudienceNote = document.getElementById("connectivityAudienceNote");
   connectivityWindowButtons = Array.from(
     document.querySelectorAll("[data-connectivity-window-hours]")
   );

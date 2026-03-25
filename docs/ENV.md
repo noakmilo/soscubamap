@@ -111,6 +111,7 @@ Layer de datos de conectividad a internet por provincias, alimentado por Cloudfl
 | `CONNECTIVITY_ALERT_ACTIVE_MAX_AGE_HOURS` | Edad máxima (sin `end_date`) para considerar alerta activa.| `24`     |
 | `CONNECTIVITY_STALE_AFTER_HOURS`           | Horas tras las que un snapshot se considera obsoleto.     | `8`      |
 | `CONNECTIVITY_FRONTEND_REFRESH_SECONDS`    | Frecuencia de refresco del layer en el navegador.         | `300`    |
+| `CONNECTIVITY_RADAR_ENRICHMENT_COOLDOWN_SECONDS` | Reutiliza el último enrichment (audiencia/speed/alertas) durante este cooldown para reducir 429. | `21600` |
 
 ## Protestas (RSS / NLP)
 
@@ -163,6 +164,7 @@ Notas de rango de ingesta:
 | `CELERY_PROTEST_QUEUE`             | Cola de Celery usada por la ingesta de protestas.                    | `ingestion` |
 | `CELERY_CONNECTIVITY_POLLING_ENABLED` | `1` habilita el polling automático de conectividad.               | `1` |
 | `CELERY_CONNECTIVITY_POLLING_INTERVAL_SECONDS` | Intervalo del polling de conectividad.                     | `7200` |
+| `CELERY_CONNECTIVITY_SINGLE_CALL` | `1` usa una sola ronda por ciclo (menos llamadas a Radar); `0` usa dos rondas con delay. | `1` |
 | `CELERY_CONNECTIVITY_QUEUE`        | Cola usada por el polling de conectividad.                           | `ingestion` |
 | `CELERY_REPRESSOR_INGESTION_ENABLED` | `1` habilita la ingesta periódica de represores.                   | `1` |
 | `CELERY_REPRESSOR_QUEUE`           | Cola usada por la ingesta de represores.                             | `ingestion` |

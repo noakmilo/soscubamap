@@ -691,6 +691,188 @@ def _fetch_radar_enrichment(base_url, token, timeout_seconds):
     return output
 
 
+def _coerce_non_negative_int(value, default):
+    try:
+        parsed = int(value)
+    except Exception:
+        parsed = int(default)
+    return max(parsed, 0)
+
+
+def _clone_json_value(value):
+    try:
+        return json.loads(json.dumps(value, ensure_ascii=False))
+    except Exception:
+        return value
+
+
+def _normalize_radar_error_items(items):
+    normalized = []
+    if not isinstance(items, list):
+        return normalized
+    for raw in items:
+        if not isinstance(raw, dict):
+            continue
+        endpoint = str(raw.get("endpoint") or "").strip() or "unknown"
+        status_code_raw = raw.get("status_code")
+        try:
+            status_code = int(status_code_raw) if status_code_raw is not None else None
+        except Exception:
+            status_code = None
+        error_text = _truncate_text(raw.get("error"), limit=320)
+        key = (endpoint, status_code, error_text)
+        if any((row.get("_key") == key) for row in normalized):
+            continue
+        normalized.append(
+            {
+                "endpoint": endpoint,
+                "status_code": status_code,
+                "error": error_text or None,
+                "_key": key,
+            }
+        )
+    for row in normalized:
+        row.pop("_key", None)
+    return normalized
+
+
+def _merge_radar_errors(*groups):
+    merged = []
+    seen = set()
+    for group in groups:
+        for item in _normalize_radar_error_items(group):
+            key = (item.get("endpoint"), item.get("status_code"), item.get("error"))
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(item)
+            if len(merged) >= 24:
+                return merged
+    return merged
+
+
+def _radar_enrichment_has_visible_data(enrichment):
+    if not isinstance(enrichment, dict):
+        return False
+    audience = enrichment.get("audience") if isinstance(enrichment.get("audience"), dict) else {}
+    speed = enrichment.get("speed") if isinstance(enrichment.get("speed"), dict) else {}
+    alerts = enrichment.get("alerts") if isinstance(enrichment.get("alerts"), dict) else {}
+    if bool(audience.get("available")) or bool(speed.get("available")) or bool(alerts.get("available")):
+        return True
+    metrics = [
+        audience.get("device_mobile_pct"),
+        audience.get("device_desktop_pct"),
+        audience.get("human_pct"),
+        audience.get("bot_pct"),
+    ]
+    if any(to_float(metric) is not None for metric in metrics):
+        return True
+    latest = speed.get("latest") if isinstance(speed.get("latest"), dict) else {}
+    return any(to_float(value) is not None for value in latest.values())
+
+
+def _radar_enrichment_has_rate_limit_error(enrichment):
+    errors = enrichment.get("errors") if isinstance(enrichment, dict) else None
+    for row in _normalize_radar_error_items(errors):
+        if row.get("status_code") == 429:
+            return True
+    return False
+
+
+def _latest_successful_radar_enrichment():
+    runs = (
+        ConnectivityIngestionRun.query.filter_by(status="success")
+        .order_by(ConnectivityIngestionRun.id.desc())
+        .limit(30)
+        .all()
+    )
+    for run in runs:
+        payload_raw = run.payload_json
+        if not payload_raw:
+            continue
+        try:
+            payload = json.loads(payload_raw)
+        except Exception:
+            continue
+        radar = payload.get("cloudflare_radar") if isinstance(payload, dict) else None
+        if not isinstance(radar, dict):
+            continue
+        return {
+            "run_id": run.id,
+            "fetched_at_utc": _parse_radar_datetime(radar.get("fetched_at_utc")),
+            "payload": radar,
+        }
+    return None
+
+
+def _resolve_radar_enrichment_with_fallback(
+    base_url,
+    token,
+    timeout_seconds,
+    cooldown_seconds,
+    previous_record=None,
+):
+    now = _utcnow()
+    previous_payload = (
+        previous_record.get("payload")
+        if isinstance(previous_record, dict) and isinstance(previous_record.get("payload"), dict)
+        else None
+    )
+    previous_run_id = previous_record.get("run_id") if isinstance(previous_record, dict) else None
+    previous_fetched_at = (
+        previous_record.get("fetched_at_utc") if isinstance(previous_record, dict) else None
+    )
+
+    if previous_payload and cooldown_seconds > 0 and previous_fetched_at:
+        age_seconds = max(0, int((now - previous_fetched_at).total_seconds()))
+        if age_seconds < cooldown_seconds:
+            reused = _clone_json_value(previous_payload)
+            reused["reused_from_run_id"] = previous_run_id
+            reused["reused_reason"] = "cooldown_active"
+            reused["reused_at_utc"] = serialize_snapshot_time(now)
+            reused["errors"] = _merge_radar_errors(
+                reused.get("errors"),
+                [
+                    {
+                        "endpoint": "cloudflare_radar",
+                        "status_code": None,
+                        "error": (
+                            "Se reutilizo enrichment previo por cooldown para reducir llamadas "
+                            "a Cloudflare Radar."
+                        ),
+                    }
+                ],
+            )
+            return reused
+
+    fresh = _fetch_radar_enrichment(base_url, token, timeout_seconds)
+    if not previous_payload:
+        return fresh
+    if not _radar_enrichment_has_visible_data(previous_payload):
+        return fresh
+    if _radar_enrichment_has_visible_data(fresh) and not _radar_enrichment_has_rate_limit_error(fresh):
+        return fresh
+
+    reused = _clone_json_value(previous_payload)
+    reused["reused_from_run_id"] = previous_run_id
+    reused["reused_at_utc"] = serialize_snapshot_time(now)
+    if _radar_enrichment_has_rate_limit_error(fresh):
+        reused["reused_reason"] = "upstream_rate_limited"
+    else:
+        reused["reused_reason"] = "upstream_unavailable"
+    reused["errors"] = _merge_radar_errors(
+        fresh.get("errors"),
+        [
+            {
+                "endpoint": "cloudflare_radar",
+                "status_code": None,
+                "error": "Se reutilizo enrichment previo por error temporal en Cloudflare Radar.",
+            }
+        ],
+    )
+    return reused
+
+
 def _historical_baseline():
     rows = (
         ConnectivitySnapshot.query.order_by(ConnectivitySnapshot.observed_at_utc.desc())
@@ -858,9 +1040,14 @@ def run_ingestion(single_call=False, scheduled_for=None):
         radar_api_base_url = app.config.get("CLOUDFLARE_RADAR_API_BASE_URL")
         timeout_seconds = int(app.config.get("CONNECTIVITY_FETCH_TIMEOUT_SECONDS", 30))
         delay_seconds = int(app.config.get("CONNECTIVITY_FETCH_DELAY_SECONDS", 120))
+        enrichment_cooldown_seconds = _coerce_non_negative_int(
+            app.config.get("CONNECTIVITY_RADAR_ENRICHMENT_COOLDOWN_SECONDS", 21600),
+            21600,
+        )
         province_geoids = _province_geoids()
         if not province_geoids:
             raise RuntimeError("No hay geoIds provinciales configurados para Radar")
+        previous_radar_enrichment = _latest_successful_radar_enrichment()
 
         run = ConnectivityIngestionRun(
             scheduled_for_utc=scheduled_for,
@@ -940,10 +1127,12 @@ def run_ingestion(single_call=False, scheduled_for=None):
             db.session.commit()
             raise RuntimeError(run.error_message or "No se pudo obtener datos de Radar")
 
-        radar_enrichment = _fetch_radar_enrichment(
+        radar_enrichment = _resolve_radar_enrichment_with_fallback(
             radar_api_base_url,
             token,
             timeout_seconds,
+            cooldown_seconds=enrichment_cooldown_seconds,
+            previous_record=previous_radar_enrichment,
         )
         payload_record = {
             "mode": "province_geoid_v1",
