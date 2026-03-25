@@ -4,7 +4,7 @@ import json
 import os
 import secrets
 from decimal import Decimal
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from sqlalchemy.exc import IntegrityError
 from flask_login import current_user
 import requests
@@ -676,6 +676,271 @@ def _build_http_requests_24h_summary():
     return _build_http_requests_window_summary(24)
 
 
+def _parse_radar_datetime(raw):
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except Exception:
+        return None
+    if parsed.tzinfo:
+        return parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    return parsed
+
+
+def _normalize_percentage(value):
+    numeric = to_float(value)
+    if numeric is None:
+        return None
+    if 0 <= numeric <= 1.000001:
+        numeric *= 100.0
+    if numeric < 0:
+        numeric = 0.0
+    if numeric > 100:
+        numeric = 100.0
+    return round(numeric, 3)
+
+
+def _coerce_alert_type(value, event_type=""):
+    text = str(value or "").strip().lower()
+    if text in {"outage", "anomaly"}:
+        return text
+    event = str(event_type or "").strip().lower()
+    if "outage" in event:
+        return "outage"
+    return "anomaly"
+
+
+def _normalize_cloudflare_alerts(raw_alerts):
+    items = []
+    for item in raw_alerts or []:
+        if not isinstance(item, dict):
+            continue
+        start_date = str(
+            item.get("start_date")
+            or item.get("startDate")
+            or ""
+        ).strip() or None
+        end_date = str(
+            item.get("end_date")
+            or item.get("endDate")
+            or ""
+        ).strip() or None
+        event_type = str(item.get("event_type") or item.get("eventType") or "").strip() or None
+        alert_type = _coerce_alert_type(item.get("alert_type"), event_type)
+        normalized = {
+            "source": str(item.get("source") or "").strip() or None,
+            "alert_type": alert_type,
+            "event_type": event_type,
+            "status": str(item.get("status") or "").strip() or None,
+            "description": str(item.get("description") or "").strip() or None,
+            "outage_cause": str(item.get("outage_cause") or "").strip() or None,
+            "outage_type": str(item.get("outage_type") or "").strip() or None,
+            "magnitude": to_float(item.get("magnitude")),
+            "asn": str(item.get("asn") or "").strip() or None,
+            "asn_name": str(item.get("asn_name") or "").strip() or None,
+            "start_date": start_date,
+            "end_date": end_date,
+            "linked_url": str(item.get("linked_url") or item.get("linkedUrl") or "").strip() or None,
+            "is_instantaneous": bool(item.get("is_instantaneous")),
+        }
+        if not normalized["start_date"]:
+            continue
+        items.append(normalized)
+
+    deduped = {}
+    for item in items:
+        key = (
+            item.get("source"),
+            item.get("alert_type"),
+            item.get("event_type"),
+            item.get("start_date"),
+        )
+        existing = deduped.get(key)
+        if existing is None:
+            deduped[key] = item
+            continue
+        existing_richness = sum(
+            1 for field in ("description", "outage_cause", "outage_type", "linked_url") if existing.get(field)
+        )
+        candidate_richness = sum(
+            1 for field in ("description", "outage_cause", "outage_type", "linked_url") if item.get(field)
+        )
+        if candidate_richness > existing_richness:
+            deduped[key] = item
+
+    sorted_items = list(deduped.values())
+    sorted_items.sort(
+        key=lambda row: _parse_radar_datetime(row.get("start_date")) or datetime.min,
+        reverse=True,
+    )
+    return sorted_items
+
+
+def _is_alert_active(alert, now_utc, max_age_hours):
+    end_dt = _parse_radar_datetime(alert.get("end_date"))
+    if end_dt and end_dt <= now_utc:
+        return False
+    start_dt = _parse_radar_datetime(alert.get("start_date"))
+    if start_dt is None:
+        return False
+    if end_dt is None:
+        max_age = timedelta(hours=max(int(max_age_hours or 24), 1))
+        if now_utc - start_dt > max_age:
+            return False
+    return True
+
+
+def _build_cloudflare_radar_summary():
+    now_utc = datetime.utcnow()
+    run = _latest_successful_connectivity_run()
+    if not run or not run.payload_json:
+        return {
+            "available": False,
+            "source_run_id": None,
+            "source_started_at_utc": None,
+            "source_finished_at_utc": None,
+            "updated_at_utc": None,
+            "parse_error": None,
+            "errors": [],
+            "audience": {"available": False},
+            "speed": {"available": False},
+            "alerts": {
+                "available": False,
+                "active_count": 0,
+                "active_outages": 0,
+                "active_anomalies": 0,
+                "latest": None,
+                "active": [],
+                "items_count": 0,
+            },
+        }
+
+    parse_error = None
+    payload = None
+    try:
+        payload = json.loads(run.payload_json)
+    except Exception as exc:
+        parse_error = str(exc)
+
+    radar = payload.get("cloudflare_radar") if isinstance(payload, dict) else None
+    if not isinstance(radar, dict):
+        return {
+            "available": False,
+            "source_run_id": run.id,
+            "source_started_at_utc": serialize_snapshot_time(run.started_at_utc),
+            "source_finished_at_utc": serialize_snapshot_time(run.finished_at_utc),
+            "updated_at_utc": None,
+            "parse_error": parse_error,
+            "errors": [],
+            "audience": {"available": False},
+            "speed": {"available": False},
+            "alerts": {
+                "available": False,
+                "active_count": 0,
+                "active_outages": 0,
+                "active_anomalies": 0,
+                "latest": None,
+                "active": [],
+                "items_count": 0,
+            },
+        }
+
+    errors = radar.get("errors") if isinstance(radar.get("errors"), list) else []
+    audience_raw = radar.get("audience") if isinstance(radar.get("audience"), dict) else {}
+    mobile_pct = _normalize_percentage(audience_raw.get("device_mobile_pct"))
+    desktop_pct = _normalize_percentage(audience_raw.get("device_desktop_pct"))
+    human_pct = _normalize_percentage(audience_raw.get("human_pct"))
+    bot_pct = _normalize_percentage(audience_raw.get("bot_pct"))
+    audience = {
+        "available": any(value is not None for value in (mobile_pct, desktop_pct, human_pct, bot_pct)),
+        "device_mobile_pct": mobile_pct,
+        "device_desktop_pct": desktop_pct,
+        "human_pct": human_pct,
+        "bot_pct": bot_pct,
+    }
+
+    speed_raw = radar.get("speed") if isinstance(radar.get("speed"), dict) else {}
+    latest_speed_raw = speed_raw.get("latest") if isinstance(speed_raw.get("latest"), dict) else {}
+    averages_raw = speed_raw.get("averages_7d") if isinstance(speed_raw.get("averages_7d"), dict) else {}
+    speed_latest = {
+        "download_mbps": to_float(latest_speed_raw.get("download_mbps")),
+        "global_download_mbps": to_float(latest_speed_raw.get("global_download_mbps")),
+        "download_delta_pct": to_float(latest_speed_raw.get("download_delta_pct")),
+        "upload_mbps": to_float(latest_speed_raw.get("upload_mbps")),
+        "latency_ms": to_float(latest_speed_raw.get("latency_ms")),
+        "global_latency_ms": to_float(latest_speed_raw.get("global_latency_ms")),
+        "latency_delta_pct": to_float(latest_speed_raw.get("latency_delta_pct")),
+        "jitter_ms": to_float(latest_speed_raw.get("jitter_ms")),
+        "packet_loss_pct": to_float(latest_speed_raw.get("packet_loss_pct")),
+    }
+    speed_averages = {
+        "download_mbps": to_float(averages_raw.get("download_mbps")),
+        "global_download_mbps": to_float(averages_raw.get("global_download_mbps")),
+        "latency_ms": to_float(averages_raw.get("latency_ms")),
+        "global_latency_ms": to_float(averages_raw.get("global_latency_ms")),
+        "jitter_ms": to_float(averages_raw.get("jitter_ms")),
+        "packet_loss_pct": to_float(averages_raw.get("packet_loss_pct")),
+    }
+    speed = {
+        "available": bool(speed_raw.get("available"))
+        or any(value is not None for value in speed_latest.values())
+        or any(value is not None for value in speed_averages.values()),
+        "latest": speed_latest,
+        "averages_7d": speed_averages,
+    }
+
+    alerts_raw = radar.get("alerts") if isinstance(radar.get("alerts"), dict) else {}
+    alert_items = []
+    if isinstance(alerts_raw.get("items"), list):
+        alert_items.extend(alerts_raw.get("items") or [])
+    if isinstance(alerts_raw.get("annotations"), list):
+        alert_items.extend(alerts_raw.get("annotations") or [])
+    if isinstance(alerts_raw.get("anomalies"), list):
+        alert_items.extend(alerts_raw.get("anomalies") or [])
+    normalized_alerts = _normalize_cloudflare_alerts(alert_items)
+
+    max_age_hours = int(current_app.config.get("CONNECTIVITY_ALERT_ACTIVE_MAX_AGE_HOURS", 24))
+    active_alerts = []
+    for item in normalized_alerts:
+        item_payload = dict(item)
+        item_payload["is_active"] = _is_alert_active(item_payload, now_utc, max_age_hours)
+        if item_payload["is_active"]:
+            active_alerts.append(item_payload)
+
+    latest_alert = active_alerts[0] if active_alerts else (normalized_alerts[0] if normalized_alerts else None)
+    alerts = {
+        "available": bool(normalized_alerts),
+        "active_count": len(active_alerts),
+        "active_outages": len(
+            [item for item in active_alerts if item.get("alert_type") == "outage"]
+        ),
+        "active_anomalies": len(
+            [item for item in active_alerts if item.get("alert_type") == "anomaly"]
+        ),
+        "latest": latest_alert,
+        "active": active_alerts[:20],
+        "items_count": len(normalized_alerts),
+    }
+
+    available = audience.get("available") or speed.get("available") or alerts.get("available")
+    return {
+        "available": bool(available),
+        "source_run_id": run.id,
+        "source_started_at_utc": serialize_snapshot_time(run.started_at_utc),
+        "source_finished_at_utc": serialize_snapshot_time(run.finished_at_utc),
+        "updated_at_utc": str(radar.get("fetched_at_utc") or "").strip() or None,
+        "parse_error": parse_error,
+        "errors": errors,
+        "audience": audience,
+        "speed": speed,
+        "alerts": alerts,
+    }
+
+
 def _cloudflare_probe():
     api_url = (current_app.config.get("CLOUDFLARE_RADAR_HTTP_TIMESERIES_URL") or "").strip()
     timeout_seconds = int(current_app.config.get("CONNECTIVITY_FETCH_TIMEOUT_SECONDS", 30))
@@ -1208,6 +1473,7 @@ def connectivity_latest():
         if window_hours == 24
         else _build_http_requests_24h_summary()
     )
+    cloudflare_radar = _build_cloudflare_radar_summary()
 
     return jsonify(
         {
@@ -1221,6 +1487,7 @@ def connectivity_latest():
             "http_requests_window": http_requests_window,
             "http_requests_window_by_province": window_by_province,
             "http_requests_24h": http_requests_24h,
+            "cloudflare_radar": cloudflare_radar,
             "source": {
                 "name": "Cloudflare Radar",
                 "url": "https://radar.cloudflare.com/",
@@ -1314,10 +1581,14 @@ def connectivity_debug():
         "generated_at_utc": serialize_snapshot_time(now),
         "config": {
             "api_url": current_app.config.get("CLOUDFLARE_RADAR_HTTP_TIMESERIES_URL"),
+            "radar_api_base_url": current_app.config.get("CLOUDFLARE_RADAR_API_BASE_URL"),
             "cf_api_token_configured": bool(_cf_api_token()),
             "cf_api_token_preview": _mask_secret(_cf_api_token()),
             "connectivity_fetch_delay_seconds": int(current_app.config.get("CONNECTIVITY_FETCH_DELAY_SECONDS", 120)),
             "connectivity_fetch_timeout_seconds": int(current_app.config.get("CONNECTIVITY_FETCH_TIMEOUT_SECONDS", 30)),
+            "connectivity_alert_active_max_age_hours": int(
+                current_app.config.get("CONNECTIVITY_ALERT_ACTIVE_MAX_AGE_HOURS", 24)
+            ),
             "connectivity_stale_after_hours": stale_after_hours,
             "connectivity_frontend_refresh_seconds": int(
                 current_app.config.get("CONNECTIVITY_FRONTEND_REFRESH_SECONDS", 300)
@@ -1332,6 +1603,7 @@ def connectivity_debug():
         "window_probe": {
             "hours": debug_window_hours,
             "http_requests_window": _build_http_requests_window_summary(debug_window_hours),
+            "cloudflare_radar": _build_cloudflare_radar_summary(),
         },
         "snapshot": snapshot_payload,
         "ingestion_runs": runs_payload,

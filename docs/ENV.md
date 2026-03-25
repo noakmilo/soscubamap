@@ -104,9 +104,11 @@ Layer de datos de conectividad a internet por provincias, alimentado por Cloudfl
 |--------------------------------------------|-----------------------------------------------------------|----------|
 | `CF_API_TOKEN`                             | Token de API de Cloudflare con permiso `Radar:Read`.      | (vacío — layer deshabilitado) |
 | `CLOUDFLARE_RADAR_HTTP_TIMESERIES_URL`     | URL del endpoint de series temporales de Radar.           | (URL pública de Cuba) |
+| `CLOUDFLARE_RADAR_API_BASE_URL`            | Base URL de API de Radar para alertas/speed/audiencia.    | `https://api.cloudflare.com/client/v4/radar` |
 | `CF_RADAR_PROVINCE_GEOIDS_JSON`            | JSON mapeando nombre de provincia → GeoID de Cloudflare.  | (vacío)  |
 | `CONNECTIVITY_FETCH_DELAY_SECONDS`         | Segundos entre peticiones al fetcher en background.       | `120`    |
 | `CONNECTIVITY_FETCH_TIMEOUT_SECONDS`       | Timeout HTTP para peticiones a Radar.                     | `30`     |
+| `CONNECTIVITY_ALERT_ACTIVE_MAX_AGE_HOURS` | Edad máxima (sin `end_date`) para considerar alerta activa.| `24`     |
 | `CONNECTIVITY_STALE_AFTER_HOURS`           | Horas tras las que un snapshot se considera obsoleto.     | `8`      |
 | `CONNECTIVITY_FRONTEND_REFRESH_SECONDS`    | Frecuencia de refresco del layer en el navegador.         | `300`    |
 

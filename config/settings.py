@@ -53,8 +53,15 @@ class Config:
         "CLOUDFLARE_RADAR_HTTP_TIMESERIES_URL",
         "https://api.cloudflare.com/client/v4/radar/http/timeseries?name=main&name=previous&geoId=3556965&geoId=3556965&dateRange=1d&dateRange=1dControl",
     )
+    CLOUDFLARE_RADAR_API_BASE_URL = os.getenv(
+        "CLOUDFLARE_RADAR_API_BASE_URL",
+        "https://api.cloudflare.com/client/v4/radar",
+    )
     CONNECTIVITY_FETCH_DELAY_SECONDS = int(os.getenv("CONNECTIVITY_FETCH_DELAY_SECONDS", "120"))
     CONNECTIVITY_FETCH_TIMEOUT_SECONDS = int(os.getenv("CONNECTIVITY_FETCH_TIMEOUT_SECONDS", "30"))
+    CONNECTIVITY_ALERT_ACTIVE_MAX_AGE_HOURS = int(
+        os.getenv("CONNECTIVITY_ALERT_ACTIVE_MAX_AGE_HOURS", "24")
+    )
     CONNECTIVITY_STALE_AFTER_HOURS = int(os.getenv("CONNECTIVITY_STALE_AFTER_HOURS", "8"))
     CONNECTIVITY_FRONTEND_REFRESH_SECONDS = int(
         os.getenv("CONNECTIVITY_FRONTEND_REFRESH_SECONDS", "300")

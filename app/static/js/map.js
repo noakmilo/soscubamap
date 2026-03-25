@@ -36,6 +36,25 @@ let connectivityRegionChart;
 let connectivityRegionLegend;
 let connectivityRegionNote;
 let connectivityRegionFocused = "";
+let connectivityAlertPanel;
+let connectivityAlertBadge;
+let connectivityAlertCopy;
+let connectivityAlertList;
+let connectivityQualityPanel;
+let connectivityQualityDownloadValue;
+let connectivityQualityDownloadMeta;
+let connectivityQualityLatencyValue;
+let connectivityQualityLatencyMeta;
+let connectivityQualityNote;
+let connectivityAudiencePanel;
+let connectivityAudienceMobileBar;
+let connectivityAudienceDesktopBar;
+let connectivityAudienceHumanBar;
+let connectivityAudienceBotBar;
+let connectivityAudienceMobileValue;
+let connectivityAudienceDesktopValue;
+let connectivityAudienceHumanValue;
+let connectivityAudienceBotValue;
 let repressorLayerGroup;
 let repressorLastPayload = null;
 let repressorOverlay;
@@ -1106,6 +1125,37 @@ function formatPercentValue(value) {
   return `${sign}${numeric.toFixed(1)}%`;
 }
 
+function formatPercentCompact(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "N/D";
+  return `${numeric.toFixed(1)}%`;
+}
+
+function formatSignedPercentDelta(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "N/D";
+  const sign = numeric > 0 ? "+" : "";
+  return `${sign}${numeric.toFixed(1)}%`;
+}
+
+function formatMbps(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "N/D";
+  return `${numeric.toFixed(2)} Mbps`;
+}
+
+function formatMilliseconds(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "N/D";
+  return `${numeric.toFixed(1)} ms`;
+}
+
+function clampPercentWidth(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.min(100, Math.max(0, numeric));
+}
+
 function formatConnectivityMiniUtcLabel(tsMs) {
   const numeric = Number(tsMs);
   if (!Number.isFinite(numeric)) return "";
@@ -2172,6 +2222,181 @@ function updateConnectivityTrafficPanel(payload) {
   }
 }
 
+function renderConnectivityAlertPanel(payload) {
+  if (!connectivityAlertPanel || !connectivityAlertBadge || !connectivityAlertCopy || !connectivityAlertList) {
+    return;
+  }
+
+  const radar = payload?.cloudflare_radar || {};
+  const alerts = radar?.alerts || {};
+  const active = Array.isArray(alerts?.active) ? alerts.active : [];
+  const latest = alerts?.latest || null;
+  const activeCount = Math.max(0, Number(alerts?.active_count) || active.length);
+  const activeOutages = Math.max(0, Number(alerts?.active_outages) || 0);
+  const activeAnomalies = Math.max(0, Number(alerts?.active_anomalies) || 0);
+
+  connectivityAlertBadge.classList.remove("is-alert", "is-outage");
+  if (!payload) {
+    connectivityAlertBadge.textContent = "Sin datos";
+    connectivityAlertCopy.textContent = "No fue posible cargar alertas de Cloudflare Radar.";
+    connectivityAlertList.innerHTML = '<div class="connectivity-alert-empty">Sin eventos activos.</div>';
+    return;
+  }
+
+  if (!activeCount) {
+    connectivityAlertBadge.textContent = "Sin alertas activas";
+    connectivityAlertCopy.textContent = "Sin alertas activas recientes detectadas por Cloudflare Radar.";
+    connectivityAlertList.innerHTML = '<div class="connectivity-alert-empty">Sin eventos activos.</div>';
+    return;
+  }
+
+  connectivityAlertBadge.classList.add("is-alert");
+  if (activeOutages > 0) {
+    connectivityAlertBadge.classList.add("is-outage");
+  }
+  connectivityAlertBadge.textContent = `${activeCount} activa${activeCount === 1 ? "" : "s"}`;
+
+  if (latest) {
+    const latestType = String(latest.alert_type || "").trim().toLowerCase() === "outage"
+      ? "Interrupción"
+      : "Anomalía";
+    const latestWhen = formatUtcAndCuba(latest.start_date);
+    const cause = latest.outage_cause ? ` · Causa: ${latest.outage_cause}` : "";
+    connectivityAlertCopy.textContent = `${latestType} más reciente: ${latestWhen}${cause}`;
+  } else {
+    connectivityAlertCopy.textContent = `${activeOutages} interrupciones y ${activeAnomalies} anomalías activas.`;
+  }
+
+  const alertRows = active
+    .slice(0, 4)
+    .map((item, idx) => {
+      const type = String(item?.alert_type || "").trim().toLowerCase() === "outage"
+        ? "Interrupción"
+        : "Anomalía";
+      const when = formatUtcAndCuba(item?.start_date);
+      const headline = String(item?.description || item?.event_type || "").trim();
+      const subline = [];
+      if (item?.outage_cause) subline.push(`Causa: ${item.outage_cause}`);
+      if (item?.status) subline.push(`Estado: ${item.status}`);
+      if (Number.isFinite(Number(item?.magnitude))) {
+        subline.push(`Magnitud: ${Number(item.magnitude).toFixed(2)}`);
+      }
+      return `
+        <div class="connectivity-alert-item">
+          <div class="connectivity-alert-item-head">
+            <strong>${escapeHtml(type)} #${idx + 1}</strong>
+            <span>${escapeHtml(when)}</span>
+          </div>
+          ${
+            headline
+              ? `<div class="connectivity-alert-item-copy">${escapeHtml(headline)}</div>`
+              : ""
+          }
+          ${
+            subline.length
+              ? `<div class="connectivity-alert-item-meta">${escapeHtml(subline.join(" · "))}</div>`
+              : ""
+          }
+        </div>
+      `;
+    })
+    .join("");
+  connectivityAlertList.innerHTML =
+    alertRows || '<div class="connectivity-alert-empty">Sin eventos activos.</div>';
+}
+
+function renderConnectivityQualityPanel(payload) {
+  if (
+    !connectivityQualityPanel ||
+    !connectivityQualityDownloadValue ||
+    !connectivityQualityDownloadMeta ||
+    !connectivityQualityLatencyValue ||
+    !connectivityQualityLatencyMeta ||
+    !connectivityQualityNote
+  ) {
+    return;
+  }
+
+  const radar = payload?.cloudflare_radar || {};
+  const speed = radar?.speed || {};
+  const latest = speed?.latest || {};
+  const averages = speed?.averages_7d || {};
+  if (!payload || !speed?.available) {
+    connectivityQualityDownloadValue.textContent = "N/D";
+    connectivityQualityDownloadMeta.textContent = "Global: N/D";
+    connectivityQualityLatencyValue.textContent = "N/D";
+    connectivityQualityLatencyMeta.textContent = "Global: N/D";
+    connectivityQualityNote.textContent = "Sin datos recientes de velocidad/latencia.";
+    return;
+  }
+
+  connectivityQualityDownloadValue.textContent = formatMbps(latest?.download_mbps);
+  connectivityQualityDownloadMeta.textContent = `Global: ${formatMbps(
+    latest?.global_download_mbps
+  )} (${formatSignedPercentDelta(latest?.download_delta_pct)})`;
+  connectivityQualityLatencyValue.textContent = formatMilliseconds(latest?.latency_ms);
+  connectivityQualityLatencyMeta.textContent = `Global: ${formatMilliseconds(
+    latest?.global_latency_ms
+  )} (${formatSignedPercentDelta(latest?.latency_delta_pct)})`;
+
+  const avgDownload = formatMbps(averages?.download_mbps);
+  const avgLatency = formatMilliseconds(averages?.latency_ms);
+  const updatedAt = radar?.updated_at_utc ? formatUtcAndCuba(radar.updated_at_utc) : "N/D";
+  connectivityQualityNote.textContent = `Promedio 7d Cuba: descarga ${avgDownload}, latencia ${avgLatency}. Actualizado: ${updatedAt}.`;
+}
+
+function renderConnectivityAudiencePanel(payload) {
+  if (
+    !connectivityAudiencePanel ||
+    !connectivityAudienceMobileBar ||
+    !connectivityAudienceDesktopBar ||
+    !connectivityAudienceHumanBar ||
+    !connectivityAudienceBotBar ||
+    !connectivityAudienceMobileValue ||
+    !connectivityAudienceDesktopValue ||
+    !connectivityAudienceHumanValue ||
+    !connectivityAudienceBotValue
+  ) {
+    return;
+  }
+
+  const radar = payload?.cloudflare_radar || {};
+  const audience = radar?.audience || {};
+  const mobilePct = Number(audience?.device_mobile_pct);
+  const desktopPct = Number(audience?.device_desktop_pct);
+  const humanPct = Number(audience?.human_pct);
+  const botPct = Number(audience?.bot_pct);
+
+  const applyAudienceValue = (valueEl, barEl, value) => {
+    valueEl.textContent = formatPercentCompact(value);
+    barEl.style.width = `${clampPercentWidth(value)}%`;
+  };
+
+  if (!payload || !audience?.available) {
+    [
+      [connectivityAudienceMobileValue, connectivityAudienceMobileBar],
+      [connectivityAudienceDesktopValue, connectivityAudienceDesktopBar],
+      [connectivityAudienceHumanValue, connectivityAudienceHumanBar],
+      [connectivityAudienceBotValue, connectivityAudienceBotBar],
+    ].forEach(([valueEl, barEl]) => {
+      valueEl.textContent = "N/D";
+      barEl.style.width = "0%";
+    });
+    return;
+  }
+
+  applyAudienceValue(connectivityAudienceMobileValue, connectivityAudienceMobileBar, mobilePct);
+  applyAudienceValue(connectivityAudienceDesktopValue, connectivityAudienceDesktopBar, desktopPct);
+  applyAudienceValue(connectivityAudienceHumanValue, connectivityAudienceHumanBar, humanPct);
+  applyAudienceValue(connectivityAudienceBotValue, connectivityAudienceBotBar, botPct);
+}
+
+function renderConnectivityRadarPanels(payload) {
+  renderConnectivityAlertPanel(payload);
+  renderConnectivityQualityPanel(payload);
+  renderConnectivityAudiencePanel(payload);
+}
+
 function computeNotableDrops(seriesMain, seriesPrev, topN = 8) {
   const prevMap = new Map(
     (seriesPrev || []).map((item) => {
@@ -2355,6 +2580,7 @@ async function refreshConnectivityLayer() {
     }
     updateConnectivityUpdatedLabel(payload);
     updateConnectivityTrafficPanel(payload);
+    renderConnectivityRadarPanels(payload);
     syncSelectedProvinceStateFromPayload(payload);
     renderConnectivityRegionChart(payload);
     renderConnectivityProvincePanel(payload);
@@ -2366,6 +2592,7 @@ async function refreshConnectivityLayer() {
       connectivityRegionNote.textContent = "No fue posible cargar la serie regional de la ventana.";
     }
     updateConnectivityTrafficPanel(null);
+    renderConnectivityRadarPanels(null);
     renderConnectivityProvincePanel(null);
     renderConnectivityRegionChart(null);
   }
@@ -2412,6 +2639,7 @@ function disableConnectivityMode() {
   setReportDetailVisible(true);
   setMapHintVisible(true);
   updateConnectivityTrafficPanel(null);
+  renderConnectivityRadarPanels(null);
   renderConnectivityProvincePanel(null);
   renderConnectivityRegionChart(null);
 }
@@ -4041,6 +4269,25 @@ async function initMap() {
   connectivityRegionChart = document.getElementById("connectivityRegionChart");
   connectivityRegionLegend = document.getElementById("connectivityRegionLegend");
   connectivityRegionNote = document.getElementById("connectivityRegionNote");
+  connectivityAlertPanel = document.getElementById("connectivityAlertPanel");
+  connectivityAlertBadge = document.getElementById("connectivityAlertBadge");
+  connectivityAlertCopy = document.getElementById("connectivityAlertCopy");
+  connectivityAlertList = document.getElementById("connectivityAlertList");
+  connectivityQualityPanel = document.getElementById("connectivityQualityPanel");
+  connectivityQualityDownloadValue = document.getElementById("connectivityQualityDownloadValue");
+  connectivityQualityDownloadMeta = document.getElementById("connectivityQualityDownloadMeta");
+  connectivityQualityLatencyValue = document.getElementById("connectivityQualityLatencyValue");
+  connectivityQualityLatencyMeta = document.getElementById("connectivityQualityLatencyMeta");
+  connectivityQualityNote = document.getElementById("connectivityQualityNote");
+  connectivityAudiencePanel = document.getElementById("connectivityAudiencePanel");
+  connectivityAudienceMobileBar = document.getElementById("connectivityAudienceMobileBar");
+  connectivityAudienceDesktopBar = document.getElementById("connectivityAudienceDesktopBar");
+  connectivityAudienceHumanBar = document.getElementById("connectivityAudienceHumanBar");
+  connectivityAudienceBotBar = document.getElementById("connectivityAudienceBotBar");
+  connectivityAudienceMobileValue = document.getElementById("connectivityAudienceMobileValue");
+  connectivityAudienceDesktopValue = document.getElementById("connectivityAudienceDesktopValue");
+  connectivityAudienceHumanValue = document.getElementById("connectivityAudienceHumanValue");
+  connectivityAudienceBotValue = document.getElementById("connectivityAudienceBotValue");
   connectivityWindowButtons = Array.from(
     document.querySelectorAll("[data-connectivity-window-hours]")
   );
@@ -4062,6 +4309,7 @@ async function initMap() {
   setActiveConnectivityWindow(connectivityWindowHours);
   renderReportDetail(null);
   renderConnectivityRegionChart(null);
+  renderConnectivityRadarPanels(null);
   renderProtestDetail(null);
   renderRepressorTerritoryDetailEmpty();
   renderRepressorStats(null, "Selecciona la capa de represores para cargar el gráfico.");

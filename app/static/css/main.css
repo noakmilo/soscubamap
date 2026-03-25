@@ -1132,6 +1132,204 @@ body.map-dashboard-page *::-webkit-scrollbar {
   font-size: 11px;
 }
 
+.connectivity-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.connectivity-panel-title {
+  color: #d6fbe7;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 700;
+}
+
+.connectivity-alert-panel {
+  margin-top: 4px;
+  border-top: 1px solid rgba(214, 251, 231, 0.15);
+  padding-top: 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.connectivity-alert-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(158, 196, 184, 0.4);
+  color: #b7ddd0;
+  background: rgba(158, 196, 184, 0.12);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.connectivity-alert-badge.is-alert {
+  color: #ffd3c8;
+  border-color: rgba(255, 161, 128, 0.55);
+  background: rgba(255, 116, 79, 0.22);
+}
+
+.connectivity-alert-badge.is-outage {
+  color: #ffe0d6;
+  border-color: rgba(239, 68, 68, 0.7);
+  background: rgba(239, 68, 68, 0.28);
+}
+
+.connectivity-alert-copy {
+  color: #b7ddd0;
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.connectivity-alert-list {
+  display: grid;
+  gap: 6px;
+  max-height: 160px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding-right: 4px;
+}
+
+.connectivity-alert-item {
+  border: 1px solid rgba(214, 251, 231, 0.15);
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.02);
+  display: grid;
+  gap: 2px;
+}
+
+.connectivity-alert-item-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  color: #e9fff4;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.connectivity-alert-item-head strong {
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.connectivity-alert-item-copy {
+  color: #b7ddd0;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.connectivity-alert-item-meta {
+  color: #9ec4b8;
+  font-size: 9.5px;
+}
+
+.connectivity-alert-empty {
+  border: 1px dashed rgba(214, 251, 231, 0.25);
+  border-radius: 8px;
+  padding: 8px;
+  color: #9ec4b8;
+  font-size: 10px;
+}
+
+.connectivity-quality-panel {
+  margin-top: 4px;
+  border-top: 1px solid rgba(214, 251, 231, 0.15);
+  padding-top: 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.connectivity-quality-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.connectivity-quality-card {
+  border: 1px solid rgba(214, 251, 231, 0.15);
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.02);
+  display: grid;
+  gap: 2px;
+}
+
+.connectivity-quality-label {
+  color: #b7ddd0;
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.35px;
+}
+
+.connectivity-quality-value {
+  color: #f3fff8;
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.connectivity-quality-meta {
+  color: #9ec4b8;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.connectivity-quality-note {
+  color: #9ec4b8;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.connectivity-audience-panel {
+  margin-top: 4px;
+  border-top: 1px solid rgba(214, 251, 231, 0.15);
+  padding-top: 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.connectivity-audience-row {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.connectivity-audience-label {
+  color: #d6fbe7;
+  font-size: 10px;
+}
+
+.connectivity-audience-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(214, 251, 231, 0.18);
+  overflow: hidden;
+}
+
+.connectivity-audience-bar span {
+  display: block;
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #22c55e 0%, #6ee7b7 100%);
+}
+
+.connectivity-audience-value {
+  color: #ecfff6;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
 .connectivity-source-credit {
   color: #9ec4b8;
   font-size: 11px;
@@ -5549,6 +5747,10 @@ textarea {
   }
 
   .legend-location-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .connectivity-quality-grid {
     grid-template-columns: 1fr;
   }
 

@@ -2,7 +2,7 @@ import argparse
 import json
 import os
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import requests
@@ -171,6 +171,477 @@ def _pick_best_attempt(attempts):
     return best
 
 
+def _radar_base_url(value):
+    text = str(value or "").strip().rstrip("/")
+    if text:
+        return text
+    return "https://api.cloudflare.com/client/v4/radar"
+
+
+def _radar_url(base_url, path, params=None):
+    base = _radar_base_url(base_url)
+    path_text = f"/{str(path or '').lstrip('/')}"
+    query = urlencode(params or {}, doseq=True)
+    if query:
+        return f"{base}{path_text}?{query}"
+    return f"{base}{path_text}"
+
+
+def _fetch_radar_json(url, token, timeout_seconds):
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json",
+    }
+    try:
+        response = requests.get(url, headers=headers, timeout=timeout_seconds)
+        payload = None
+        try:
+            payload = response.json()
+        except Exception:
+            payload = None
+
+        success_flag = True
+        errors = None
+        if isinstance(payload, dict) and "success" in payload:
+            success_flag = bool(payload.get("success"))
+            errors = payload.get("errors")
+
+        ok = response.ok and success_flag and isinstance(payload, dict)
+        error_message = None
+        if not ok:
+            if errors:
+                error_message = str(errors)
+            elif response.text:
+                error_message = (response.text or "")[:400]
+            else:
+                error_message = f"HTTP {response.status_code}"
+
+        return {
+            "ok": ok,
+            "status_code": response.status_code,
+            "payload": payload if isinstance(payload, dict) else None,
+            "error": error_message,
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "status_code": None,
+            "payload": None,
+            "error": str(exc),
+        }
+
+
+def _to_percent(value):
+    numeric = to_float(value)
+    if numeric is None:
+        return None
+    if 0 <= numeric <= 1.000001:
+        numeric *= 100.0
+    if numeric < 0:
+        numeric = 0.0
+    if numeric > 100:
+        numeric = 100.0
+    return round(numeric, 3)
+
+
+def _parse_radar_datetime(raw):
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except Exception:
+        return None
+    if parsed.tzinfo:
+        return parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    return parsed
+
+
+def _speed_window_params(days=7, location=None):
+    params = [("format", "json")]
+    now_utc = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    def _iso_utc(dt):
+        return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+    for day_idx in range(max(1, int(days))):
+        end_dt = now_utc - timedelta(days=day_idx)
+        start_dt = end_dt - timedelta(days=1)
+        params.append(("name", f"day{day_idx}"))
+        params.append(("dateStart", _iso_utc(start_dt)))
+        params.append(("dateEnd", _iso_utc(end_dt)))
+        if location:
+            params.append(("location", str(location)))
+    return params
+
+
+def _parse_speed_row(row):
+    if not isinstance(row, dict):
+        return {
+            "download_mbps": None,
+            "upload_mbps": None,
+            "latency_ms": None,
+            "jitter_ms": None,
+            "packet_loss_pct": None,
+        }
+    return {
+        "download_mbps": to_float(
+            row.get("bandwidthDownload")
+            or row.get("downloadMbps")
+            or row.get("download")
+        ),
+        "upload_mbps": to_float(
+            row.get("bandwidthUpload")
+            or row.get("uploadMbps")
+            or row.get("upload")
+        ),
+        "latency_ms": to_float(
+            row.get("latencyIdle")
+            or row.get("latencyLoaded")
+            or row.get("latency")
+        ),
+        "jitter_ms": to_float(
+            row.get("jitterIdle")
+            or row.get("jitterLoaded")
+            or row.get("jitter")
+        ),
+        "packet_loss_pct": to_float(
+            row.get("packetLoss")
+            or row.get("packetLossPct")
+            or row.get("packet_loss")
+        ),
+    }
+
+
+def _average(values):
+    numeric = [to_float(value) for value in (values or [])]
+    numeric = [value for value in numeric if value is not None]
+    if not numeric:
+        return None
+    return sum(numeric) / len(numeric)
+
+
+def _safe_round(value, decimals=3):
+    numeric = to_float(value)
+    if numeric is None:
+        return None
+    return round(numeric, decimals)
+
+
+def _build_speed_summary(cuba_payload, world_payload, days=7):
+    cuba_result = cuba_payload.get("result") if isinstance(cuba_payload, dict) else None
+    world_result = world_payload.get("result") if isinstance(world_payload, dict) else None
+    if not isinstance(cuba_result, dict):
+        return {
+            "available": False,
+            "days": [],
+            "latest": None,
+            "averages_7d": {},
+        }
+
+    rows = []
+    for day_idx in range(max(1, int(days))):
+        key = f"day{day_idx}"
+        cuba_row = _parse_speed_row(cuba_result.get(key))
+        world_row = _parse_speed_row(world_result.get(key) if isinstance(world_result, dict) else None)
+
+        if all(
+            cuba_row.get(field) is None
+            for field in ("download_mbps", "upload_mbps", "latency_ms", "jitter_ms", "packet_loss_pct")
+        ):
+            continue
+
+        download_delta_pct = None
+        if (
+            cuba_row.get("download_mbps") is not None
+            and world_row.get("download_mbps") is not None
+            and world_row["download_mbps"] > 0
+        ):
+            download_delta_pct = (
+                (cuba_row["download_mbps"] - world_row["download_mbps"])
+                / world_row["download_mbps"]
+            ) * 100.0
+
+        latency_delta_pct = None
+        if (
+            cuba_row.get("latency_ms") is not None
+            and world_row.get("latency_ms") is not None
+            and world_row["latency_ms"] > 0
+        ):
+            latency_delta_pct = (
+                (cuba_row["latency_ms"] - world_row["latency_ms"])
+                / world_row["latency_ms"]
+            ) * 100.0
+
+        rows.append(
+            {
+                "day_index": day_idx,
+                "download_mbps": _safe_round(cuba_row.get("download_mbps"), 3),
+                "upload_mbps": _safe_round(cuba_row.get("upload_mbps"), 3),
+                "latency_ms": _safe_round(cuba_row.get("latency_ms"), 2),
+                "jitter_ms": _safe_round(cuba_row.get("jitter_ms"), 2),
+                "packet_loss_pct": _safe_round(cuba_row.get("packet_loss_pct"), 3),
+                "global_download_mbps": _safe_round(world_row.get("download_mbps"), 3),
+                "global_upload_mbps": _safe_round(world_row.get("upload_mbps"), 3),
+                "global_latency_ms": _safe_round(world_row.get("latency_ms"), 2),
+                "global_jitter_ms": _safe_round(world_row.get("jitter_ms"), 2),
+                "download_delta_pct": _safe_round(download_delta_pct, 2),
+                "latency_delta_pct": _safe_round(latency_delta_pct, 2),
+            }
+        )
+
+    rows.sort(key=lambda item: int(item.get("day_index") or 0))
+    latest = rows[0] if rows else None
+    averages = {
+        "download_mbps": _safe_round(_average([row.get("download_mbps") for row in rows]), 3),
+        "upload_mbps": _safe_round(_average([row.get("upload_mbps") for row in rows]), 3),
+        "latency_ms": _safe_round(_average([row.get("latency_ms") for row in rows]), 2),
+        "jitter_ms": _safe_round(_average([row.get("jitter_ms") for row in rows]), 2),
+        "packet_loss_pct": _safe_round(_average([row.get("packet_loss_pct") for row in rows]), 3),
+        "global_download_mbps": _safe_round(
+            _average([row.get("global_download_mbps") for row in rows]),
+            3,
+        ),
+        "global_latency_ms": _safe_round(
+            _average([row.get("global_latency_ms") for row in rows]),
+            2,
+        ),
+    }
+    return {
+        "available": bool(rows),
+        "days": rows,
+        "latest": latest,
+        "averages_7d": averages,
+    }
+
+
+def _extract_annotation_alerts(payload):
+    result = payload.get("result") if isinstance(payload, dict) else None
+    annotations = result.get("annotations") if isinstance(result, dict) else None
+    if not isinstance(annotations, list):
+        return []
+
+    alerts = []
+    for item in annotations:
+        if not isinstance(item, dict):
+            continue
+        event_type = str(item.get("eventType") or "").strip().upper()
+        alert_type = "outage" if event_type == "OUTAGE" else "anomaly"
+        start_date = str(item.get("startDate") or "").strip() or None
+        end_date = str(item.get("endDate") or "").strip() or None
+        outage = item.get("outage") if isinstance(item.get("outage"), dict) else {}
+        locations = item.get("locations") if isinstance(item.get("locations"), list) else []
+        asns = item.get("asns") if isinstance(item.get("asns"), list) else []
+        alerts.append(
+            {
+                "source": "annotation",
+                "alert_type": alert_type,
+                "event_type": event_type or None,
+                "description": str(item.get("description") or "").strip() or None,
+                "start_date": start_date,
+                "end_date": end_date,
+                "linked_url": str(item.get("linkedUrl") or "").strip() or None,
+                "outage_cause": str(outage.get("outageCause") or "").strip() or None,
+                "outage_type": str(outage.get("outageType") or "").strip() or None,
+                "data_source": str(item.get("dataSource") or "").strip() or None,
+                "is_instantaneous": bool(item.get("isInstantaneous")),
+                "locations": [str(loc).strip() for loc in locations if str(loc).strip()],
+                "asns": [str(asn).strip() for asn in asns if str(asn).strip()],
+            }
+        )
+    return alerts
+
+
+def _extract_anomaly_alerts(payload):
+    result = payload.get("result") if isinstance(payload, dict) else None
+    anomalies = result.get("trafficAnomalies") if isinstance(result, dict) else None
+    if not isinstance(anomalies, list):
+        return []
+
+    alerts = []
+    for item in anomalies:
+        if not isinstance(item, dict):
+            continue
+        asn_details = item.get("asnDetails") if isinstance(item.get("asnDetails"), dict) else {}
+        alerts.append(
+            {
+                "source": "traffic_anomaly",
+                "alert_type": "anomaly",
+                "event_type": str(item.get("type") or "").strip() or None,
+                "status": str(item.get("status") or "").strip() or None,
+                "description": str(item.get("description") or "").strip() or None,
+                "start_date": str(item.get("startDate") or "").strip() or None,
+                "end_date": str(item.get("endDate") or "").strip() or None,
+                "magnitude": _safe_round(to_float(item.get("magnitude")), 3),
+                "asn": str(asn_details.get("asn") or "").strip() or None,
+                "asn_name": str(asn_details.get("name") or "").strip() or None,
+            }
+        )
+    return alerts
+
+
+def _dedupe_and_sort_alerts(alerts):
+    deduped = {}
+    for item in alerts or []:
+        if not isinstance(item, dict):
+            continue
+        key = (
+            str(item.get("source") or "").strip().lower(),
+            str(item.get("alert_type") or "").strip().lower(),
+            str(item.get("event_type") or "").strip().lower(),
+            str(item.get("start_date") or "").strip(),
+        )
+        existing = deduped.get(key)
+        if existing is None:
+            deduped[key] = item
+            continue
+        # Preserve richer records (description/outage fields).
+        existing_richness = sum(
+            1 for field in ("description", "outage_cause", "outage_type", "linked_url") if existing.get(field)
+        )
+        candidate_richness = sum(
+            1 for field in ("description", "outage_cause", "outage_type", "linked_url") if item.get(field)
+        )
+        if candidate_richness > existing_richness:
+            deduped[key] = item
+
+    sorted_items = list(deduped.values())
+    sorted_items.sort(
+        key=lambda row: _parse_radar_datetime(row.get("start_date")) or datetime.min,
+        reverse=True,
+    )
+    return sorted_items
+
+
+def _fetch_radar_enrichment(base_url, token, timeout_seconds):
+    output = {
+        "fetched_at_utc": serialize_snapshot_time(datetime.utcnow()),
+        "api_base_url": _radar_base_url(base_url),
+        "audience": {
+            "available": False,
+            "device_mobile_pct": None,
+            "device_desktop_pct": None,
+            "human_pct": None,
+            "bot_pct": None,
+        },
+        "alerts": {
+            "available": False,
+            "items": [],
+            "count_annotations": 0,
+            "count_anomalies": 0,
+        },
+        "speed": {
+            "available": False,
+            "days": [],
+            "latest": None,
+            "averages_7d": {},
+        },
+        "errors": [],
+    }
+
+    urls = {
+        "device_type": _radar_url(
+            base_url,
+            "/http/summary/device_type",
+            {"dateRange": "1d", "location": "CU", "format": "json"},
+        ),
+        "bot_class": _radar_url(
+            base_url,
+            "/http/summary/bot_class",
+            {"dateRange": "1d", "location": "CU", "format": "json"},
+        ),
+        "annotations": _radar_url(
+            base_url,
+            "/annotations/outages",
+            {"dateRange": "2d", "location": "CU", "format": "json"},
+        ),
+        "traffic_anomalies": _radar_url(
+            base_url,
+            "/traffic_anomalies",
+            {"dateRange": "2d", "location": "CU", "limit": 20, "format": "json"},
+        ),
+        "speed_cuba": _radar_url(
+            base_url,
+            "/quality/speed/summary",
+            _speed_window_params(days=7, location="CU"),
+        ),
+        "speed_world": _radar_url(
+            base_url,
+            "/quality/speed/summary",
+            _speed_window_params(days=7, location=None),
+        ),
+    }
+
+    responses = {}
+    for name, url in urls.items():
+        response = _fetch_radar_json(url, token, timeout_seconds)
+        responses[name] = response
+        if not response.get("ok"):
+            output["errors"].append(
+                {
+                    "endpoint": name,
+                    "status_code": response.get("status_code"),
+                    "error": response.get("error"),
+                }
+            )
+
+    device_payload = responses.get("device_type", {}).get("payload") or {}
+    bot_payload = responses.get("bot_class", {}).get("payload") or {}
+    device_summary = (
+        device_payload.get("result", {}).get("summary_0")
+        if isinstance(device_payload, dict)
+        else None
+    )
+    bot_summary = (
+        bot_payload.get("result", {}).get("summary_0")
+        if isinstance(bot_payload, dict)
+        else None
+    )
+    mobile_pct = _to_percent((device_summary or {}).get("mobile"))
+    desktop_pct = _to_percent((device_summary or {}).get("desktop"))
+    human_pct = _to_percent((bot_summary or {}).get("human"))
+    bot_pct = _to_percent((bot_summary or {}).get("bot"))
+    if mobile_pct is not None and desktop_pct is None:
+        desktop_pct = _safe_round(100 - mobile_pct, 3)
+    if desktop_pct is not None and mobile_pct is None:
+        mobile_pct = _safe_round(100 - desktop_pct, 3)
+    if human_pct is not None and bot_pct is None:
+        bot_pct = _safe_round(100 - human_pct, 3)
+    if bot_pct is not None and human_pct is None:
+        human_pct = _safe_round(100 - bot_pct, 3)
+    output["audience"] = {
+        "available": any(value is not None for value in (mobile_pct, desktop_pct, human_pct, bot_pct)),
+        "device_mobile_pct": mobile_pct,
+        "device_desktop_pct": desktop_pct,
+        "human_pct": human_pct,
+        "bot_pct": bot_pct,
+    }
+
+    annotation_alerts = _extract_annotation_alerts(
+        responses.get("annotations", {}).get("payload")
+    )
+    anomaly_alerts = _extract_anomaly_alerts(
+        responses.get("traffic_anomalies", {}).get("payload")
+    )
+    merged_alerts = _dedupe_and_sort_alerts(annotation_alerts + anomaly_alerts)
+    output["alerts"] = {
+        "available": bool(merged_alerts),
+        "items": merged_alerts[:40],
+        "count_annotations": len(annotation_alerts),
+        "count_anomalies": len(anomaly_alerts),
+    }
+
+    speed_summary = _build_speed_summary(
+        responses.get("speed_cuba", {}).get("payload"),
+        responses.get("speed_world", {}).get("payload"),
+        days=7,
+    )
+    output["speed"] = speed_summary
+    return output
+
+
 def _historical_baseline():
     rows = (
         ConnectivitySnapshot.query.order_by(ConnectivitySnapshot.observed_at_utc.desc())
@@ -335,6 +806,7 @@ def run_ingestion(single_call=False, scheduled_for=None):
             raise RuntimeError("CF_API_TOKEN no configurado")
 
         api_url = app.config.get("CLOUDFLARE_RADAR_HTTP_TIMESERIES_URL")
+        radar_api_base_url = app.config.get("CLOUDFLARE_RADAR_API_BASE_URL")
         timeout_seconds = int(app.config.get("CONNECTIVITY_FETCH_TIMEOUT_SECONDS", 30))
         delay_seconds = int(app.config.get("CONNECTIVITY_FETCH_DELAY_SECONDS", 120))
         province_geoids = _province_geoids()
@@ -415,6 +887,11 @@ def run_ingestion(single_call=False, scheduled_for=None):
             db.session.commit()
             raise RuntimeError(run.error_message or "No se pudo obtener datos de Radar")
 
+        radar_enrichment = _fetch_radar_enrichment(
+            radar_api_base_url,
+            token,
+            timeout_seconds,
+        )
         payload_record = {
             "mode": "province_geoid_v1",
             "generated_at_utc": serialize_snapshot_time(datetime.utcnow()),
@@ -427,6 +904,7 @@ def run_ingestion(single_call=False, scheduled_for=None):
                 }
                 for province, details in best_payloads_by_province.items()
             },
+            "cloudflare_radar": radar_enrichment,
         }
 
         snapshot, snapshot_error = _upsert_snapshot(run, best_payloads_by_province)

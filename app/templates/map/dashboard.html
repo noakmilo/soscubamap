@@ -190,6 +190,59 @@
           <span>Apagón o conectividad crítica</span>
         </div>
         <div class="connectivity-updated" id="connectivityUpdatedLabel"></div>
+        <div class="connectivity-alert-panel" id="connectivityAlertPanel">
+          <div class="connectivity-panel-head">
+            <div class="connectivity-panel-title">Alertas Radar</div>
+            <div class="connectivity-alert-badge" id="connectivityAlertBadge">Sin alertas activas</div>
+          </div>
+          <div class="connectivity-alert-copy" id="connectivityAlertCopy">
+            Sin alertas activas recientes detectadas por Cloudflare Radar.
+          </div>
+          <div class="connectivity-alert-list" id="connectivityAlertList">
+            <div class="connectivity-alert-empty">Sin eventos activos.</div>
+          </div>
+        </div>
+        <div class="connectivity-quality-panel" id="connectivityQualityPanel">
+          <div class="connectivity-panel-title">Calidad de internet (Radar Speed)</div>
+          <div class="connectivity-quality-grid">
+            <div class="connectivity-quality-card">
+              <div class="connectivity-quality-label">Descarga Cuba</div>
+              <div class="connectivity-quality-value" id="connectivityQualityDownloadValue">N/D</div>
+              <div class="connectivity-quality-meta" id="connectivityQualityDownloadMeta">Global: N/D</div>
+            </div>
+            <div class="connectivity-quality-card">
+              <div class="connectivity-quality-label">Latencia Cuba</div>
+              <div class="connectivity-quality-value" id="connectivityQualityLatencyValue">N/D</div>
+              <div class="connectivity-quality-meta" id="connectivityQualityLatencyMeta">Global: N/D</div>
+            </div>
+          </div>
+          <div class="connectivity-quality-note" id="connectivityQualityNote">
+            Sin datos recientes de velocidad/latencia.
+          </div>
+        </div>
+        <div class="connectivity-audience-panel" id="connectivityAudiencePanel">
+          <div class="connectivity-panel-title">Composición del tráfico</div>
+          <div class="connectivity-audience-row">
+            <div class="connectivity-audience-label">Móvil</div>
+            <div class="connectivity-audience-bar"><span id="connectivityAudienceMobileBar"></span></div>
+            <div class="connectivity-audience-value" id="connectivityAudienceMobileValue">N/D</div>
+          </div>
+          <div class="connectivity-audience-row">
+            <div class="connectivity-audience-label">Desktop</div>
+            <div class="connectivity-audience-bar"><span id="connectivityAudienceDesktopBar"></span></div>
+            <div class="connectivity-audience-value" id="connectivityAudienceDesktopValue">N/D</div>
+          </div>
+          <div class="connectivity-audience-row">
+            <div class="connectivity-audience-label">Humano</div>
+            <div class="connectivity-audience-bar"><span id="connectivityAudienceHumanBar"></span></div>
+            <div class="connectivity-audience-value" id="connectivityAudienceHumanValue">N/D</div>
+          </div>
+          <div class="connectivity-audience-row">
+            <div class="connectivity-audience-label">Bot</div>
+            <div class="connectivity-audience-bar"><span id="connectivityAudienceBotBar"></span></div>
+            <div class="connectivity-audience-value" id="connectivityAudienceBotValue">N/D</div>
+          </div>
+        </div>
         <div class="connectivity-traffic-panel" id="connectivityTrafficPanel">
           <div class="connectivity-traffic-title">Trafico HTTP nacional</div>
           <div class="connectivity-traffic-kpi" id="connectivityTrafficValue">N/D</div>
