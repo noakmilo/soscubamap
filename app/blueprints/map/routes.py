@@ -105,6 +105,18 @@ URGENT_CATEGORY_SLUGS = {
 _REPRESSOR_VIEWER_STACK_KEY = "repressors_viewer_stack"
 _REPRESSOR_VIEWER_INDEX_KEY = "repressors_viewer_index"
 _TOKEN_SANITIZE_RE = re.compile(r"[^a-z0-9]+")
+_MAP_LAYER_ALIASES = {
+    "map": "map",
+    "mapa": "map",
+    "satellite": "satellite",
+    "satelite": "satellite",
+    "connectivity": "connectivity",
+    "conectividad": "connectivity",
+    "repressors": "repressors",
+    "represores": "repressors",
+    "protests": "protests",
+    "protestas": "protests",
+}
 _REPRESSOR_TYPE_PALETTES = {
     "batablanca": {
         "bg": "linear-gradient(145deg, #d8f0ff 0%, #b8dfff 100%)",
@@ -413,11 +425,18 @@ def _serialize_residence_report(report: RepressorResidenceReport):
     }
 
 
+def _normalize_map_layer(value: str | None) -> str:
+    raw = (value or "").strip().lower()
+    return _MAP_LAYER_ALIASES.get(raw, "map")
+
+
 @map_bp.route("/")
-def dashboard():
+@map_bp.route("/map=<string:layer_slug>")
+def dashboard(layer_slug: str | None = None):
     categories = Category.query.order_by(Category.id.asc()).all()
     posts = Post.query.filter_by(status="approved").all()
     map_provider_main = get_map_provider_main()
+    initial_base_mode = _normalize_map_layer(layer_slug)
     return render_template(
         "map/dashboard.html",
         categories=categories,
@@ -437,6 +456,8 @@ def dashboard():
         ),
         map_provider_main=map_provider_main,
         google_maps_api_key=_google_maps_api_key(),
+        initial_base_mode=initial_base_mode,
+        map_layer_route_template=url_for("map.dashboard", layer_slug="__layer__"),
     )
 
 

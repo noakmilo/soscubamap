@@ -84,6 +84,7 @@ let mapImageModalImg;
 let mapImageModalCaption;
 let pendingMarkers = [];
 let mainBaseLayers = {};
+let mapLayerRouteTemplate = "/map=__layer__";
 let mapAppShell;
 let mapSidePanel;
 let mapSideScroll;
@@ -115,6 +116,25 @@ const MOBILE_SHEET_OFFSETS = {
   peek: 92,
   mid: 42,
   full: 6,
+};
+const MAP_MODE_TO_ROUTE_SLUG = {
+  map: "mapa",
+  satellite: "satelite",
+  connectivity: "conectividad",
+  repressors: "represores",
+  protests: "protestas",
+};
+const ROUTE_SLUG_TO_MAP_MODE = {
+  map: "map",
+  mapa: "map",
+  satellite: "satellite",
+  satelite: "satellite",
+  connectivity: "connectivity",
+  conectividad: "connectivity",
+  repressors: "repressors",
+  represores: "repressors",
+  protests: "protests",
+  protestas: "protests",
 };
 const CONNECTIVITY_STATUS_COLORS = {
   normal: "#2E7D32",
@@ -336,6 +356,103 @@ function safeUrl(value) {
   const url = String(value || "").trim();
   if (!/^https?:\/\//i.test(url)) return "";
   return url.replaceAll('"', "%22").replaceAll("'", "%27");
+}
+
+function normalizeBaseMode(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw) return "map";
+  return ROUTE_SLUG_TO_MAP_MODE[raw] || "map";
+}
+
+function mapModeRouteSlug(mode) {
+  const normalized = normalizeBaseMode(mode);
+  return MAP_MODE_TO_ROUTE_SLUG[normalized] || "mapa";
+}
+
+function parseBaseModeFromPath(pathname) {
+  const path = String(pathname || "").trim();
+  if (!path) return "map";
+
+  const mapEqualMatch = path.match(/\/map=([^/?#]+)/i);
+  if (mapEqualMatch && mapEqualMatch[1]) {
+    try {
+      return normalizeBaseMode(decodeURIComponent(mapEqualMatch[1]));
+    } catch (_error) {
+      return normalizeBaseMode(mapEqualMatch[1]);
+    }
+  }
+
+  const mapSlashMatch = path.match(/\/map\/([^/?#]+)/i);
+  if (mapSlashMatch && mapSlashMatch[1]) {
+    try {
+      return normalizeBaseMode(decodeURIComponent(mapSlashMatch[1]));
+    } catch (_error) {
+      return normalizeBaseMode(mapSlashMatch[1]);
+    }
+  }
+
+  return "map";
+}
+
+function buildBaseModeRoutePath(mode) {
+  const slug = mapModeRouteSlug(mode);
+  const template = String(mapLayerRouteTemplate || "").trim();
+  if (template.includes("__layer__")) {
+    return template.replace("__layer__", slug);
+  }
+  return `/map=${slug}`;
+}
+
+function syncBaseModeRoute(mode, options = {}) {
+  if (typeof window === "undefined" || !window.history || !window.location) return;
+  const targetPath = buildBaseModeRoutePath(mode);
+  if (!targetPath) return;
+
+  const search = window.location.search || "";
+  const hash = window.location.hash || "";
+  const target = `${targetPath}${search}${hash}`;
+  const current = `${window.location.pathname}${search}${hash}`;
+  if (target === current) return;
+
+  const method = options.replace ? "replaceState" : "pushState";
+  const state = {
+    ...(window.history.state || {}),
+    map_base_mode: normalizeBaseMode(mode),
+  };
+  window.history[method](state, "", target);
+}
+
+function baseLayerForMode(mode) {
+  const normalized = normalizeBaseMode(mode);
+  const {
+    streetsLayer,
+    satelliteLayer,
+    connectivityBaseLayer,
+    repressorBaseLayer,
+    protestBaseLayer,
+  } = mainBaseLayers || {};
+  if (normalized === "satellite") return satelliteLayer;
+  if (normalized === "connectivity") return connectivityBaseLayer;
+  if (normalized === "repressors") return repressorBaseLayer;
+  if (normalized === "protests") return protestBaseLayer;
+  return streetsLayer;
+}
+
+function modeForBaseLayer(layer) {
+  if (!layer) return "map";
+  const {
+    streetsLayer,
+    satelliteLayer,
+    connectivityBaseLayer,
+    repressorBaseLayer,
+    protestBaseLayer,
+  } = mainBaseLayers || {};
+  if (layer === satelliteLayer) return "satellite";
+  if (layer === connectivityBaseLayer) return "connectivity";
+  if (layer === repressorBaseLayer) return "repressors";
+  if (layer === protestBaseLayer) return "protests";
+  if (layer === streetsLayer) return "map";
+  return "map";
 }
 
 function isWithinCubaBounds(location) {
@@ -770,9 +887,10 @@ function closeActivePopup() {
   activePopup = null;
 }
 
-async function ensureMapModeForReportFocus() {
-  if (!map || !mainBaseLayers?.streetsLayer) return;
+async function switchBaseMode(nextMode, options = {}) {
+  if (!map || !mainBaseLayers) return;
 
+  const mode = normalizeBaseMode(nextMode);
   const {
     streetsLayer,
     satelliteLayer,
@@ -781,6 +899,70 @@ async function ensureMapModeForReportFocus() {
     repressorBaseLayer,
     protestBaseLayer,
   } = mainBaseLayers;
+  const targetLayer = baseLayerForMode(mode);
+
+  [streetsLayer, satelliteLayer, connectivityBaseLayer, repressorBaseLayer, protestBaseLayer]
+    .filter(Boolean)
+    .forEach((layer) => {
+      if (layer !== targetLayer && map.hasLayer(layer)) {
+        map.removeLayer(layer);
+      }
+    });
+
+  if (targetLayer && !map.hasLayer(targetLayer)) {
+    targetLayer.addTo(map);
+  }
+
+  if (mode === "connectivity") {
+    if (activeBaseMode === "protests") {
+      disableProtestMode();
+    }
+    if (activeBaseMode === "repressors") {
+      disableRepressorMode();
+    }
+    if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
+      map.removeLayer(satelliteLabelsLayer);
+    }
+    await enableConnectivityMode();
+    if (options.syncRoute !== false) {
+      syncBaseModeRoute("connectivity", { replace: options.replaceRoute === true });
+    }
+    return;
+  }
+
+  if (mode === "repressors") {
+    if (activeBaseMode === "connectivity") {
+      disableConnectivityMode();
+    }
+    if (activeBaseMode === "protests") {
+      disableProtestMode();
+    }
+    if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
+      map.removeLayer(satelliteLabelsLayer);
+    }
+    await enableRepressorMode();
+    if (options.syncRoute !== false) {
+      syncBaseModeRoute("repressors", { replace: options.replaceRoute === true });
+    }
+    return;
+  }
+
+  if (mode === "protests") {
+    if (activeBaseMode === "connectivity") {
+      disableConnectivityMode();
+    }
+    if (activeBaseMode === "repressors") {
+      disableRepressorMode();
+    }
+    if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
+      map.removeLayer(satelliteLabelsLayer);
+    }
+    await enableProtestMode();
+    if (options.syncRoute !== false) {
+      syncBaseModeRoute("protests", { replace: options.replaceRoute === true });
+    }
+    return;
+  }
 
   if (activeBaseMode === "connectivity") {
     disableConnectivityMode();
@@ -792,27 +974,29 @@ async function ensureMapModeForReportFocus() {
     disableRepressorMode();
   }
 
-  [satelliteLayer, connectivityBaseLayer, repressorBaseLayer, protestBaseLayer].forEach((layer) => {
-    if (layer && map.hasLayer(layer)) {
-      map.removeLayer(layer);
-    }
-  });
-
-  if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
+  activeBaseMode = mode === "satellite" ? "satellite" : "map";
+  if (satelliteLabelsLayer && activeBaseMode === "satellite") {
+    if (!map.hasLayer(satelliteLabelsLayer)) satelliteLabelsLayer.addTo(map);
+  } else if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
     map.removeLayer(satelliteLabelsLayer);
   }
 
-  if (!map.hasLayer(streetsLayer)) {
-    streetsLayer.addTo(map);
-  }
-
-  activeBaseMode = "map";
+  setMapHintVisible(true);
   setReportLegendVisible(true);
   setReportDetailVisible(true);
   setConnectivityLegendVisible(false);
   setProtestOverlayVisible(false);
   setRepressorOverlayVisible(false);
   await applyFilters();
+
+  if (options.syncRoute !== false) {
+    syncBaseModeRoute(activeBaseMode, { replace: options.replaceRoute === true });
+  }
+}
+
+async function ensureMapModeForReportFocus() {
+  if (!map || !mainBaseLayers?.streetsLayer) return;
+  await switchBaseMode("map", { syncRoute: true });
 }
 
 function setMapHintVisible(visible) {
@@ -3831,6 +4015,10 @@ async function initMap() {
   connectivityRefreshSeconds = Number(mapEl.dataset.connectivityRefreshSeconds || 300);
   protestRefreshSeconds = Number(mapEl.dataset.protestRefreshSeconds || 300);
   const preferredProvider = (mapEl.dataset.mapProvider || MAP_PROVIDER_LEAFLET).toLowerCase();
+  mapLayerRouteTemplate = String(mapEl.dataset.layerRouteTemplate || "/map=__layer__").trim();
+  const requestedBaseMode = normalizeBaseMode(
+    mapEl.dataset.initialBaseMode || parseBaseModeFromPath(window.location.pathname)
+  );
   mapHintElement = document.getElementById("mapHint");
   reportLegendSection = document.getElementById("reportLegendSection");
   connectivityLegendOverlay = document.getElementById("connectivityLegendOverlay");
@@ -4013,66 +4201,10 @@ async function initMap() {
   setRepressorOverlayVisible(false);
 
   map.on("baselayerchange", (event) => {
-    if (event.layer === connectivityBaseLayer) {
-      if (activeBaseMode === "protests") {
-        disableProtestMode();
-      }
-      if (activeBaseMode === "repressors") {
-        disableRepressorMode();
-      }
-      if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
-        map.removeLayer(satelliteLabelsLayer);
-      }
-      enableConnectivityMode();
-      return;
-    }
-
-    if (event.layer === repressorBaseLayer) {
-      if (activeBaseMode === "connectivity") {
-        disableConnectivityMode();
-      }
-      if (activeBaseMode === "protests") {
-        disableProtestMode();
-      }
-      if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
-        map.removeLayer(satelliteLabelsLayer);
-      }
-      enableRepressorMode();
-      return;
-    }
-
-    if (event.layer === protestBaseLayer) {
-      if (activeBaseMode === "connectivity") {
-        disableConnectivityMode();
-      }
-      if (activeBaseMode === "repressors") {
-        disableRepressorMode();
-      }
-      if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
-        map.removeLayer(satelliteLabelsLayer);
-      }
-      enableProtestMode();
-      return;
-    }
-
-    if (activeBaseMode === "connectivity") {
-      disableConnectivityMode();
-    }
-    if (activeBaseMode === "protests") {
-      disableProtestMode();
-    }
-    if (activeBaseMode === "repressors") {
-      disableRepressorMode();
-    }
-
-    activeBaseMode = event.layer === satelliteLayer ? "satellite" : "map";
-    if (satelliteLabelsLayer && event.layer === satelliteLayer) {
-      if (!map.hasLayer(satelliteLabelsLayer)) satelliteLabelsLayer.addTo(map);
-    } else if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
-      map.removeLayer(satelliteLabelsLayer);
-    }
-
-    applyFilters();
+    const nextMode = modeForBaseLayer(event.layer);
+    switchBaseMode(nextMode, { syncRoute: true }).catch(() => {
+      // no-op
+    });
   });
 
   const onMobileViewport = isMobileViewport();
@@ -4099,7 +4231,17 @@ async function initMap() {
   setupLegendCategoryFilter();
   allPosts = await loadPosts();
   await applyFilters();
+  if (requestedBaseMode !== "map") {
+    await switchBaseMode(requestedBaseMode, { syncRoute: true, replaceRoute: true });
+  }
   await refreshAlerts();
+
+  window.addEventListener("popstate", () => {
+    const routeMode = parseBaseModeFromPath(window.location.pathname);
+    switchBaseMode(routeMode, { syncRoute: false }).catch(() => {
+      // no-op
+    });
+  });
 
   const provinceSelect = document.getElementById("provinceFilter");
   const municipalitySelect = document.getElementById("municipalityFilter");
