@@ -103,12 +103,71 @@ def _url_with_geoid(base_url, geo_id):
     )
 
 
+def _utcnow():
+    # Keep naive UTC datetimes for existing DB schema, without using deprecated utcnow().
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _truncate_text(value, limit=400):
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if len(text) <= limit:
+        return text
+    return f"{text[: max(0, limit - 3)]}..."
+
+
+def _format_cloudflare_entries(raw):
+    if raw is None:
+        return ""
+    if isinstance(raw, str):
+        return raw.strip()
+    if isinstance(raw, dict):
+        code = raw.get("code")
+        message = (
+            raw.get("message")
+            or raw.get("error")
+            or raw.get("description")
+        )
+        if code is not None and message:
+            return f"{code}: {message}"
+        if message:
+            return str(message)
+        return json.dumps(raw, ensure_ascii=False)
+    if isinstance(raw, list):
+        items = []
+        for entry in raw[:5]:
+            item_text = _format_cloudflare_entries(entry)
+            if item_text:
+                items.append(item_text)
+        return " | ".join(items)
+    return str(raw)
+
+
+def _build_radar_error_message(payload, text, status_code):
+    parts = []
+    if isinstance(payload, dict):
+        errors_text = _format_cloudflare_entries(payload.get("errors"))
+        messages_text = _format_cloudflare_entries(payload.get("messages"))
+        if errors_text:
+            parts.append(f"errors={errors_text}")
+        if messages_text:
+            parts.append(f"messages={messages_text}")
+    if parts:
+        return _truncate_text("; ".join(parts), limit=500)
+    if text:
+        return _truncate_text(text, limit=500)
+    if status_code is not None:
+        return f"HTTP {status_code}"
+    return "respuesta invalida"
+
+
 def _fetch_once(url, token, timeout_seconds):
     headers = {
         "Authorization": f"Bearer {token}",
         "Accept": "application/json",
     }
-    started = datetime.utcnow()
+    started = _utcnow()
     try:
         response = requests.get(url, headers=headers, timeout=timeout_seconds)
         text = response.text or ""
@@ -119,20 +178,13 @@ def _fetch_once(url, token, timeout_seconds):
             payload = None
 
         success_flag = True
-        errors = None
         if isinstance(payload, dict) and "success" in payload:
             success_flag = bool(payload.get("success"))
-            errors = payload.get("errors")
 
         ok = response.ok and success_flag and isinstance(payload, dict)
         error_message = None
         if not ok:
-            if errors:
-                error_message = str(errors)
-            elif text:
-                error_message = text[:400]
-            else:
-                error_message = f"HTTP {response.status_code}"
+            error_message = _build_radar_error_message(payload, text, response.status_code)
 
         return {
             "ok": ok,
@@ -140,7 +192,7 @@ def _fetch_once(url, token, timeout_seconds):
             "payload": payload,
             "error": error_message,
             "started_at": started,
-            "finished_at": datetime.utcnow(),
+            "finished_at": _utcnow(),
         }
     except Exception as exc:
         return {
@@ -149,7 +201,7 @@ def _fetch_once(url, token, timeout_seconds):
             "payload": None,
             "error": str(exc),
             "started_at": started,
-            "finished_at": datetime.utcnow(),
+            "finished_at": _utcnow(),
         }
 
 
@@ -201,20 +253,17 @@ def _fetch_radar_json(url, token, timeout_seconds):
             payload = None
 
         success_flag = True
-        errors = None
         if isinstance(payload, dict) and "success" in payload:
             success_flag = bool(payload.get("success"))
-            errors = payload.get("errors")
 
         ok = response.ok and success_flag and isinstance(payload, dict)
         error_message = None
         if not ok:
-            if errors:
-                error_message = str(errors)
-            elif response.text:
-                error_message = (response.text or "")[:400]
-            else:
-                error_message = f"HTTP {response.status_code}"
+            error_message = _build_radar_error_message(
+                payload,
+                response.text or "",
+                response.status_code,
+            )
 
         return {
             "ok": ok,
@@ -517,7 +566,7 @@ def _dedupe_and_sort_alerts(alerts):
 
 def _fetch_radar_enrichment(base_url, token, timeout_seconds):
     output = {
-        "fetched_at_utc": serialize_snapshot_time(datetime.utcnow()),
+        "fetched_at_utc": serialize_snapshot_time(_utcnow()),
         "api_base_url": _radar_base_url(base_url),
         "audience": {
             "available": False,
@@ -764,7 +813,7 @@ def _upsert_snapshot(run, best_payloads_by_province):
     snapshot = ConnectivitySnapshot(
         ingestion_run_id=run.id,
         observed_at_utc=observed_at,
-        fetched_at_utc=datetime.utcnow(),
+        fetched_at_utc=_utcnow(),
         traffic_value=traffic_value,
         baseline_value=baseline_value,
         score=score,
@@ -815,7 +864,7 @@ def run_ingestion(single_call=False, scheduled_for=None):
 
         run = ConnectivityIngestionRun(
             scheduled_for_utc=scheduled_for,
-            started_at_utc=datetime.utcnow(),
+            started_at_utc=_utcnow(),
             status="running",
             attempt_count=0,
             api_url=api_url,
@@ -865,9 +914,13 @@ def run_ingestion(single_call=False, scheduled_for=None):
             all_errors = []
             for round_attempts in attempt_rounds:
                 for province, attempt in round_attempts.items():
-                    all_errors.append(f"{province}: {attempt.get('error') or 'respuesta invalida'}")
+                    status_code = attempt.get("status_code")
+                    all_errors.append(
+                        f"{province}: HTTP {status_code if status_code is not None else '-'} - "
+                        f"{attempt.get('error') or 'respuesta invalida'}"
+                    )
             run.error_message = "; ".join(all_errors)[:1200]
-            run.finished_at_utc = datetime.utcnow()
+            run.finished_at_utc = _utcnow()
             run.payload_json = json.dumps(
                 {
                     "mode": "province_geoid_v1",
@@ -894,7 +947,7 @@ def run_ingestion(single_call=False, scheduled_for=None):
         )
         payload_record = {
             "mode": "province_geoid_v1",
-            "generated_at_utc": serialize_snapshot_time(datetime.utcnow()),
+            "generated_at_utc": serialize_snapshot_time(_utcnow()),
             "provinces": {
                 province: {
                     "geo_id": details.get("geo_id"),
@@ -911,14 +964,14 @@ def run_ingestion(single_call=False, scheduled_for=None):
         if snapshot_error:
             run.status = "failed"
             run.error_message = snapshot_error
-            run.finished_at_utc = datetime.utcnow()
+            run.finished_at_utc = _utcnow()
             run.payload_json = json.dumps(payload_record, ensure_ascii=False)
             db.session.commit()
             raise RuntimeError(snapshot_error)
 
         run.status = "success"
         run.error_message = None
-        run.finished_at_utc = datetime.utcnow()
+        run.finished_at_utc = _utcnow()
         run.payload_json = json.dumps(payload_record, ensure_ascii=False)
         db.session.commit()
 
