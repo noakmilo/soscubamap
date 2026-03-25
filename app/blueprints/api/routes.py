@@ -2070,6 +2070,20 @@ def repressor_stats_v1():
     )
 
 
+def _approved_repressor_ids_subquery():
+    return (
+        db.session.query(
+            RepressorResidenceReport.repressor_id.label("repressor_id"),
+        )
+        .filter(
+            RepressorResidenceReport.status == "approved",
+            RepressorResidenceReport.repressor_id.isnot(None),
+        )
+        .distinct()
+        .subquery()
+    )
+
+
 @api_bp.route("/v1/repressors/map-layer")
 @limiter.limit("120/minute")
 def repressor_map_layer_v1():
@@ -2122,17 +2136,7 @@ def repressor_map_layer_v1():
             }
         )
 
-    approved_repressor_ids_subquery = (
-        db.session.query(
-            RepressorResidenceReport.repressor_id.label("repressor_id"),
-        )
-        .filter(
-            RepressorResidenceReport.status == "approved",
-            RepressorResidenceReport.repressor_id.isnot(None),
-        )
-        .distinct()
-        .subquery()
-    )
+    approved_repressor_ids_subquery = _approved_repressor_ids_subquery()
 
     unresolved_rows = (
         db.session.query(
@@ -2240,6 +2244,99 @@ def repressor_map_layer_v1():
                 "confirmed_residences_points": len(confirmed_residences),
                 "unresolved_territories_points": len(unresolved_territories),
             },
+        }
+    )
+
+
+@api_bp.route("/v1/repressors/unresolved-territory")
+@limiter.limit("120/minute")
+def unresolved_repressors_territory_v1():
+    scope = (request.args.get("scope") or "").strip().lower()
+    province = (request.args.get("province") or "").strip()
+    municipality = (request.args.get("municipality") or "").strip()
+
+    if scope not in {"province", "municipality"}:
+        return (
+            jsonify({"ok": False, "error": "scope inválido. Usa 'province' o 'municipality'."}),
+            400,
+        )
+
+    canonical_province, canonical_municipality = canonicalize_location_names(
+        province,
+        municipality,
+    )
+    if not canonical_province:
+        return jsonify({"ok": False, "error": "province es obligatorio."}), 400
+    if scope == "municipality" and not canonical_municipality:
+        return jsonify({"ok": False, "error": "municipality es obligatorio para scope=municipality."}), 400
+
+    approved_repressor_ids_subquery = _approved_repressor_ids_subquery()
+    query = (
+        Repressor.query.options(
+            selectinload(Repressor.types),
+        )
+        .outerjoin(
+            approved_repressor_ids_subquery,
+            approved_repressor_ids_subquery.c.repressor_id == Repressor.id,
+        )
+        .filter(approved_repressor_ids_subquery.c.repressor_id.is_(None))
+    )
+
+    if scope == "municipality":
+        query = query.filter(
+            Repressor.province_name == canonical_province,
+            Repressor.municipality_name == canonical_municipality,
+        )
+    else:
+        query = query.filter(
+            Repressor.province_name == canonical_province,
+            or_(Repressor.municipality_name.is_(None), Repressor.municipality_name == ""),
+        )
+
+    rows = (
+        query.order_by(
+            Repressor.lastname.asc(),
+            Repressor.name.asc(),
+            Repressor.id.asc(),
+        )
+        .all()
+    )
+
+    items = []
+    for repressor in rows:
+        type_names = [
+            str(item.name or "").strip()
+            for item in (repressor.types or [])
+            if str(item.name or "").strip()
+        ]
+        items.append(
+            {
+                "id": repressor.id,
+                "external_id": repressor.external_id,
+                "full_name": repressor.full_name,
+                "nickname": repressor.nickname,
+                "province_name": repressor.province_name,
+                "municipality_name": repressor.municipality_name,
+                "image_url": repressor.image_url,
+                "type_names": type_names,
+            }
+        )
+
+    territory_label = (
+        f"{canonical_province} · {canonical_municipality}"
+        if scope == "municipality"
+        else canonical_province
+    )
+
+    return jsonify(
+        {
+            "ok": True,
+            "scope": scope,
+            "province": canonical_province,
+            "municipality": canonical_municipality if scope == "municipality" else None,
+            "territory_label": territory_label,
+            "count": len(items),
+            "items": items,
         }
     )
 

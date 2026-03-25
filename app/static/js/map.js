@@ -40,6 +40,8 @@ let repressorLayerGroup;
 let repressorLastPayload = null;
 let repressorOverlay;
 let repressorSummary;
+let repressorDetailPanel;
+let repressorDetailRequestSeq = 0;
 let protestLayerGroup;
 let protestRefreshTimer;
 let protestRefreshPromise;
@@ -161,6 +163,7 @@ const PROTEST_EVENT_COLORS = {
 };
 const REPRESSOR_CONFIRMED_COLOR = "#16a34a";
 const REPRESSOR_UNRESOLVED_COLOR = "#dc2626";
+const repressorUnresolvedDetailCache = new Map();
 const MAP_POPUP_OPTIONS = {
   maxWidth: 320,
   maxHeight: 320,
@@ -2294,11 +2297,7 @@ function confirmedResidencePopupHtml(item) {
 
 function unresolvedTerritoryPopupHtml(item) {
   const count = Math.max(0, Number(item?.count) || 0);
-  const province = escapeHtml(item?.province || "N/D");
-  const municipality = escapeHtml(item?.municipality || "");
-  const scope = String(item?.scope || "").trim().toLowerCase();
-  const territory =
-    scope === "municipality" && municipality ? `${province} · ${municipality}` : province;
+  const territory = escapeHtml(repressorTerritoryLabel(item));
   const label =
     count === 1
       ? "1 represor sin localizar en este territorio."
@@ -2310,6 +2309,166 @@ function unresolvedTerritoryPopupHtml(item) {
       <div class="repressor-popup-meta">${label}</div>
     </div>
   `;
+}
+
+function repressorTerritoryLabel(item) {
+  const province = String(item?.province || "").trim();
+  const municipality = String(item?.municipality || "").trim();
+  const scope = String(item?.scope || "").trim().toLowerCase();
+  if (scope === "municipality" && province && municipality) {
+    return `${province} · ${municipality}`;
+  }
+  return province || "Territorio sin nombre";
+}
+
+function normalizeRepressorTerritoryRequest(item) {
+  const scope = String(item?.scope || "").trim().toLowerCase();
+  const province = String(item?.province || "").trim();
+  const municipality = String(item?.municipality || "").trim();
+  if (!["province", "municipality"].includes(scope)) return null;
+  if (!province) return null;
+  if (scope === "municipality" && !municipality) return null;
+  const key = `${scope}|${province.toLowerCase()}|${municipality.toLowerCase()}`;
+  return { scope, province, municipality, key };
+}
+
+function renderRepressorTerritoryDetailEmpty(message = "") {
+  if (!repressorDetailPanel) return;
+  const text =
+    message || "Haz clic en un contador rojo para ver la lista de represores sin localizar.";
+  repressorDetailPanel.innerHTML = `<div class="repressor-detail-empty">${escapeHtml(text)}</div>`;
+}
+
+function renderRepressorTerritoryDetailLoading(territoryLabel) {
+  if (!repressorDetailPanel) return;
+  repressorDetailPanel.innerHTML = `
+    <div class="repressor-detail-headline">
+      <div class="repressor-detail-territory">${escapeHtml(territoryLabel)}</div>
+      <div class="repressor-detail-count">Cargando represores sin localizar...</div>
+    </div>
+  `;
+}
+
+function renderRepressorTerritoryDetail(item, payload) {
+  if (!repressorDetailPanel) return;
+  const territoryLabel = String(payload?.territory_label || repressorTerritoryLabel(item) || "").trim();
+  const entries = Array.isArray(payload?.items) ? payload.items : [];
+  const count = Math.max(0, Number(payload?.count) || entries.length);
+  const countLabel =
+    count === 1
+      ? "1 represor sin localizar"
+      : `${count.toLocaleString("es-ES")} represores sin localizar`;
+
+  if (!entries.length) {
+    repressorDetailPanel.innerHTML = `
+      <div class="repressor-detail-headline">
+        <div class="repressor-detail-territory">${escapeHtml(territoryLabel || "Territorio")}</div>
+        <div class="repressor-detail-count">${countLabel}</div>
+      </div>
+      <div class="repressor-detail-empty">No hay represores pendientes de localizar para este territorio.</div>
+    `;
+    return;
+  }
+
+  const cardsHtml = entries
+    .map((entry) => {
+      const repressorId = Number(entry?.id);
+      if (!Number.isFinite(repressorId) || repressorId <= 0) return "";
+      const fullName = escapeHtml(entry?.full_name || "Represor");
+      const nickname = String(entry?.nickname || "").trim();
+      const externalId = Number(entry?.external_id);
+      const imageUrl = safeUrl(entry?.image_url || "");
+      const typeNames = Array.isArray(entry?.type_names)
+        ? entry.type_names
+            .filter((name) => String(name || "").trim())
+            .map((name) => escapeHtml(name))
+        : [];
+      const metadata = [];
+      if (Number.isFinite(externalId) && externalId > 0) {
+        metadata.push(`Ficha #${externalId}`);
+      }
+      if (nickname) {
+        metadata.push(`Seudónimo: ${escapeHtml(nickname)}`);
+      }
+      if (typeNames.length) {
+        metadata.push(`Tipo: ${typeNames.slice(0, 2).join(", ")}${typeNames.length > 2 ? "..." : ""}`);
+      }
+      const detailUrl = `/represores/${repressorId}`;
+      const editUrl = `/represores/${repressorId}/editar`;
+      const residenceUrl = `/represores/${repressorId}/reportar-residencia`;
+      return `
+        <article class="repressor-detail-card">
+          <div class="repressor-detail-head">
+            ${
+              imageUrl
+                ? `<img src="${imageUrl}" alt="${fullName}" class="repressor-detail-avatar" />`
+                : '<div class="repressor-detail-avatar repressor-detail-avatar-empty" aria-hidden="true">?</div>'
+            }
+            <div class="repressor-detail-identity">
+              <div class="repressor-detail-name">${fullName}</div>
+              <div class="repressor-detail-meta">${metadata.join(" · ") || "Sin metadatos adicionales"}</div>
+            </div>
+          </div>
+          <div class="repressor-detail-actions">
+            <a class="info-btn info-btn-outline" href="${detailUrl}">Ver ficha</a>
+            <a class="info-btn info-btn-outline" href="${editUrl}">Editar ficha</a>
+            <a class="info-btn" href="${residenceUrl}">Identificar vivienda</a>
+          </div>
+        </article>
+      `;
+    })
+    .filter(Boolean)
+    .join("");
+
+  repressorDetailPanel.innerHTML = `
+    <div class="repressor-detail-headline">
+      <div class="repressor-detail-territory">${escapeHtml(territoryLabel || "Territorio")}</div>
+      <div class="repressor-detail-count">${countLabel}</div>
+    </div>
+    <div class="repressor-detail-list">${cardsHtml}</div>
+  `;
+}
+
+async function fetchRepressorTerritoryDetail(item) {
+  const requestData = normalizeRepressorTerritoryRequest(item);
+  if (!requestData) {
+    renderRepressorTerritoryDetailEmpty("No se pudo determinar el territorio seleccionado.");
+    return;
+  }
+  const territoryLabel = repressorTerritoryLabel(requestData);
+  const cached = repressorUnresolvedDetailCache.get(requestData.key);
+  if (cached) {
+    renderRepressorTerritoryDetail(requestData, cached);
+    return;
+  }
+
+  const requestSeq = ++repressorDetailRequestSeq;
+  renderRepressorTerritoryDetailLoading(territoryLabel);
+  const params = new URLSearchParams({
+    scope: requestData.scope,
+    province: requestData.province,
+  });
+  if (requestData.scope === "municipality") {
+    params.set("municipality", requestData.municipality);
+  }
+
+  try {
+    const response = await fetch(`/api/v1/repressors/unresolved-territory?${params.toString()}`, {
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      throw new Error("No se pudo cargar el detalle del territorio.");
+    }
+    const payload = await response.json();
+    if (requestSeq !== repressorDetailRequestSeq) return;
+    repressorUnresolvedDetailCache.set(requestData.key, payload);
+    renderRepressorTerritoryDetail(requestData, payload);
+  } catch (_error) {
+    if (requestSeq !== repressorDetailRequestSeq) return;
+    renderRepressorTerritoryDetailEmpty(
+      `No fue posible cargar la lista para ${territoryLabel}. Intenta nuevamente.`
+    );
+  }
 }
 
 function renderRepressorSummary(payload, errorText = "") {
@@ -2372,6 +2531,7 @@ function renderRepressorLayer(payload) {
     marker.bindPopup(unresolvedTerritoryPopupHtml(item), MAP_POPUP_OPTIONS);
     marker.on("click", () => {
       ensureContextPanelVisible({ mobileState: "full" });
+      fetchRepressorTerritoryDetail(item);
     });
     marker.addTo(repressorLayerGroup);
   });
@@ -2392,6 +2552,7 @@ async function refreshRepressorLayer() {
   try {
     const payload = await fetchRepressorLayerData();
     repressorLastPayload = payload;
+    repressorUnresolvedDetailCache.clear();
     renderRepressorLayer(payload);
     renderRepressorSummary(payload);
   } catch (_error) {
@@ -2407,6 +2568,8 @@ async function refreshRepressorLayer() {
 
 async function enableRepressorMode() {
   activeBaseMode = "repressors";
+  repressorDetailRequestSeq += 1;
+  renderRepressorTerritoryDetailEmpty();
   clearMarkers();
   closeActivePopup();
   renderReportDetail(null);
@@ -2423,6 +2586,9 @@ async function enableRepressorMode() {
 function disableRepressorMode() {
   if (activeBaseMode !== "repressors") return;
   activeBaseMode = "map";
+  repressorDetailRequestSeq += 1;
+  repressorUnresolvedDetailCache.clear();
+  renderRepressorTerritoryDetailEmpty();
   clearRepressorLayer();
   repressorLastPayload = null;
   setRepressorOverlayVisible(false);
@@ -3549,11 +3715,13 @@ async function initMap() {
   protestDetailPanel = document.getElementById("protestDetailPanel");
   repressorOverlay = document.getElementById("repressorOverlay");
   repressorSummary = document.getElementById("repressorSummary");
+  repressorDetailPanel = document.getElementById("repressorDetailPanel");
   reportDetailPanel = document.getElementById("reportDetailPanel");
   setActiveConnectivityWindow(connectivityWindowHours);
   renderReportDetail(null);
   renderConnectivityRegionChart(null);
   renderProtestDetail(null);
+  renderRepressorTerritoryDetailEmpty();
   setReportDetailVisible(true);
   setProtestOverlayVisible(false);
   setRepressorOverlayVisible(false);

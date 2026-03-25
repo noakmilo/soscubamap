@@ -1853,6 +1853,8 @@ def _has_repressor_changes(
     form_data: dict[str, Any],
     crimes: list[str],
     types: list[str],
+    *,
+    new_photo_selected: bool = False,
 ) -> bool:
     current_province, current_municipality = canonicalize_location_names(
         repressor.province_name,
@@ -1879,6 +1881,8 @@ def _has_repressor_changes(
         return True
     if (repressor.testimony or "") != (form_data.get("testimony") or ""):
         return True
+    if new_photo_selected:
+        return True
 
     current_crimes = sorted([item.name for item in repressor.crimes if item.name])
     current_types = sorted([item.name for item in repressor.types if item.name])
@@ -1903,6 +1907,11 @@ def _handle_repressor_edit_form(repressor_id: int, edit_kind: str):
     allowed_type_names = get_repressor_type_names()
     existing_crime_names = list_existing_repressor_crime_names()
     existing_crime_name_set = set(existing_crime_names)
+    cloudinary_enabled = bool(
+        (current_app.config.get("CLOUDINARY_CLOUD_NAME") or "").strip()
+        and (current_app.config.get("CLOUDINARY_API_KEY") or "").strip()
+        and (current_app.config.get("CLOUDINARY_API_SECRET") or "").strip()
+    )
     errors = {}
     form_data = _repressor_form_defaults(repressor)
     is_report_mode = edit_kind == "report"
@@ -1910,6 +1919,11 @@ def _handle_repressor_edit_form(repressor_id: int, edit_kind: str):
     if request.method == "POST":
         selected_crime_names = normalize_list_items(request.form.getlist("crime_names[]"))
         selected_type_names = normalize_list_items(request.form.getlist("type_names[]"))
+        photo_files = [
+            file
+            for file in request.files.getlist("photo")
+            if file and (file.filename or "").strip()
+        ]
         custom_crimes_text = request.form.get("custom_crimes", "").strip()
         form_data = {
             "name": request.form.get("name", "").strip(),
@@ -1959,6 +1973,14 @@ def _handle_repressor_edit_form(repressor_id: int, edit_kind: str):
             errors["note"] = "La nota no puede exceder 4000 caracteres."
         if len(form_data["testimony"]) > 12000:
             errors["testimony"] = "El testimonio no puede exceder 12000 caracteres."
+        if len(photo_files) > 1:
+            errors["photo"] = "Solo puedes subir una foto por envío."
+        elif photo_files and not cloudinary_enabled:
+            errors["photo"] = "Subida de imagen no disponible: falta configuración de Cloudinary."
+        elif photo_files:
+            ok, error = validate_files(photo_files)
+            if not ok:
+                errors["photo"] = error
 
         if not form_data["name"]:
             errors["name"] = "El nombre es obligatorio."
@@ -1990,9 +2012,21 @@ def _handle_repressor_edit_form(repressor_id: int, edit_kind: str):
             form_data=form_data,
             crimes=all_crime_names,
             types=filtered_selected_types,
+            new_photo_selected=bool(photo_files),
         )
         if not has_changes and not is_report_mode:
             errors["form"] = "No se detectaron cambios en la ficha."
+
+        uploaded_photo_url = None
+        if not errors and photo_files:
+            try:
+                uploaded_urls = upload_files(photo_files)
+                uploaded_photo_url = uploaded_urls[0] if uploaded_urls else None
+            except Exception:
+                current_app.logger.exception("Error al subir foto de edición de represor")
+                errors["photo"] = "No se pudo subir la foto a Cloudinary."
+            if not uploaded_photo_url and "photo" not in errors:
+                errors["photo"] = "No se pudo subir la foto a Cloudinary."
 
         if not errors:
             try:
@@ -2017,7 +2051,7 @@ def _handle_repressor_edit_form(repressor_id: int, edit_kind: str):
                     province_name=form_data["province_name"] or None,
                     municipality_name=form_data["municipality_name"] or None,
                     testimony=form_data["testimony"] or None,
-                    image_url=repressor.image_url,
+                    image_url=uploaded_photo_url or repressor.image_url,
                     crimes_json=json.dumps(all_crime_names, ensure_ascii=False),
                     types_json=json.dumps(filtered_selected_types, ensure_ascii=False),
                     payload_json=json.dumps(
@@ -2026,6 +2060,7 @@ def _handle_repressor_edit_form(repressor_id: int, edit_kind: str):
                             "selected_crimes": filtered_selected_crimes,
                             "selected_types": filtered_selected_types,
                             "source": "community_repressor_edit",
+                            "photo_replaced": bool(uploaded_photo_url),
                         },
                         ensure_ascii=False,
                     ),

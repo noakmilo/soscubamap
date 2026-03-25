@@ -24,7 +24,34 @@
     <div class="flash error">{{ errors.get("form") }}</div>
   {% endif %}
 
-  <form method="post" class="form-grid" id="editRepressorForm">
+  <form method="post" class="form-grid" id="editRepressorForm" enctype="multipart/form-data">
+    <label>
+      Foto actual
+      {% if repressor.image_url %}
+        <div class="history-media">
+          <img src="{{ repressor.image_url }}" alt="{{ repressor.full_name }}" />
+        </div>
+      {% else %}
+        <div class="muted">Sin foto registrada actualmente.</div>
+      {% endif %}
+    </label>
+
+    <label>
+      Nueva foto (opcional)
+      <input
+        type="file"
+        name="photo"
+        accept=".jpg,.jpeg,.png,.webp,.heic,image/heic,image/heif"
+        class="{{ 'field-error' if errors.get('photo') else '' }}"
+      />
+      <div class="muted">
+        Si subes una foto, la propuesta reemplazará la imagen actual al aprobarse.
+      </div>
+      {% if errors.get("photo") %}
+        <div class="field-error-msg">{{ errors.get("photo") }}</div>
+      {% endif %}
+    </label>
+
     <label>
       Motivo de la propuesta *
       <textarea
