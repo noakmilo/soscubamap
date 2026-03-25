@@ -36,6 +36,10 @@ let connectivityRegionChart;
 let connectivityRegionLegend;
 let connectivityRegionNote;
 let connectivityRegionFocused = "";
+let repressorLayerGroup;
+let repressorLastPayload = null;
+let repressorOverlay;
+let repressorSummary;
 let protestLayerGroup;
 let protestRefreshTimer;
 let protestRefreshPromise;
@@ -155,6 +159,8 @@ const PROTEST_EVENT_COLORS = {
   unresolved_location: "#d97706",
   context_only: "#64748b",
 };
+const REPRESSOR_CONFIRMED_COLOR = "#16a34a";
+const REPRESSOR_UNRESOLVED_COLOR = "#dc2626";
 const MAP_POPUP_OPTIONS = {
   maxWidth: 320,
   maxHeight: 320,
@@ -192,6 +198,10 @@ function buildMainBaseLayers(provider) {
       type: "roadmap",
       maxZoom: 20,
     });
+    const repressorLayer = L.gridLayer.googleMutant({
+      type: "roadmap",
+      maxZoom: 20,
+    });
     const protestLayer = L.gridLayer.googleMutant({
       type: "roadmap",
       maxZoom: 20,
@@ -202,6 +212,7 @@ function buildMainBaseLayers(provider) {
       satelliteLayer,
       satelliteLabelsLayer: null,
       connectivityBaseLayer: connectivityLayer,
+      repressorBaseLayer: repressorLayer,
       protestBaseLayer: protestLayer,
     };
   }
@@ -230,6 +241,10 @@ function buildMainBaseLayers(provider) {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19,
   });
+  const repressorBaseLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19,
+  });
   const protestBaseLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19,
@@ -240,6 +255,7 @@ function buildMainBaseLayers(provider) {
     satelliteLayer,
     satelliteLabelsLayer,
     connectivityBaseLayer,
+    repressorBaseLayer,
     protestBaseLayer,
   };
 }
@@ -758,6 +774,7 @@ async function ensureMapModeForReportFocus() {
     satelliteLayer,
     satelliteLabelsLayer,
     connectivityBaseLayer,
+    repressorBaseLayer,
     protestBaseLayer,
   } = mainBaseLayers;
 
@@ -767,8 +784,11 @@ async function ensureMapModeForReportFocus() {
   if (activeBaseMode === "protests") {
     disableProtestMode();
   }
+  if (activeBaseMode === "repressors") {
+    disableRepressorMode();
+  }
 
-  [satelliteLayer, connectivityBaseLayer, protestBaseLayer].forEach((layer) => {
+  [satelliteLayer, connectivityBaseLayer, repressorBaseLayer, protestBaseLayer].forEach((layer) => {
     if (layer && map.hasLayer(layer)) {
       map.removeLayer(layer);
     }
@@ -787,6 +807,7 @@ async function ensureMapModeForReportFocus() {
   setReportDetailVisible(true);
   setConnectivityLegendVisible(false);
   setProtestOverlayVisible(false);
+  setRepressorOverlayVisible(false);
   await applyFilters();
 }
 
@@ -813,6 +834,11 @@ function setConnectivityLegendVisible(visible) {
 function setProtestOverlayVisible(visible) {
   if (!protestOverlay) return;
   protestOverlay.hidden = !visible;
+}
+
+function setRepressorOverlayVisible(visible) {
+  if (!repressorOverlay) return;
+  repressorOverlay.hidden = !visible;
 }
 
 function setActiveConnectivityWindow(hours) {
@@ -1684,11 +1710,18 @@ function updateLegendCounts(posts) {
 
 window.handleNewReport = function (payload) {
   if (!payload || !map) return;
-  if (activeBaseMode === "connectivity" || activeBaseMode === "protests") {
+  if (
+    activeBaseMode === "connectivity" ||
+    activeBaseMode === "protests" ||
+    activeBaseMode === "repressors"
+  ) {
     if (Array.isArray(allPosts) && payload.status === "approved") {
       allPosts.unshift(payload);
     }
     updateLegendCounts(allPosts);
+    if (activeBaseMode === "repressors") {
+      refreshRepressorLayer();
+    }
     refreshAlerts();
     return;
   }
@@ -2167,6 +2200,7 @@ async function enableConnectivityMode() {
   setReportDetailVisible(false);
   setConnectivityLegendVisible(true);
   setProtestOverlayVisible(false);
+  setRepressorOverlayVisible(false);
   ensureContextPanelVisible({ mobileState: "mid" });
   await refreshConnectivityLayer();
   startConnectivityPolling();
@@ -2184,12 +2218,217 @@ function disableConnectivityMode() {
   selectedConnectivityProvinceState = null;
   connectivityRegionFocused = "";
   setConnectivityLegendVisible(false);
+  setRepressorOverlayVisible(false);
   setReportLegendVisible(true);
   setReportDetailVisible(true);
   setMapHintVisible(true);
   updateConnectivityTrafficPanel(null);
   renderConnectivityProvincePanel(null);
   renderConnectivityRegionChart(null);
+}
+
+function clearRepressorLayer() {
+  if (repressorLayerGroup && map) {
+    map.removeLayer(repressorLayerGroup);
+  }
+  repressorLayerGroup = null;
+}
+
+function buildRepressorUnresolvedIcon(count) {
+  const numeric = Math.max(1, Number(count) || 0);
+  const label = numeric > 999 ? "999+" : String(numeric);
+  return L.divIcon({
+    className: "repressor-unresolved-marker-wrap",
+    html: `<span class="repressor-unresolved-marker" style="background:${REPRESSOR_UNRESOLVED_COLOR};">${escapeHtml(
+      label
+    )}</span>`,
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+    popupAnchor: [0, -18],
+  });
+}
+
+function confirmedResidencePopupHtml(item) {
+  const repressorName = escapeHtml(item?.repressor_name || "Represor");
+  const province = escapeHtml(item?.province || "N/D");
+  const municipality = escapeHtml(item?.municipality || "N/D");
+  const address = escapeHtml(item?.address || "");
+  const imageUrl = safeUrl(item?.repressor_image_url || "");
+  const typeNames = Array.isArray(item?.repressor_type_names)
+    ? item.repressor_type_names.filter(Boolean).map((name) => escapeHtml(name))
+    : [];
+  const repressorId = Number(item?.repressor_id);
+  const detailUrl = Number.isFinite(repressorId) && repressorId > 0 ? `/represores/${repressorId}` : "";
+  const rawMessage = String(item?.message || "").trim();
+  const shortMessage =
+    rawMessage.length > 220 ? `${rawMessage.slice(0, 217).trimEnd()}...` : rawMessage;
+
+  return `
+    <div class="repressor-popup">
+      ${
+        imageUrl
+          ? `<img src="${imageUrl}" alt="${repressorName}" class="repressor-popup-image" />`
+          : ""
+      }
+      <div class="repressor-popup-title">${repressorName}</div>
+      ${
+        typeNames.length
+          ? `<div class="repressor-popup-meta">Tipo: ${typeNames.join(", ")}</div>`
+          : ""
+      }
+      <div class="repressor-popup-meta">Vivienda confirmada: ${province} · ${municipality}</div>
+      ${address ? `<div class="repressor-popup-meta">Dirección: ${address}</div>` : ""}
+      ${
+        shortMessage
+          ? `<div class="repressor-popup-meta">Nota: ${escapeHtml(shortMessage)}</div>`
+          : ""
+      }
+      ${
+        detailUrl
+          ? `<a class="repressor-popup-link" href="${detailUrl}">Ver ficha del represor</a>`
+          : ""
+      }
+    </div>
+  `;
+}
+
+function unresolvedTerritoryPopupHtml(item) {
+  const count = Math.max(0, Number(item?.count) || 0);
+  const province = escapeHtml(item?.province || "N/D");
+  const municipality = escapeHtml(item?.municipality || "");
+  const scope = String(item?.scope || "").trim().toLowerCase();
+  const territory =
+    scope === "municipality" && municipality ? `${province} · ${municipality}` : province;
+  const label =
+    count === 1
+      ? "1 represor sin localizar en este territorio."
+      : `${count.toLocaleString("es-ES")} represores sin localizar en este territorio.`;
+
+  return `
+    <div class="repressor-popup">
+      <div class="repressor-popup-title">${territory}</div>
+      <div class="repressor-popup-meta">${label}</div>
+    </div>
+  `;
+}
+
+function renderRepressorSummary(payload, errorText = "") {
+  if (!repressorSummary) return;
+  if (errorText) {
+    repressorSummary.textContent = errorText;
+    return;
+  }
+  const summary = payload?.summary || {};
+  const confirmed = Number(summary.confirmed_residences_points) || 0;
+  const unresolved = Number(summary.unresolved_territories_points) || 0;
+  const unresolvedPeople = Number(summary.without_confirmed_residence) || 0;
+  const withoutTerritory = Number(summary.without_territory_reference) || 0;
+  repressorSummary.textContent = `Viviendas confirmadas: ${confirmed.toLocaleString(
+    "es-ES"
+  )} · Territorios sin localizar: ${unresolved.toLocaleString(
+    "es-ES"
+  )} · Represores sin localizar: ${unresolvedPeople.toLocaleString("es-ES")} · Sin territorio: ${withoutTerritory.toLocaleString(
+    "es-ES"
+  )}.`;
+}
+
+function renderRepressorLayer(payload) {
+  if (!map) return;
+  clearRepressorLayer();
+  repressorLayerGroup = L.layerGroup();
+
+  const confirmedItems = Array.isArray(payload?.confirmed_residences)
+    ? payload.confirmed_residences
+    : [];
+  confirmedItems.forEach((item) => {
+    const lat = Number(item?.latitude);
+    const lng = Number(item?.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const marker = L.circleMarker([lat, lng], {
+      radius: 6,
+      color: "#f8fafc",
+      weight: 1.4,
+      fillColor: REPRESSOR_CONFIRMED_COLOR,
+      fillOpacity: 0.9,
+    });
+    marker.bindPopup(confirmedResidencePopupHtml(item), MAP_POPUP_OPTIONS);
+    marker.on("click", () => {
+      ensureContextPanelVisible({ mobileState: "full" });
+    });
+    marker.addTo(repressorLayerGroup);
+  });
+
+  const unresolvedItems = Array.isArray(payload?.unresolved_territories)
+    ? payload.unresolved_territories
+    : [];
+  unresolvedItems.forEach((item) => {
+    const lat = Number(item?.latitude);
+    const lng = Number(item?.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const marker = L.marker([lat, lng], {
+      icon: buildRepressorUnresolvedIcon(item?.count),
+      title: `Sin localizar: ${Number(item?.count) || 0}`,
+    });
+    marker.bindPopup(unresolvedTerritoryPopupHtml(item), MAP_POPUP_OPTIONS);
+    marker.on("click", () => {
+      ensureContextPanelVisible({ mobileState: "full" });
+    });
+    marker.addTo(repressorLayerGroup);
+  });
+
+  repressorLayerGroup.addTo(map);
+}
+
+async function fetchRepressorLayerData() {
+  const response = await fetch("/api/v1/repressors/map-layer", { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error("No se pudo cargar la capa de represores");
+  }
+  return await response.json();
+}
+
+async function refreshRepressorLayer() {
+  if (activeBaseMode !== "repressors") return;
+  try {
+    const payload = await fetchRepressorLayerData();
+    repressorLastPayload = payload;
+    renderRepressorLayer(payload);
+    renderRepressorSummary(payload);
+  } catch (_error) {
+    if (!repressorLastPayload) {
+      clearRepressorLayer();
+    }
+    renderRepressorSummary(
+      repressorLastPayload,
+      "No fue posible actualizar la capa de represores."
+    );
+  }
+}
+
+async function enableRepressorMode() {
+  activeBaseMode = "repressors";
+  clearMarkers();
+  closeActivePopup();
+  renderReportDetail(null);
+  setMapHintVisible(false);
+  setReportLegendVisible(false);
+  setReportDetailVisible(false);
+  setConnectivityLegendVisible(false);
+  setProtestOverlayVisible(false);
+  setRepressorOverlayVisible(true);
+  ensureContextPanelVisible({ mobileState: "mid" });
+  await refreshRepressorLayer();
+}
+
+function disableRepressorMode() {
+  if (activeBaseMode !== "repressors") return;
+  activeBaseMode = "map";
+  clearRepressorLayer();
+  repressorLastPayload = null;
+  setRepressorOverlayVisible(false);
+  setReportLegendVisible(true);
+  setReportDetailVisible(true);
+  setMapHintVisible(true);
 }
 
 function clearProtestLayer() {
@@ -2656,6 +2895,7 @@ async function enableProtestMode() {
   setReportDetailVisible(false);
   setConnectivityLegendVisible(false);
   setProtestOverlayVisible(true);
+  setRepressorOverlayVisible(false);
   ensureContextPanelVisible({ mobileState: "mid" });
   await refreshProtestLayer();
   startProtestPolling();
@@ -2672,6 +2912,7 @@ function disableProtestMode() {
   protestSelectedStartDay = "";
   protestSelectedEndDay = "";
   setProtestOverlayVisible(false);
+  setRepressorOverlayVisible(false);
   setReportLegendVisible(true);
   setReportDetailVisible(true);
   setMapHintVisible(true);
@@ -2679,7 +2920,11 @@ function disableProtestMode() {
 }
 
 async function applyFilters() {
-  if (activeBaseMode === "connectivity" || activeBaseMode === "protests") {
+  if (
+    activeBaseMode === "connectivity" ||
+    activeBaseMode === "protests" ||
+    activeBaseMode === "repressors"
+  ) {
     clearMarkers();
     updateLegendCounts(allPosts);
     return;
@@ -3302,6 +3547,8 @@ async function initMap() {
   protestResetRangeBtn = document.getElementById("protestResetRangeBtn");
   protestSummary = document.getElementById("protestSummary");
   protestDetailPanel = document.getElementById("protestDetailPanel");
+  repressorOverlay = document.getElementById("repressorOverlay");
+  repressorSummary = document.getElementById("repressorSummary");
   reportDetailPanel = document.getElementById("reportDetailPanel");
   setActiveConnectivityWindow(connectivityWindowHours);
   renderReportDetail(null);
@@ -3309,6 +3556,7 @@ async function initMap() {
   renderProtestDetail(null);
   setReportDetailVisible(true);
   setProtestOverlayVisible(false);
+  setRepressorOverlayVisible(false);
 
   const nowUtc = new Date();
   const currentDayUtc = `${nowUtc.getUTCFullYear()}-${String(nowUtc.getUTCMonth() + 1).padStart(
@@ -3410,12 +3658,14 @@ async function initMap() {
   const satelliteLayer = layerSet.satelliteLayer;
   const satelliteLabelsLayer = layerSet.satelliteLabelsLayer;
   const connectivityBaseLayer = layerSet.connectivityBaseLayer;
+  const repressorBaseLayer = layerSet.repressorBaseLayer;
   const protestBaseLayer = layerSet.protestBaseLayer;
   mainBaseLayers = {
     streetsLayer,
     satelliteLayer,
     satelliteLabelsLayer,
     connectivityBaseLayer,
+    repressorBaseLayer,
     protestBaseLayer,
   };
 
@@ -3426,6 +3676,7 @@ async function initMap() {
         Mapa: streetsLayer,
         Satelite: satelliteLayer,
         Conectividad: connectivityBaseLayer,
+        Represores: repressorBaseLayer,
         Protestas: protestBaseLayer,
       },
       {},
@@ -3436,11 +3687,15 @@ async function initMap() {
   setReportLegendVisible(true);
   setConnectivityLegendVisible(false);
   setProtestOverlayVisible(false);
+  setRepressorOverlayVisible(false);
 
   map.on("baselayerchange", (event) => {
     if (event.layer === connectivityBaseLayer) {
       if (activeBaseMode === "protests") {
         disableProtestMode();
+      }
+      if (activeBaseMode === "repressors") {
+        disableRepressorMode();
       }
       if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
         map.removeLayer(satelliteLabelsLayer);
@@ -3449,9 +3704,26 @@ async function initMap() {
       return;
     }
 
+    if (event.layer === repressorBaseLayer) {
+      if (activeBaseMode === "connectivity") {
+        disableConnectivityMode();
+      }
+      if (activeBaseMode === "protests") {
+        disableProtestMode();
+      }
+      if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
+        map.removeLayer(satelliteLabelsLayer);
+      }
+      enableRepressorMode();
+      return;
+    }
+
     if (event.layer === protestBaseLayer) {
       if (activeBaseMode === "connectivity") {
         disableConnectivityMode();
+      }
+      if (activeBaseMode === "repressors") {
+        disableRepressorMode();
       }
       if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
         map.removeLayer(satelliteLabelsLayer);
@@ -3465,6 +3737,9 @@ async function initMap() {
     }
     if (activeBaseMode === "protests") {
       disableProtestMode();
+    }
+    if (activeBaseMode === "repressors") {
+      disableRepressorMode();
     }
 
     activeBaseMode = event.layer === satelliteLayer ? "satellite" : "map";
@@ -3533,7 +3808,11 @@ async function initMap() {
   }
 
   map.on("click", (event) => {
-    if (activeBaseMode === "connectivity" || activeBaseMode === "protests") {
+    if (
+      activeBaseMode === "connectivity" ||
+      activeBaseMode === "protests" ||
+      activeBaseMode === "repressors"
+    ) {
       closeActivePopup();
       return;
     }

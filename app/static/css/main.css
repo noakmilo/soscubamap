@@ -376,6 +376,7 @@ body.map-dashboard-page .map-canvas {
 .map-side-panel .legend,
 .map-side-panel .connectivity-legend-overlay,
 .map-side-panel .protest-overlay,
+.map-side-panel .repressor-overlay,
 .map-side-panel .report-detail-panel {
   margin: 0;
 }
@@ -711,7 +712,8 @@ body.map-dashboard-page *::-webkit-scrollbar {
 }
 
 .map-side-panel .connectivity-legend-overlay,
-.map-side-panel .protest-overlay {
+.map-side-panel .protest-overlay,
+.map-side-panel .repressor-overlay {
   position: static;
   inset: auto;
   width: 100%;
@@ -1604,6 +1606,134 @@ body.map-dashboard-page *::-webkit-scrollbar {
 .protest-detail-empty {
   color: #ffc9b5;
   font-size: 11px;
+}
+
+.repressor-overlay {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+  bottom: 16px;
+  width: min(360px, calc(100% - 32px));
+  background: rgba(10, 16, 21, 0.95);
+  border: 1px solid rgba(214, 251, 231, 0.28);
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+  z-index: 955;
+  display: grid;
+  gap: 8px;
+  max-height: none;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.repressor-overlay[hidden] {
+  display: none !important;
+}
+
+.repressor-title {
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #d6fbe7;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.repressor-subtitle {
+  color: #b8e2d0;
+  font-size: 11px;
+}
+
+.repressor-legend {
+  border-top: 1px solid rgba(214, 251, 231, 0.2);
+  padding-top: 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.repressor-legend-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #e8fff3;
+}
+
+.repressor-legend-item .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.repressor-legend-item .dot-confirmed {
+  background: #16a34a;
+}
+
+.repressor-legend-item .dot-unresolved {
+  background: #dc2626;
+}
+
+.repressor-summary {
+  border-top: 1px solid rgba(214, 251, 231, 0.2);
+  padding-top: 8px;
+  color: #d6fbe7;
+  font-size: 11px;
+}
+
+.repressor-unresolved-marker-wrap {
+  background: transparent;
+  border: 0;
+}
+
+.repressor-unresolved-marker {
+  min-width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.repressor-popup {
+  color: #0f172a;
+  max-width: 260px;
+  display: grid;
+  gap: 6px;
+}
+
+.repressor-popup-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.repressor-popup-meta {
+  font-size: 12px;
+  color: #334155;
+}
+
+.repressor-popup-image {
+  width: 100%;
+  max-height: 132px;
+  object-fit: cover;
+  object-position: top center;
+  border-radius: 8px;
+  border: 1px solid rgba(100, 116, 139, 0.3);
+}
+
+.repressor-popup-link {
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .protest-detail-title {
@@ -4335,6 +4465,21 @@ textarea {
   letter-spacing: 0.3px;
 }
 
+.repressor-delete-form {
+  margin: 0;
+}
+
+.repressor-delete-btn {
+  border-color: rgba(255, 138, 138, 0.7);
+  background: rgba(198, 40, 40, 0.25);
+  color: #ffd5d5;
+}
+
+.repressor-delete-btn:hover {
+  border-color: rgba(255, 172, 172, 0.9);
+  color: #ffe4e4;
+}
+
 .repressor-type-legend-grid {
   margin-top: 10px;
   display: grid;
@@ -5102,6 +5247,17 @@ textarea {
     z-index: auto;
   }
 
+  .repressor-overlay {
+    position: static;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    width: 100%;
+    margin-top: 12px;
+    max-height: min(56vh, 540px);
+    z-index: auto;
+  }
+
   body.map-dashboard-page .content.map-dashboard-content {
     padding: 14px 0 16px;
   }
@@ -5198,7 +5354,8 @@ textarea {
   }
 
   body.map-dashboard-page .map-side-panel .connectivity-legend-overlay,
-  body.map-dashboard-page .map-side-panel .protest-overlay {
+  body.map-dashboard-page .map-side-panel .protest-overlay,
+  body.map-dashboard-page .map-side-panel .repressor-overlay {
     max-height: none;
   }
 

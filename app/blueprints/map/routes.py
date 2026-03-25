@@ -1803,6 +1803,33 @@ def repressor_detail(repressor_id):
     )
 
 
+@map_bp.route("/represores/<int:repressor_id>/eliminar", methods=["POST"])
+def delete_repressor(repressor_id):
+    if not _is_admin_user():
+        abort(403)
+
+    repressor = Repressor.query.get_or_404(repressor_id)
+    full_name = repressor.full_name
+    try:
+        Post.query.filter_by(repressor_id=repressor.id).update(
+            {Post.repressor_id: None},
+            synchronize_session=False,
+        )
+        RepressorSubmission.query.filter_by(repressor_id=repressor.id).update(
+            {RepressorSubmission.repressor_id: None},
+            synchronize_session=False,
+        )
+        db.session.delete(repressor)
+        db.session.commit()
+        flash(f"Ficha eliminada: {full_name}.", "success")
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Error eliminando represor id=%s", repressor_id)
+        flash("No se pudo eliminar la ficha del represor.", "error")
+
+    return redirect(url_for("map.repressors"))
+
+
 def _repressor_form_defaults(repressor: Repressor) -> dict[str, Any]:
     return {
         "name": repressor.name or "",

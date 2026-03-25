@@ -61,13 +61,14 @@ from app.services.connectivity_geo import (
     province_names_from_geojson,
 )
 from app.services.geo_lookup import is_within_cuba_bounds, list_provinces, lookup_location
-from app.services.cuba_locations import PROVINCES
+from app.services.cuba_locations import PROVINCES, PROVINCE_CENTER_FALLBACKS
 from app.services.location_names import (
     canonicalize_location_names,
     canonicalize_province_name,
     normalize_location_key,
 )
 from app.services.protests import (
+    _gazetteer as protest_gazetteer,
     display_source_name as protest_display_source_name,
     get_fetch_interval_seconds as protest_fetch_interval_seconds,
     get_fetch_timeout_seconds as protest_fetch_timeout_seconds,
@@ -192,6 +193,75 @@ def _matching_stored_province_values(model_column, selected_province):
     if canonical not in seen:
         values.append(canonical)
     return values
+
+
+def _safe_float(value):
+    try:
+        numeric = float(value)
+    except Exception:
+        return None
+    if math.isfinite(numeric):
+        return numeric
+    return None
+
+
+def _resolve_territory_centroid(province_name=None, municipality_name=None):
+    province_text = canonicalize_province_name(province_name) or str(province_name or "").strip()
+    municipality_text = (
+        canonicalize_location_names(province_name, municipality_name)[1]
+        if municipality_name
+        else None
+    )
+    province_key = normalize_location_key(province_text)
+    municipality_key = normalize_location_key(municipality_text)
+
+    gazetteer = {}
+    try:
+        gazetteer = protest_gazetteer() or {}
+    except Exception:
+        gazetteer = {}
+    gazetteer_all = gazetteer.get("all") if isinstance(gazetteer, dict) else {}
+    if not isinstance(gazetteer_all, dict):
+        gazetteer_all = {}
+
+    def _pick_lat_lng(entry):
+        if not isinstance(entry, dict):
+            return None, None
+        lat = _safe_float(entry.get("lat"))
+        lng = _safe_float(entry.get("lng"))
+        if lat is None or lng is None:
+            return None, None
+        return lat, lng
+
+    if municipality_key:
+        entries = gazetteer_all.get(municipality_key) or []
+        for entry in entries:
+            if str(entry.get("type") or "").strip() != "municipality":
+                continue
+            entry_province_key = normalize_location_key(entry.get("province"))
+            if province_key and entry_province_key and entry_province_key != province_key:
+                continue
+            lat, lng = _pick_lat_lng(entry)
+            if lat is not None and lng is not None:
+                return lat, lng
+
+    if province_key:
+        entries = gazetteer_all.get(province_key) or []
+        for entry in entries:
+            if str(entry.get("type") or "").strip() != "province":
+                continue
+            lat, lng = _pick_lat_lng(entry)
+            if lat is not None and lng is not None:
+                return lat, lng
+
+    fallback = PROVINCE_CENTER_FALLBACKS.get(province_text)
+    if isinstance(fallback, (list, tuple)) and len(fallback) >= 2:
+        lat = _safe_float(fallback[0])
+        lng = _safe_float(fallback[1])
+        if lat is not None and lng is not None:
+            return lat, lng
+
+    return None, None
 
 
 def _cf_api_token():
@@ -1996,6 +2066,180 @@ def repressor_stats_v1():
                 }
                 for row in municipality_rows
             ],
+        }
+    )
+
+
+@api_bp.route("/v1/repressors/map-layer")
+@limiter.limit("120/minute")
+def repressor_map_layer_v1():
+    approved_reports = (
+        RepressorResidenceReport.query.options(
+            selectinload(RepressorResidenceReport.repressor).selectinload(Repressor.types)
+        )
+        .filter(RepressorResidenceReport.status == "approved")
+        .order_by(
+            RepressorResidenceReport.created_at.desc(),
+            RepressorResidenceReport.id.desc(),
+        )
+        .all()
+    )
+
+    confirmed_residences = []
+    for report in approved_reports:
+        lat = _safe_float(report.latitude)
+        lng = _safe_float(report.longitude)
+        if lat is None or lng is None:
+            continue
+
+        repressor = report.repressor
+        report_province, report_municipality = canonicalize_location_names(
+            report.province or (repressor.province_name if repressor else None),
+            report.municipality or (repressor.municipality_name if repressor else None),
+        )
+        type_names = []
+        if repressor:
+            type_names = [
+                str(item.name or "").strip()
+                for item in (repressor.types or [])
+                if str(item.name or "").strip()
+            ]
+
+        confirmed_residences.append(
+            {
+                "report_id": report.id,
+                "repressor_id": repressor.id if repressor else None,
+                "repressor_name": repressor.full_name if repressor else "",
+                "repressor_image_url": repressor.image_url if repressor else None,
+                "repressor_type_names": type_names,
+                "province": report_province,
+                "municipality": report_municipality,
+                "address": report.address,
+                "message": report.message,
+                "latitude": lat,
+                "longitude": lng,
+                "created_at": report.created_at.isoformat() if report.created_at else None,
+            }
+        )
+
+    approved_repressor_ids_subquery = (
+        db.session.query(
+            RepressorResidenceReport.repressor_id.label("repressor_id"),
+        )
+        .filter(
+            RepressorResidenceReport.status == "approved",
+            RepressorResidenceReport.repressor_id.isnot(None),
+        )
+        .distinct()
+        .subquery()
+    )
+
+    unresolved_rows = (
+        db.session.query(
+            Repressor.province_name,
+            Repressor.municipality_name,
+            func.count(Repressor.id),
+        )
+        .outerjoin(
+            approved_repressor_ids_subquery,
+            approved_repressor_ids_subquery.c.repressor_id == Repressor.id,
+        )
+        .filter(approved_repressor_ids_subquery.c.repressor_id.is_(None))
+        .group_by(
+            Repressor.province_name,
+            Repressor.municipality_name,
+        )
+        .all()
+    )
+
+    buckets = {}
+    without_territory_reference = 0
+    for raw_province, raw_municipality, raw_count in unresolved_rows:
+        count = int(raw_count or 0)
+        if count <= 0:
+            continue
+
+        province_name, municipality_name = canonicalize_location_names(
+            raw_province,
+            raw_municipality,
+        )
+
+        scope = (
+            "municipality"
+            if (municipality_name and province_name)
+            else ("province" if province_name else "")
+        )
+        if not scope:
+            without_territory_reference += count
+            continue
+
+        province_key = normalize_location_key(province_name) or "__nd__"
+        municipality_key = normalize_location_key(municipality_name) if municipality_name else "__nd__"
+        bucket_key = f"{scope}|{province_key}|{municipality_key}"
+        bucket = buckets.get(bucket_key)
+        if bucket is None:
+            bucket = {
+                "scope": scope,
+                "province": province_name,
+                "municipality": municipality_name if scope == "municipality" else None,
+                "count": 0,
+            }
+            buckets[bucket_key] = bucket
+        bucket["count"] = int(bucket["count"] or 0) + count
+
+    unresolved_territories = []
+    for bucket in buckets.values():
+        lat, lng = _resolve_territory_centroid(
+            bucket.get("province"),
+            bucket.get("municipality"),
+        )
+        if lat is None or lng is None:
+            without_territory_reference += int(bucket.get("count") or 0)
+            continue
+
+        unresolved_territories.append(
+            {
+                "scope": bucket.get("scope"),
+                "province": bucket.get("province"),
+                "municipality": bucket.get("municipality"),
+                "count": int(bucket.get("count") or 0),
+                "latitude": lat,
+                "longitude": lng,
+            }
+        )
+
+    unresolved_territories.sort(
+        key=lambda item: (
+            -int(item.get("count") or 0),
+            str(item.get("province") or ""),
+            str(item.get("municipality") or ""),
+        )
+    )
+
+    total_repressors = int(db.session.query(func.count(Repressor.id)).scalar() or 0)
+    with_confirmed_residence = int(
+        db.session.query(func.count(func.distinct(RepressorResidenceReport.repressor_id)))
+        .filter(
+            RepressorResidenceReport.status == "approved",
+            RepressorResidenceReport.repressor_id.isnot(None),
+        )
+        .scalar()
+        or 0
+    )
+    without_confirmed_residence = max(total_repressors - with_confirmed_residence, 0)
+
+    return jsonify(
+        {
+            "confirmed_residences": confirmed_residences,
+            "unresolved_territories": unresolved_territories,
+            "summary": {
+                "total_repressors": total_repressors,
+                "with_confirmed_residence": with_confirmed_residence,
+                "without_confirmed_residence": without_confirmed_residence,
+                "without_territory_reference": without_territory_reference,
+                "confirmed_residences_points": len(confirmed_residences),
+                "unresolved_territories_points": len(unresolved_territories),
+            },
         }
     )
 

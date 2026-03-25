@@ -129,6 +129,16 @@
       <button class="btn-primary" type="button" data-repressor-share-btn>
         Compartir
       </button>
+      {% if current_user.is_authenticated and current_user.has_role('administrador') %}
+        <form
+          method="post"
+          action="{{ url_for('map.delete_repressor', repressor_id=repressor.id) }}"
+          class="repressor-delete-form"
+          onsubmit="return confirm('¿Eliminar esta ficha de represor? Esta acción no se puede deshacer.');"
+        >
+          <button class="btn-secondary repressor-delete-btn" type="submit">Eliminar ficha</button>
+        </form>
+      {% endif %}
     </div>
   </article>
 {% endif %}
