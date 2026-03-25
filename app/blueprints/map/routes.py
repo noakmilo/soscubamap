@@ -61,6 +61,7 @@ from app.services.location_names import (
     canonicalize_province_name,
     normalize_location_key,
 )
+from app.services.cuba_locations import PROVINCE_CENTER_FALLBACKS
 from app.services.input_safety import has_malicious_input
 from app.services.media_upload import (
     get_media_payload,
@@ -245,6 +246,41 @@ def _clean_captions(raw, count):
 
 def _residence_category():
     return Category.query.filter_by(slug="residencia-represor").first()
+
+
+def _initial_repressor_residence_coords(repressor: Repressor) -> tuple[float, float]:
+    latest_report = (
+        RepressorResidenceReport.query.filter_by(
+            repressor_id=repressor.id,
+            status="approved",
+        )
+        .order_by(
+            RepressorResidenceReport.created_at.desc(),
+            RepressorResidenceReport.id.desc(),
+        )
+        .first()
+    )
+    if latest_report is not None:
+        try:
+            lat = float(latest_report.latitude)
+            lng = float(latest_report.longitude)
+            if is_within_cuba_bounds(lat, lng):
+                return lat, lng
+        except Exception:
+            pass
+
+    canonical_province = canonicalize_province_name(repressor.province_name)
+    fallback = PROVINCE_CENTER_FALLBACKS.get(canonical_province or "")
+    if isinstance(fallback, (list, tuple)) and len(fallback) >= 2:
+        try:
+            lat = float(fallback[0])
+            lng = float(fallback[1])
+            if is_within_cuba_bounds(lat, lng):
+                return lat, lng
+        except Exception:
+            pass
+
+    return 23.1136, -82.3666
 
 
 def _is_moderation_enabled() -> bool:
@@ -2253,13 +2289,14 @@ def report_repressor_residence(repressor_id):
 
     errors = {}
     submitted = False
+    default_lat, default_lng = _initial_repressor_residence_coords(repressor)
     form_data = {
         "message": "",
         "address": "",
         "province": repressor.province_name or "",
         "municipality": repressor.municipality_name or "",
-        "latitude": "",
-        "longitude": "",
+        "latitude": f"{default_lat:.6f}",
+        "longitude": f"{default_lng:.6f}",
         "links": [""],
     }
 

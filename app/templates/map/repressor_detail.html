@@ -30,5 +30,14 @@
     {% endfor %}
   </div>
 </section>
+
+<div id="repressorImageModal" class="image-modal" aria-hidden="true" data-allow-zoom="1">
+  <div class="image-modal-backdrop" data-close-repressor-image></div>
+  <div class="image-modal-content">
+    <button class="image-modal-close" type="button" data-close-repressor-image>&times;</button>
+    <img id="repressorImageModalImg" src="" alt="Imagen ampliada" />
+    <div class="image-modal-caption" id="repressorImageModalCaption"></div>
+  </div>
+</div>
 <script src="{{ url_for('static', filename='js/repressor_card_share.js') }}?v={{ config.ASSET_VERSION }}"></script>
 {% endblock %}

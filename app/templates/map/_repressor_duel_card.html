@@ -48,6 +48,11 @@
           src="{{ repressor_payload.image_url }}"
           alt="{{ repressor_payload.full_name }}"
           class="repressor-duel-art"
+          data-repressor-image="{{ repressor_payload.image_url }}"
+          data-repressor-caption="{{ repressor_payload.full_name }}"
+          role="button"
+          tabindex="0"
+          aria-label="Ampliar imagen"
           crossorigin="anonymous"
           referrerpolicy="no-referrer"
         />

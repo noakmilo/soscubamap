@@ -40,8 +40,9 @@ let repressorLayerGroup;
 let repressorLastPayload = null;
 let repressorOverlay;
 let repressorSummary;
-let repressorDetailPanel;
+let repressorStatsPanel;
 let repressorDetailRequestSeq = 0;
+let repressorStatsPayload = null;
 let protestLayerGroup;
 let protestRefreshTimer;
 let protestRefreshPromise;
@@ -1724,6 +1725,7 @@ window.handleNewReport = function (payload) {
     updateLegendCounts(allPosts);
     if (activeBaseMode === "repressors") {
       refreshRepressorLayer();
+      refreshRepressorStats();
     }
     refreshAlerts();
     return;
@@ -2333,24 +2335,25 @@ function normalizeRepressorTerritoryRequest(item) {
 }
 
 function renderRepressorTerritoryDetailEmpty(message = "") {
-  if (!repressorDetailPanel) return;
-  const text =
-    message || "Haz clic en un contador rojo para ver la lista de represores sin localizar.";
-  repressorDetailPanel.innerHTML = `<div class="repressor-detail-empty">${escapeHtml(text)}</div>`;
+  if (!reportDetailPanel) return;
+  const text = message || "Haz click en un reporte para ver sus detalles.";
+  reportDetailPanel.classList.remove("is-revealing");
+  reportDetailPanel.innerHTML = `<div class="report-detail-empty">${escapeHtml(text)}</div>`;
 }
 
 function renderRepressorTerritoryDetailLoading(territoryLabel) {
-  if (!repressorDetailPanel) return;
-  repressorDetailPanel.innerHTML = `
-    <div class="repressor-detail-headline">
-      <div class="repressor-detail-territory">${escapeHtml(territoryLabel)}</div>
-      <div class="repressor-detail-count">Cargando represores sin localizar...</div>
+  if (!reportDetailPanel) return;
+  reportDetailPanel.innerHTML = `
+    <div class="report-detail-content">
+      <h3 class="report-detail-title">${escapeHtml(territoryLabel)}</h3>
+      <div class="report-detail-meta">Cargando represores sin localizar...</div>
     </div>
   `;
+  triggerReportDetailReveal();
 }
 
 function renderRepressorTerritoryDetail(item, payload) {
-  if (!repressorDetailPanel) return;
+  if (!reportDetailPanel) return;
   const territoryLabel = String(payload?.territory_label || repressorTerritoryLabel(item) || "").trim();
   const entries = Array.isArray(payload?.items) ? payload.items : [];
   const count = Math.max(0, Number(payload?.count) || entries.length);
@@ -2360,13 +2363,14 @@ function renderRepressorTerritoryDetail(item, payload) {
       : `${count.toLocaleString("es-ES")} represores sin localizar`;
 
   if (!entries.length) {
-    repressorDetailPanel.innerHTML = `
-      <div class="repressor-detail-headline">
-        <div class="repressor-detail-territory">${escapeHtml(territoryLabel || "Territorio")}</div>
-        <div class="repressor-detail-count">${countLabel}</div>
+    reportDetailPanel.innerHTML = `
+      <div class="report-detail-content">
+        <h3 class="report-detail-title">${escapeHtml(territoryLabel || "Territorio")}</h3>
+        <div class="report-detail-meta">${countLabel}</div>
+        <div class="repressor-detail-empty">No hay represores pendientes de localizar para este territorio.</div>
       </div>
-      <div class="repressor-detail-empty">No hay represores pendientes de localizar para este territorio.</div>
     `;
+    triggerReportDetailReveal();
     return;
   }
 
@@ -2388,7 +2392,7 @@ function renderRepressorTerritoryDetail(item, payload) {
         metadata.push(`Ficha #${externalId}`);
       }
       if (nickname) {
-        metadata.push(`Seudónimo: ${escapeHtml(nickname)}`);
+        metadata.push(`Seudonimo: ${escapeHtml(nickname)}`);
       }
       if (typeNames.length) {
         metadata.push(`Tipo: ${typeNames.slice(0, 2).join(", ")}${typeNames.length > 2 ? "..." : ""}`);
@@ -2396,14 +2400,22 @@ function renderRepressorTerritoryDetail(item, payload) {
       const detailUrl = `/represores/${repressorId}`;
       const editUrl = `/represores/${repressorId}/editar`;
       const residenceUrl = `/represores/${repressorId}/reportar-residencia`;
+      const imageThumbHtml = imageUrl
+        ? `
+            <button
+              class="info-media-thumb repressor-detail-thumb"
+              type="button"
+              data-image="${imageUrl}"
+              data-caption="${fullName}"
+            >
+              <img src="${imageUrl}" alt="${fullName}" class="repressor-detail-avatar" />
+            </button>
+          `
+        : '<div class="repressor-detail-avatar repressor-detail-avatar-empty" aria-hidden="true">?</div>';
       return `
         <article class="repressor-detail-card">
           <div class="repressor-detail-head">
-            ${
-              imageUrl
-                ? `<img src="${imageUrl}" alt="${fullName}" class="repressor-detail-avatar" />`
-                : '<div class="repressor-detail-avatar repressor-detail-avatar-empty" aria-hidden="true">?</div>'
-            }
+            ${imageThumbHtml}
             <div class="repressor-detail-identity">
               <div class="repressor-detail-name">${fullName}</div>
               <div class="repressor-detail-meta">${metadata.join(" · ") || "Sin metadatos adicionales"}</div>
@@ -2420,13 +2432,18 @@ function renderRepressorTerritoryDetail(item, payload) {
     .filter(Boolean)
     .join("");
 
-  repressorDetailPanel.innerHTML = `
-    <div class="repressor-detail-headline">
-      <div class="repressor-detail-territory">${escapeHtml(territoryLabel || "Territorio")}</div>
-      <div class="repressor-detail-count">${countLabel}</div>
+  reportDetailPanel.innerHTML = `
+    <div class="report-detail-content">
+      <h3 class="report-detail-title">${escapeHtml(territoryLabel || "Territorio")}</h3>
+      <div class="report-detail-meta">${countLabel}</div>
+      <div class="repressor-detail-list">${cardsHtml}</div>
     </div>
-    <div class="repressor-detail-list">${cardsHtml}</div>
   `;
+  triggerReportDetailReveal();
+  attachMediaThumbHandlers(reportDetailPanel);
+  if (mapSideScroll) {
+    mapSideScroll.scrollTop = 0;
+  }
 }
 
 async function fetchRepressorTerritoryDetail(item) {
@@ -2471,6 +2488,72 @@ async function fetchRepressorTerritoryDetail(item) {
   }
 }
 
+function renderRepressorConfirmedDetail(item) {
+  if (!reportDetailPanel) return;
+  const repressorId = Number(item?.repressor_id);
+  const repressorName = escapeHtml(item?.repressor_name || "Represor");
+  const province = escapeHtml(item?.province || "N/D");
+  const municipality = escapeHtml(item?.municipality || "N/D");
+  const address = escapeHtml(item?.address || "");
+  const message = String(item?.message || "").trim();
+  const shortMessage = message.length > 280 ? `${message.slice(0, 277).trimEnd()}...` : message;
+  const imageUrl = safeUrl(item?.repressor_image_url || "");
+  const typeNames = Array.isArray(item?.repressor_type_names)
+    ? item.repressor_type_names
+        .filter((name) => String(name || "").trim())
+        .map((name) => escapeHtml(name))
+    : [];
+  const detailUrl = Number.isFinite(repressorId) && repressorId > 0 ? `/represores/${repressorId}` : "";
+  const editUrl = Number.isFinite(repressorId) && repressorId > 0 ? `/represores/${repressorId}/editar` : "";
+  const residenceUrl =
+    Number.isFinite(repressorId) && repressorId > 0
+      ? `/represores/${repressorId}/reportar-residencia`
+      : "";
+
+  reportDetailPanel.innerHTML = `
+    <div class="report-detail-content">
+      <h3 class="report-detail-title">${repressorName}</h3>
+      <div class="report-detail-meta">Vivienda confirmada: ${province} · ${municipality}</div>
+      ${
+        typeNames.length
+          ? `<div class="repressor-detail-meta">Tipo: ${typeNames.join(", ")}</div>`
+          : ""
+      }
+      ${
+        imageUrl
+          ? `
+            <div class="info-media">
+              <button class="info-media-thumb repressor-detail-thumb" type="button" data-image="${imageUrl}" data-caption="${repressorName}">
+                <img src="${imageUrl}" alt="${repressorName}" />
+              </button>
+            </div>
+          `
+          : ""
+      }
+      ${address ? `<div class="repressor-detail-meta">Direccion: ${address}</div>` : ""}
+      ${
+        shortMessage
+          ? `<p class="report-detail-description">${escapeHtml(shortMessage)}</p>`
+          : ""
+      }
+      <div class="repressor-detail-actions">
+        ${detailUrl ? `<a class="info-btn info-btn-outline" href="${detailUrl}">Ver ficha</a>` : ""}
+        ${editUrl ? `<a class="info-btn info-btn-outline" href="${editUrl}">Editar ficha</a>` : ""}
+        ${
+          residenceUrl
+            ? `<a class="info-btn" href="${residenceUrl}">Actualizar localizacion</a>`
+            : ""
+        }
+      </div>
+    </div>
+  `;
+  triggerReportDetailReveal();
+  attachMediaThumbHandlers(reportDetailPanel);
+  if (mapSideScroll) {
+    mapSideScroll.scrollTop = 0;
+  }
+}
+
 function renderRepressorSummary(payload, errorText = "") {
   if (!repressorSummary) return;
   if (errorText) {
@@ -2491,6 +2574,70 @@ function renderRepressorSummary(payload, errorText = "") {
   )}.`;
 }
 
+function renderRepressorStats(payload, errorText = "") {
+  if (!repressorStatsPanel) return;
+  if (errorText) {
+    repressorStatsPanel.innerHTML = `<div class="repressor-stats-empty">${escapeHtml(errorText)}</div>`;
+    return;
+  }
+
+  const total = Math.max(0, Number(payload?.total_repressors) || 0);
+  const byProvince = Array.isArray(payload?.by_province) ? payload.by_province : [];
+  if (!byProvince.length) {
+    repressorStatsPanel.innerHTML = `
+      <div class="repressor-stats-total">Total país: ${total.toLocaleString("es-ES")}</div>
+      <div class="repressor-stats-empty">Sin datos provinciales disponibles.</div>
+    `;
+    return;
+  }
+
+  const topRows = byProvince.slice(0, 16);
+  const maxCount = Math.max(...topRows.map((item) => Number(item?.count) || 0), 1);
+  const rowsHtml = topRows
+    .map((item) => {
+      const province = escapeHtml(item?.province || "N/D");
+      const count = Math.max(0, Number(item?.count) || 0);
+      const width = Math.max(4, Math.round((count / maxCount) * 100));
+      return `
+        <div class="repressor-stats-row">
+          <div class="repressor-stats-label">${province}</div>
+          <div class="repressor-stats-bar">
+            <span style="width:${width}%"></span>
+          </div>
+          <div class="repressor-stats-value">${count.toLocaleString("es-ES")}</div>
+        </div>
+      `;
+    })
+    .join("");
+
+  repressorStatsPanel.innerHTML = `
+    <div class="repressor-stats-total">Total país: ${total.toLocaleString("es-ES")}</div>
+    <div class="repressor-stats-list">${rowsHtml}</div>
+  `;
+}
+
+async function fetchRepressorStatsData() {
+  const response = await fetch("/api/v1/repressors/stats", { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error("No se pudo cargar el gráfico de represores.");
+  }
+  return await response.json();
+}
+
+async function refreshRepressorStats() {
+  if (activeBaseMode !== "repressors") return;
+  try {
+    const payload = await fetchRepressorStatsData();
+    repressorStatsPayload = payload;
+    renderRepressorStats(payload);
+  } catch (_error) {
+    renderRepressorStats(
+      repressorStatsPayload,
+      "No fue posible actualizar el gráfico por provincia."
+    );
+  }
+}
+
 function renderRepressorLayer(payload) {
   if (!map) return;
   clearRepressorLayer();
@@ -2503,16 +2650,19 @@ function renderRepressorLayer(payload) {
     const lat = Number(item?.latitude);
     const lng = Number(item?.longitude);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-    const marker = L.circleMarker([lat, lng], {
-      radius: 6,
-      color: "#f8fafc",
-      weight: 1.4,
-      fillColor: REPRESSOR_CONFIRMED_COLOR,
-      fillOpacity: 0.9,
+    const marker = L.marker([lat, lng], {
+      icon: createMarkerIcon(
+        CATEGORY_ICONS["residencia-represor"] || "fa-house-chimney-user",
+        CATEGORY_IMAGES["residencia-represor"] || "",
+        "residencia-represor",
+        false
+      ),
+      title: item?.repressor_name || "Represor localizado",
     });
     marker.bindPopup(confirmedResidencePopupHtml(item), MAP_POPUP_OPTIONS);
     marker.on("click", () => {
       ensureContextPanelVisible({ mobileState: "full" });
+      renderRepressorConfirmedDetail(item);
     });
     marker.addTo(repressorLayerGroup);
   });
@@ -2572,14 +2722,16 @@ async function enableRepressorMode() {
   renderRepressorTerritoryDetailEmpty();
   clearMarkers();
   closeActivePopup();
-  renderReportDetail(null);
+  selectedReportId = null;
   setMapHintVisible(false);
   setReportLegendVisible(false);
-  setReportDetailVisible(false);
+  setReportDetailVisible(true);
   setConnectivityLegendVisible(false);
   setProtestOverlayVisible(false);
   setRepressorOverlayVisible(true);
   ensureContextPanelVisible({ mobileState: "mid" });
+  renderRepressorStats(repressorStatsPayload, "Cargando gráfico de represores...");
+  refreshRepressorStats();
   await refreshRepressorLayer();
 }
 
@@ -2591,6 +2743,8 @@ function disableRepressorMode() {
   renderRepressorTerritoryDetailEmpty();
   clearRepressorLayer();
   repressorLastPayload = null;
+  repressorStatsPayload = null;
+  renderRepressorStats(null, "Selecciona la capa de represores para cargar el gráfico.");
   setRepressorOverlayVisible(false);
   setReportLegendVisible(true);
   setReportDetailVisible(true);
@@ -3715,13 +3869,14 @@ async function initMap() {
   protestDetailPanel = document.getElementById("protestDetailPanel");
   repressorOverlay = document.getElementById("repressorOverlay");
   repressorSummary = document.getElementById("repressorSummary");
-  repressorDetailPanel = document.getElementById("repressorDetailPanel");
+  repressorStatsPanel = document.getElementById("repressorStatsPanel");
   reportDetailPanel = document.getElementById("reportDetailPanel");
   setActiveConnectivityWindow(connectivityWindowHours);
   renderReportDetail(null);
   renderConnectivityRegionChart(null);
   renderProtestDetail(null);
   renderRepressorTerritoryDetailEmpty();
+  renderRepressorStats(null, "Selecciona la capa de represores para cargar el gráfico.");
   setReportDetailVisible(true);
   setProtestOverlayVisible(false);
   setRepressorOverlayVisible(false);

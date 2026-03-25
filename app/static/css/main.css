@@ -1682,6 +1682,75 @@ body.map-dashboard-page *::-webkit-scrollbar {
   font-size: 11px;
 }
 
+.repressor-stats-heading {
+  color: #ecfff6;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+}
+
+.repressor-stats-panel {
+  border: 1px solid rgba(214, 251, 231, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.repressor-stats-total {
+  color: #f3fff8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.repressor-stats-empty {
+  color: #b8e2d0;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.repressor-stats-list {
+  display: grid;
+  gap: 6px;
+}
+
+.repressor-stats-row {
+  display: grid;
+  grid-template-columns: minmax(80px, 1fr) minmax(80px, 2fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.repressor-stats-label {
+  color: #d6fbe7;
+  font-size: 10.5px;
+  line-height: 1.2;
+}
+
+.repressor-stats-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(214, 251, 231, 0.18);
+  overflow: hidden;
+}
+
+.repressor-stats-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #16a34a 0%, #22c55e 100%);
+}
+
+.repressor-stats-value {
+  color: #ecfff6;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
 .repressor-detail-panel {
   border: 1px solid rgba(214, 251, 231, 0.2);
   border-radius: 8px;
@@ -1689,8 +1758,11 @@ body.map-dashboard-page *::-webkit-scrollbar {
   padding: 8px;
   display: grid;
   gap: 8px;
-  max-height: 320px;
-  overflow-y: auto;
+}
+
+.repressor-detail-list {
+  display: grid;
+  gap: 8px;
 }
 
 .repressor-detail-empty {
@@ -1713,11 +1785,6 @@ body.map-dashboard-page *::-webkit-scrollbar {
 .repressor-detail-count {
   color: #b8e2d0;
   font-size: 11px;
-}
-
-.repressor-detail-list {
-  display: grid;
-  gap: 8px;
 }
 
 .repressor-detail-card {
@@ -1743,6 +1810,13 @@ body.map-dashboard-page *::-webkit-scrollbar {
   object-fit: cover;
   object-position: top center;
   border: 1px solid rgba(214, 251, 231, 0.3);
+}
+
+.repressor-detail-thumb {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: zoom-in;
 }
 
 .repressor-detail-avatar-empty {
@@ -4461,12 +4535,14 @@ textarea {
 }
 
 .repressor-duel-art {
-  width: 100%;
-  height: 100%;
-  min-height: 220px;
-  object-fit: cover;
-  object-position: top center;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center;
   display: block;
+  cursor: zoom-in;
 }
 
 .repressor-duel-art-empty {
@@ -4766,10 +4842,6 @@ textarea {
   .repressor-duel-art-frame {
     min-height: 180px;
     height: clamp(180px, 34vh, 300px);
-  }
-
-  .repressor-duel-art {
-    min-height: 180px;
   }
 
   .repressor-duel-grid {

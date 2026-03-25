@@ -2,6 +2,11 @@
   const CARD_SELECTOR = "[data-repressor-card]";
   const DOWNLOAD_SELECTOR = "[data-repressor-download-btn]";
   const SHARE_SELECTOR = "[data-repressor-share-btn]";
+  const ART_SELECTOR = ".repressor-duel-art[data-repressor-image]";
+  const IMAGE_MODAL_ID = "repressorImageModal";
+  const IMAGE_MODAL_IMG_ID = "repressorImageModalImg";
+  const IMAGE_MODAL_CAPTION_ID = "repressorImageModalCaption";
+  const IMAGE_MODAL_CLOSE_SELECTOR = "[data-close-repressor-image]";
 
   let html2CanvasPromise = null;
 
@@ -224,6 +229,45 @@
     });
     document.querySelectorAll(SHARE_SELECTOR).forEach((button) => {
       button.addEventListener("click", handleShare);
+    });
+    wireImageModal();
+  }
+
+  function wireImageModal() {
+    const modal = document.getElementById(IMAGE_MODAL_ID);
+    const modalImg = document.getElementById(IMAGE_MODAL_IMG_ID);
+    const modalCaption = document.getElementById(IMAGE_MODAL_CAPTION_ID);
+    if (!modal || !modalImg) return;
+
+    const closeModal = () => {
+      modal.setAttribute("aria-hidden", "true");
+      modal.classList.remove("open");
+      modalImg.src = "";
+      if (modalCaption) modalCaption.textContent = "";
+    };
+
+    document.querySelectorAll(IMAGE_MODAL_CLOSE_SELECTOR).forEach((button) => {
+      button.addEventListener("click", closeModal);
+    });
+
+    const openModal = (imageUrl, captionText) => {
+      const url = String(imageUrl || "").trim();
+      if (!url) return;
+      modalImg.src = url;
+      if (modalCaption) modalCaption.textContent = String(captionText || "").trim();
+      modal.setAttribute("aria-hidden", "false");
+      modal.classList.add("open");
+    };
+
+    document.querySelectorAll(ART_SELECTOR).forEach((image) => {
+      image.addEventListener("click", () => {
+        openModal(image.getAttribute("data-repressor-image"), image.getAttribute("data-repressor-caption"));
+      });
+      image.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        openModal(image.getAttribute("data-repressor-image"), image.getAttribute("data-repressor-caption"));
+      });
     });
   }
 
