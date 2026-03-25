@@ -71,6 +71,16 @@
     clone.style.minHeight = "0";
     clone.style.overflow = "visible";
     clone.style.aspectRatio = "auto";
+
+    const artFrame = clone.querySelector(".repressor-duel-art-frame");
+    if (artFrame) {
+      artFrame.style.background = "#262324";
+    }
+    clone.querySelectorAll(".repressor-duel-art").forEach((img) => {
+      img.style.objectFit = "contain";
+      img.style.objectPosition = "center center";
+      img.style.background = "#262324";
+    });
     return clone;
   }
 

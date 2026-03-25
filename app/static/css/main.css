@@ -4128,6 +4128,7 @@ textarea {
   max-width: calc(100vw - 24px);
   aspect-ratio: auto;
   height: auto;
+  box-sizing: border-box;
   border-radius: 18px;
   border: 1px solid #8f764a;
   background:
@@ -4157,6 +4158,7 @@ textarea {
   line-height: 1.2;
   color: #2b1600;
   text-wrap: balance;
+  overflow-wrap: anywhere;
 }
 
 .repressor-duel-code {
@@ -4494,8 +4496,8 @@ textarea {
   }
 
   .repressor-duel-card {
-    width: calc(100vw - 16px);
-    max-width: calc(100vw - 16px);
+    width: 100%;
+    max-width: 100%;
     padding: 11px;
     gap: 8px;
   }
