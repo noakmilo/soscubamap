@@ -7,6 +7,7 @@
   const IMAGE_MODAL_IMG_ID = "repressorImageModalImg";
   const IMAGE_MODAL_CAPTION_ID = "repressorImageModalCaption";
   const IMAGE_MODAL_CLOSE_SELECTOR = "[data-close-repressor-image]";
+  const DESKTOP_CAPTURE_WIDTH_PX = 720;
 
   let html2CanvasPromise = null;
 
@@ -68,24 +69,57 @@
   }
 
   function buildCardClone(card) {
-    const rect = card.getBoundingClientRect();
     const clone = card.cloneNode(true);
-    clone.style.width = `${Math.ceil(rect.width)}px`;
-    clone.style.maxWidth = "none";
+    clone.style.width = `${DESKTOP_CAPTURE_WIDTH_PX}px`;
+    clone.style.maxWidth = `${DESKTOP_CAPTURE_WIDTH_PX}px`;
     clone.style.height = "auto";
     clone.style.minHeight = "0";
     clone.style.overflow = "visible";
     clone.style.aspectRatio = "auto";
+    clone.style.padding = "14px";
+    clone.style.gap = "10px";
+
+    const head = clone.querySelector(".repressor-duel-head");
+    if (head) {
+      head.style.flexDirection = "row";
+      head.style.alignItems = "flex-start";
+      head.style.justifyContent = "space-between";
+      head.style.gap = "12px";
+    }
+
+    const name = clone.querySelector(".repressor-duel-name");
+    if (name) {
+      name.style.fontSize = "24px";
+    }
+
+    const code = clone.querySelector(".repressor-duel-code");
+    if (code) {
+      code.style.textAlign = "right";
+    }
 
     const artFrame = clone.querySelector(".repressor-duel-art-frame");
     if (artFrame) {
       artFrame.style.background = "#262324";
+      artFrame.style.minHeight = "220px";
+      artFrame.style.height = "clamp(220px, 36vh, 420px)";
     }
     clone.querySelectorAll(".repressor-duel-art").forEach((img) => {
       img.style.objectFit = "contain";
       img.style.objectPosition = "top center";
       img.style.background = "#262324";
     });
+
+    const grid = clone.querySelector(".repressor-duel-grid");
+    if (grid) {
+      grid.style.gridTemplateColumns = "repeat(2, minmax(0, 1fr))";
+    }
+
+    const actions = clone.querySelector(".repressor-duel-actions");
+    if (actions) {
+      actions.style.display = "flex";
+      actions.style.flexWrap = "wrap";
+      actions.style.gridTemplateColumns = "none";
+    }
     return clone;
   }
 
@@ -149,16 +183,12 @@
     const typeText = card.dataset.repressorTypes || "N/D";
     const detailPath = card.dataset.repressorUrl || window.location.pathname;
     const detailUrl = new URL(detailPath, window.location.origin).toString();
-    const shareText = `Identifica al represor\nNombre: ${name}\nTipo: ${typeText}`;
+    const shareText = `Identifica al represor\nNombre: ${name}\nTipo: ${typeText}\nFicha: ${detailUrl}\n#SOSCuba`;
     return { name, typeText, detailUrl, shareText };
   }
 
-  function openXIntent(shareText, detailUrl) {
-    const intentUrl =
-      "https://twitter.com/intent/tweet?text=" +
-      encodeURIComponent(shareText) +
-      "&url=" +
-      encodeURIComponent(detailUrl);
+  function openXIntent(shareText) {
+    const intentUrl = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(shareText);
     window.open(intentUrl, "_blank", "noopener,noreferrer");
   }
 
@@ -213,11 +243,11 @@
       }
 
       triggerDownload(blob, fileName);
-      openXIntent(shareText, detailUrl);
+      openXIntent(shareText);
     } catch (error) {
       console.error(error);
-      const { shareText, detailUrl } = buildSharePayload(card);
-      openXIntent(shareText, detailUrl);
+      const { shareText } = buildSharePayload(card);
+      openXIntent(shareText);
     } finally {
       event.currentTarget.disabled = false;
     }
