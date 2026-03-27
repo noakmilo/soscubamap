@@ -108,6 +108,7 @@ URGENT_CATEGORY_SLUGS = {
 
 _REPRESSOR_VIEWER_STACK_KEY = "repressors_viewer_stack"
 _REPRESSOR_VIEWER_INDEX_KEY = "repressors_viewer_index"
+_AUTO_CONNECTIVITY_REPORT_MARKER = "auto_connectivity_cloudflare"
 _TOKEN_SANITIZE_RE = re.compile(r"[^a-z0-9]+")
 _MAP_LAYER_ALIASES = {
     "map": "map",
@@ -1566,6 +1567,9 @@ def reports():
         province_filter_values = [selected_province]
 
     query = Post.query.filter_by(status="approved")
+    query = query.filter(
+        func.coalesce(func.lower(Post.other_type), "") != _AUTO_CONNECTIVITY_REPORT_MARKER
+    )
     if province_filter_values:
         query = query.filter(Post.province.in_(province_filter_values))
     if selected_municipality:

@@ -184,7 +184,7 @@
     const prison = card.dataset.prisonerPrison || "N/D";
     const detailPath = card.dataset.prisonerUrl || window.location.pathname;
     const detailUrl = new URL(detailPath, window.location.origin).toString();
-    const shareText = `Ficha de prisionero político\nNombre: ${name}\nPrisión: ${prison}\nFicha: ${detailUrl}\n#SOSCuba`;
+    const shareText = `Ficha de prisionero político\nNombre: ${name}\nPrisión: ${prison}\nFicha: ${detailUrl}\n#SOSCuba #LibertadParaLosPresosPoliticos`;
     return { name, detailUrl, shareText };
   }
 
