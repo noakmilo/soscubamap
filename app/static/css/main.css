@@ -4942,6 +4942,24 @@ textarea {
   overflow: visible;
 }
 
+.repressor-duel-card[data-prisoner-card] {
+  background: #c65151;
+  border-color: rgba(241, 241, 241, 0.42);
+  box-shadow: 0 22px 44px rgba(80, 20, 20, 0.35);
+  color: #f1f1f1;
+}
+
+.repressor-duel-card[data-prisoner-card] .repressor-duel-name,
+.repressor-duel-card[data-prisoner-card] .repressor-duel-code,
+.repressor-duel-card[data-prisoner-card] .repressor-duel-item strong,
+.repressor-duel-card[data-prisoner-card] .repressor-duel-label,
+.repressor-duel-card[data-prisoner-card] .repressor-duel-crimes h3,
+.repressor-duel-card[data-prisoner-card] .repressor-duel-crimes p,
+.repressor-duel-card[data-prisoner-card] .repressor-duel-crimes-list li,
+.repressor-duel-card[data-prisoner-card] .muted {
+  color: #f1f1f1;
+}
+
 .repressor-duel-head {
   display: flex;
   align-items: flex-start;
