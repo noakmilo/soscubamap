@@ -24,6 +24,7 @@ from app.models.donation_log import DonationLog
 from app.models.protest_event import ProtestEvent
 from app.models.protest_ingestion_run import ProtestIngestionRun
 from app.models.repressor import (
+    REPRESSOR_VERIFY_LOCK_COUNT,
     Repressor,
     RepressorIngestionRun,
     RepressorResidenceReport,
@@ -1041,6 +1042,12 @@ def restore_revision(post_id, revision_id):
 @role_required("administrador")
 def restore_repressor_revision(repressor_id, revision_id):
     repressor = Repressor.query.get_or_404(repressor_id)
+    if (repressor.verify_count or 0) >= REPRESSOR_VERIFY_LOCK_COUNT:
+        flash(
+            "La ficha alcanzó 10 verificaciones y ya no puede editarse en la plataforma.",
+            "error",
+        )
+        return redirect(url_for("map.repressor_history", repressor_id=repressor.id))
     revision = RepressorRevision.query.get_or_404(revision_id)
     if revision.repressor_id != repressor.id:
         flash("Revisión inválida.", "error")

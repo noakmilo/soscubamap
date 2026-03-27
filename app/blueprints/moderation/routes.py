@@ -9,7 +9,12 @@ from app.models.category import Category
 from app.models.post_revision import PostRevision
 from app.models.post_edit_request import PostEditRequest
 from app.models.media import Media
-from app.models.repressor import Repressor, RepressorEditRequest, RepressorSubmission
+from app.models.repressor import (
+    REPRESSOR_VERIFY_LOCK_COUNT,
+    Repressor,
+    RepressorEditRequest,
+    RepressorSubmission,
+)
 from app.services.media_upload import media_json_from_post, parse_media_json
 from app.services.repressor_submissions import materialize_repressor_submission
 from app.services.repressor_edits import apply_repressor_edit_request, snapshot_repressor
@@ -230,6 +235,9 @@ def approve_repressor_submission(submission_id):
         )
         db.session.commit()
         flash(f"Represor aprobado y agregado al catálogo: {repressor.full_name}.", "success")
+    except ValueError as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
     except Exception:
         db.session.rollback()
         flash("No se pudo aprobar la propuesta de represor.", "error")
@@ -273,6 +281,12 @@ def repressor_edit_detail(edit_id):
 def approve_repressor_edit(edit_id):
     edit = RepressorEditRequest.query.get_or_404(edit_id)
     repressor = Repressor.query.get_or_404(edit.repressor_id)
+    if (repressor.verify_count or 0) >= REPRESSOR_VERIFY_LOCK_COUNT:
+        flash(
+            "La ficha alcanzó 10 verificaciones y ya no puede editarse en la plataforma.",
+            "error",
+        )
+        return redirect(url_for("moderation.dashboard"))
     if edit.status == "approved":
         flash("La edición de represor ya estaba aprobada.", "warning")
         return redirect(url_for("moderation.dashboard"))

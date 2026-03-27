@@ -35,6 +35,7 @@ from app.models.post import Post
 from app.models.post_edit_request import PostEditRequest
 from app.models.post_revision import PostRevision
 from app.models.repressor import (
+    REPRESSOR_VERIFY_LOCK_COUNT,
     Repressor,
     RepressorEditRequest,
     RepressorResidenceReport,
@@ -191,6 +192,25 @@ def _get_verified_post_ids(post_ids):
     rows = (
         VoteRecord.query.filter_by(target_type="post_verify", voter_hash=voter_hash)
         .filter(VoteRecord.target_id.in_(post_ids))
+        .all()
+    )
+    return {row.target_id for row in rows}
+
+
+def _get_verified_repressor_ids(repressor_ids):
+    if not repressor_ids:
+        return set()
+    voter_hash = get_voter_hash(
+        current_user, request, current_app.config.get("SECRET_KEY", "")
+    )
+    if not voter_hash:
+        return set()
+    rows = (
+        VoteRecord.query.filter_by(
+            target_type="repressor_verify",
+            voter_hash=voter_hash,
+        )
+        .filter(VoteRecord.target_id.in_(repressor_ids))
         .all()
     )
     return {row.target_id for row in rows}
@@ -1010,6 +1030,10 @@ def _is_admin_user():
 
 def _is_edit_locked(post: Post) -> bool:
     return (post.verify_count or 0) >= 10 and not _is_admin_user()
+
+
+def _is_repressor_profile_locked(repressor: Repressor) -> bool:
+    return (repressor.verify_count or 0) >= REPRESSOR_VERIFY_LOCK_COUNT
 
 
 def _get_editor_identity():
@@ -1849,6 +1873,8 @@ def repressor_detail(repressor_id):
         .filter_by(id=repressor_id)
         .first_or_404()
     )
+    repressor_verified_by_me = repressor.id in _get_verified_repressor_ids([repressor.id])
+    repressor_edit_locked = _is_repressor_profile_locked(repressor)
 
     return render_template(
         "map/repressor_detail.html",
@@ -1857,6 +1883,8 @@ def repressor_detail(repressor_id):
         type_badges=_build_repressor_type_badges(repressor),
         type_legend=_build_repressor_type_legend(),
         show_profile_actions=True,
+        repressor_verified_by_me=repressor_verified_by_me,
+        repressor_edit_locked=repressor_edit_locked,
     )
 
 
@@ -1866,6 +1894,12 @@ def delete_repressor(repressor_id):
         abort(403)
 
     repressor = Repressor.query.get_or_404(repressor_id)
+    if _is_repressor_profile_locked(repressor):
+        flash(
+            "Esta ficha alcanzó 10 verificaciones y no puede eliminarse.",
+            "error",
+        )
+        return redirect(url_for("map.repressor_detail", repressor_id=repressor.id))
     full_name = repressor.full_name
     try:
         Post.query.filter_by(repressor_id=repressor.id).update(
@@ -1959,6 +1993,12 @@ def _handle_repressor_edit_form(repressor_id: int, edit_kind: str):
         .filter_by(id=repressor_id)
         .first_or_404()
     )
+    if _is_repressor_profile_locked(repressor):
+        flash(
+            "Esta ficha alcanzó 10 verificaciones y ya no puede editarse ni reportarse.",
+            "error",
+        )
+        return redirect(url_for("map.repressor_detail", repressor_id=repressor.id))
     moderation_enabled = _is_moderation_enabled()
     type_options = get_repressor_type_options()
     allowed_type_names = get_repressor_type_names()
@@ -2235,6 +2275,8 @@ def repressors_viewer():
             viewer_total_seen=0,
             viewer_position=0,
             total_repressors=0,
+            repressor_verified_by_me=False,
+            repressor_edit_locked=False,
         )
 
     if not stack:
@@ -2282,6 +2324,10 @@ def repressors_viewer():
             )
 
     _save_viewer_history_state(stack, index)
+    repressor_verified_by_me = (
+        repressor.id in _get_verified_repressor_ids([repressor.id]) if repressor else False
+    )
+    repressor_edit_locked = _is_repressor_profile_locked(repressor) if repressor else False
 
     return render_template(
         "map/repressor_random_viewer.html",
@@ -2297,6 +2343,8 @@ def repressors_viewer():
         viewer_total_seen=len(stack),
         viewer_position=(index + 1) if index >= 0 else 0,
         total_repressors=total_repressors,
+        repressor_verified_by_me=repressor_verified_by_me,
+        repressor_edit_locked=repressor_edit_locked,
     )
 
 

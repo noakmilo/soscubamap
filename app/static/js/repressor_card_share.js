@@ -2,6 +2,8 @@
   const CARD_SELECTOR = "[data-repressor-card]";
   const DOWNLOAD_SELECTOR = "[data-repressor-download-btn]";
   const SHARE_SELECTOR = "[data-repressor-share-btn]";
+  const VERIFY_SELECTOR = "[data-repressor-verify-btn]";
+  const VERIFY_COUNT_SELECTOR = "[data-repressor-verify-count]";
   const ART_SELECTOR = ".repressor-duel-art[data-repressor-image]";
   const IMAGE_MODAL_ID = "repressorImageModal";
   const IMAGE_MODAL_IMG_ID = "repressorImageModalImg";
@@ -192,6 +194,11 @@
     window.open(intentUrl, "_blank", "noopener,noreferrer");
   }
 
+  async function verifyRepressor(repressorId) {
+    const res = await fetch(`/api/repressors/${repressorId}/verify`, { method: "POST" });
+    return await res.json();
+  }
+
   async function handleDownload(event) {
     const card = event.currentTarget.closest(CARD_SELECTOR);
     if (!card) return;
@@ -253,6 +260,49 @@
     }
   }
 
+  function wireRepressorVerification() {
+    document.querySelectorAll(VERIFY_SELECTOR).forEach((button) => {
+      if (button.getAttribute("data-verified") === "1") {
+        button.disabled = true;
+        button.textContent = "Verificado";
+        button.classList.add("is-verified");
+      }
+      button.addEventListener("click", async () => {
+        if (button.disabled) return;
+        const repressorId = button.getAttribute("data-repressor-id");
+        if (!repressorId) return;
+
+        button.disabled = true;
+        try {
+          const result = await verifyRepressor(repressorId);
+          const card = button.closest(CARD_SELECTOR);
+          const countEl =
+            (card && card.querySelector(`#repressor-verify-count-${repressorId}`)) ||
+            (card && card.querySelector(VERIFY_COUNT_SELECTOR));
+
+          if (countEl && result && typeof result.verify_count !== "undefined") {
+            countEl.textContent = result.verify_count;
+          }
+          if (result && result.ok) {
+            button.textContent = "Verificado";
+            button.setAttribute("data-verified", "1");
+            button.classList.add("is-verified");
+            if (result.locked) {
+              window.location.reload();
+            }
+            return;
+          }
+        } catch (error) {
+          console.error(error);
+        } finally {
+          if (button.getAttribute("data-verified") !== "1") {
+            button.disabled = false;
+          }
+        }
+      });
+    });
+  }
+
   function wireCardActions() {
     document.querySelectorAll(DOWNLOAD_SELECTOR).forEach((button) => {
       button.addEventListener("click", handleDownload);
@@ -260,6 +310,7 @@
     document.querySelectorAll(SHARE_SELECTOR).forEach((button) => {
       button.addEventListener("click", handleShare);
     });
+    wireRepressorVerification();
     wireImageModal();
   }
 

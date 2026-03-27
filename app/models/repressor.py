@@ -3,6 +3,8 @@ from datetime import datetime
 
 from app.extensions import db
 
+REPRESSOR_VERIFY_LOCK_COUNT = 10
+
 
 class Repressor(db.Model):
     __tablename__ = "repressors"
@@ -30,6 +32,7 @@ class Repressor(db.Model):
     source_status = db.Column(db.Integer)
     source_is_identifies = db.Column(db.String(60))
     source_payload_json = db.Column(db.Text, nullable=False, default="{}")
+    verify_count = db.Column(db.Integer, nullable=False, default=0)
 
     first_seen_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     last_synced_at = db.Column(

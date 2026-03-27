@@ -39,6 +39,7 @@ from app.models.connectivity_province_status import ConnectivityProvinceStatus
 from app.models.protest_event import ProtestEvent
 from app.models.protest_ingestion_run import ProtestIngestionRun
 from app.models.repressor import (
+    REPRESSOR_VERIFY_LOCK_COUNT,
     Repressor,
     RepressorIngestionRun,
     RepressorResidenceReport,
@@ -3222,6 +3223,60 @@ def verify_post(post_id):
         return jsonify({"ok": False, "verify_count": post.verify_count or 0})
 
     resp = make_response(jsonify({"ok": True, "verify_count": post.verify_count}))
+    resp.set_cookie(cookie_key, "1")
+    return resp
+
+
+@api_bp.route("/repressors/<int:repressor_id>/verify", methods=["POST"])
+@limiter.limit("10/minute; 200/day")
+def verify_repressor(repressor_id):
+    repressor = Repressor.query.get_or_404(repressor_id)
+    cookie_key = f"verified_repressor_{repressor_id}"
+    voter_hash = get_voter_hash(current_user, request, current_app.config.get("SECRET_KEY", ""))
+
+    existing = VoteRecord.query.filter_by(
+        target_type="repressor_verify",
+        target_id=repressor.id,
+        voter_hash=voter_hash,
+    ).first()
+    if existing or request.cookies.get(cookie_key):
+        return jsonify(
+            {
+                "ok": False,
+                "verify_count": repressor.verify_count or 0,
+                "locked": (repressor.verify_count or 0) >= REPRESSOR_VERIFY_LOCK_COUNT,
+            }
+        )
+
+    record = VoteRecord(
+        target_type="repressor_verify",
+        target_id=repressor.id,
+        voter_hash=voter_hash,
+        value=1,
+    )
+    db.session.add(record)
+    repressor.verify_count = (repressor.verify_count or 0) + 1
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify(
+            {
+                "ok": False,
+                "verify_count": repressor.verify_count or 0,
+                "locked": (repressor.verify_count or 0) >= REPRESSOR_VERIFY_LOCK_COUNT,
+            }
+        )
+
+    resp = make_response(
+        jsonify(
+            {
+                "ok": True,
+                "verify_count": repressor.verify_count,
+                "locked": (repressor.verify_count or 0) >= REPRESSOR_VERIFY_LOCK_COUNT,
+            }
+        )
+    )
     resp.set_cookie(cookie_key, "1")
     return resp
 

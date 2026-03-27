@@ -4,6 +4,7 @@ from typing import Any
 
 from app.extensions import db
 from app.models.repressor import (
+    REPRESSOR_VERIFY_LOCK_COUNT,
     Repressor,
     RepressorCrime,
     RepressorEditRequest,
@@ -138,6 +139,10 @@ def apply_repressor_edit_request(
     repressor: Repressor,
     edit_request: RepressorEditRequest,
 ) -> None:
+    if (repressor.verify_count or 0) >= REPRESSOR_VERIFY_LOCK_COUNT:
+        raise ValueError(
+            "La ficha alcanzó 10 verificaciones y ya no puede editarse en la plataforma."
+        )
     _apply_payload(
         repressor,
         name=edit_request.name or "",
@@ -158,6 +163,10 @@ def apply_repressor_revision(
     repressor: Repressor,
     revision: RepressorRevision,
 ) -> None:
+    if (repressor.verify_count or 0) >= REPRESSOR_VERIFY_LOCK_COUNT:
+        raise ValueError(
+            "La ficha alcanzó 10 verificaciones y ya no puede editarse en la plataforma."
+        )
     _apply_payload(
         repressor,
         name=revision.name or "",

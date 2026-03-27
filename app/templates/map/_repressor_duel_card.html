@@ -1,8 +1,11 @@
 {% if repressor and repressor_payload %}
   {% set crimes = repressor_payload.crimes or [] %}
+  {% set is_repressor_verified_by_me = repressor_verified_by_me|default(false) %}
+  {% set is_repressor_edit_locked = repressor_edit_locked|default(false) %}
   <article
     class="repressor-duel-card"
     data-repressor-card
+    data-repressor-id="{{ repressor.id }}"
     data-repressor-name="{{ repressor_payload.full_name }}"
     data-repressor-types="{{ (repressor_payload.types or [])|join(', ') }}"
     data-repressor-url="{{ url_for('map.repressor_detail', repressor_id=repressor.id) }}"
@@ -109,19 +112,37 @@
     {% endif %}
 
     <div class="repressor-duel-actions">
+      <button
+        class="btn-primary{% if is_repressor_verified_by_me %} is-verified{% endif %}"
+        type="button"
+        data-repressor-verify-btn
+        data-repressor-id="{{ repressor.id }}"
+        data-verified="{{ 1 if is_repressor_verified_by_me else 0 }}"
+        {% if is_repressor_verified_by_me %}disabled{% endif %}
+      >
+        {% if is_repressor_verified_by_me %}Verificado{% else %}Verificar{% endif %}
+      </button>
+      <span class="verify-count" id="repressor-verify-count-{{ repressor.id }}" data-repressor-verify-count>
+        {{ repressor.verify_count or 0 }}
+      </span>
       <a class="btn-primary" href="{{ url_for('map.report_repressor_residence', repressor_id=repressor.id) }}">
         Identificar en el mapa
       </a>
       {% if show_profile_actions %}
-        <a class="btn-secondary" href="{{ url_for('map.edit_repressor_public', repressor_id=repressor.id) }}">
-          Editar ficha
-        </a>
-        <a class="btn-secondary" href="{{ url_for('map.report_repressor_profile', repressor_id=repressor.id) }}">
-          Reportar ficha
-        </a>
+        {% if not is_repressor_edit_locked %}
+          <a class="btn-secondary" href="{{ url_for('map.edit_repressor_public', repressor_id=repressor.id) }}">
+            Editar ficha
+          </a>
+          <a class="btn-secondary" href="{{ url_for('map.report_repressor_profile', repressor_id=repressor.id) }}">
+            Reportar ficha
+          </a>
+        {% endif %}
         <a class="btn-secondary" href="{{ url_for('map.repressor_history', repressor_id=repressor.id) }}">
           Ver historial de ediciones
         </a>
+        {% if is_repressor_edit_locked %}
+          <span class="muted">Edición y eliminación bloqueadas: la ficha alcanzó 10 verificaciones.</span>
+        {% endif %}
       {% endif %}
       {% if repressor_payload.source_detail_url %}
         <a class="btn-secondary" href="{{ repressor_payload.source_detail_url }}" target="_blank" rel="noopener">
@@ -135,14 +156,16 @@
         Compartir
       </button>
       {% if current_user.is_authenticated and current_user.has_role('administrador') %}
-        <form
-          method="post"
-          action="{{ url_for('map.delete_repressor', repressor_id=repressor.id) }}"
-          class="repressor-delete-form"
-          onsubmit="return confirm('¿Eliminar esta ficha de represor? Esta acción no se puede deshacer.');"
-        >
-          <button class="btn-secondary repressor-delete-btn" type="submit">Eliminar ficha</button>
-        </form>
+        {% if not is_repressor_edit_locked %}
+          <form
+            method="post"
+            action="{{ url_for('map.delete_repressor', repressor_id=repressor.id) }}"
+            class="repressor-delete-form"
+            onsubmit="return confirm('¿Eliminar esta ficha de represor? Esta acción no se puede deshacer.');"
+          >
+            <button class="btn-secondary repressor-delete-btn" type="submit">Eliminar ficha</button>
+          </form>
+        {% endif %}
       {% endif %}
     </div>
   </article>

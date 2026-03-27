@@ -6,6 +6,7 @@ from sqlalchemy import func
 
 from app.extensions import db
 from app.models.repressor import (
+    REPRESSOR_VERIFY_LOCK_COUNT,
     Repressor,
     RepressorCrime,
     RepressorSubmission,
@@ -146,6 +147,10 @@ def materialize_repressor_submission(
     repressor = None
     if submission.repressor_id:
         repressor = Repressor.query.get(submission.repressor_id)
+        if repressor and (repressor.verify_count or 0) >= REPRESSOR_VERIFY_LOCK_COUNT:
+            raise ValueError(
+                "La ficha alcanzó 10 verificaciones y ya no puede editarse en la plataforma."
+            )
     if repressor is None:
         repressor = Repressor(
             external_id=_next_manual_external_id(),

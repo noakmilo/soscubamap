@@ -19,6 +19,7 @@ from app.models.repressor import (
     Repressor,
     RepressorCrime,
     RepressorIngestionRun,
+    REPRESSOR_VERIFY_LOCK_COUNT,
     RepressorType,
 )
 from app.services.location_names import canonicalize_location_names
@@ -398,6 +399,8 @@ def _upsert_repressor(
         db.session.add(repressor)
     else:
         action = "unchanged"
+        if (repressor.verify_count or 0) >= REPRESSOR_VERIFY_LOCK_COUNT:
+            return "unchanged", repressor
 
     source_image_url = _build_source_image_url(base_row.get("image"))
     image_changed = source_image_url != repressor.image_source_url
@@ -472,6 +475,7 @@ def serialize_repressor(repressor: Repressor, include_relationships: bool = True
     payload = {
         "id": repressor.id,
         "external_id": repressor.external_id,
+        "verify_count": repressor.verify_count or 0,
         "name": repressor.name,
         "lastname": repressor.lastname,
         "full_name": repressor.full_name,
