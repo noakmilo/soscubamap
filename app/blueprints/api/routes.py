@@ -221,10 +221,16 @@ def _resolve_territory_centroid(province_name=None, municipality_name=None):
         key = normalize_location_key(value)
         if key and key not in province_keys:
             province_keys.append(key)
-    if province_text == "La Habana" and "ciudaddelahabana" not in province_keys:
-        province_keys.append("ciudaddelahabana")
+    if province_text == "La Habana":
+        # Algunos geojson históricos etiquetan la ciudad como "Ciudad de La Habana"
+        # y otros como "La Habana". Priorizamos la variante de ciudad para no caer
+        # en centroides de la antigua provincia Habana.
+        prioritized_keys: list[str] = ["ciudaddelahabana", "lahabana"]
+        for key in province_keys:
+            if key not in prioritized_keys:
+                prioritized_keys.append(key)
+        province_keys = prioritized_keys
 
-    province_key = province_keys[0] if province_keys else ""
     municipality_key = normalize_location_key(municipality_text)
 
     gazetteer = {}
