@@ -13,4 +13,3 @@ scripts/build_palsaco_catalog_json.py
 scripts/scrape_prisonersdefenders_index.py
 scripts/scrape_prisonersdefenders_profiles.py
 
-scripts/ingest_prisonersdefenders_profiles.py
