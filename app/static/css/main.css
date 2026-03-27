@@ -2143,6 +2143,13 @@ body.map-dashboard-page *::-webkit-scrollbar {
   scrollbar-width: thin;
 }
 
+.prisoner-overlay > * {
+  box-sizing: border-box;
+  width: calc(100% - 4px);
+  margin-inline: 2px;
+  min-width: 0;
+}
+
 .prisoner-overlay[hidden] {
   display: none !important;
 }
@@ -2294,6 +2301,13 @@ body.map-dashboard-page *::-webkit-scrollbar {
   overflow-x: hidden;
 }
 
+.prisoner-detail-list > * {
+  box-sizing: border-box;
+  width: calc(100% - 4px);
+  margin-inline: 2px;
+  min-width: 0;
+}
+
 .prisoner-detail-empty {
   color: #c1e9cf;
   font-size: 11px;
@@ -2309,7 +2323,6 @@ body.map-dashboard-page *::-webkit-scrollbar {
   gap: 8px;
   min-width: 0;
   max-width: 100%;
-  overflow-x: hidden;
 }
 
 .prisoner-detail-head {
@@ -2375,6 +2388,7 @@ body.map-dashboard-page *::-webkit-scrollbar {
   gap: 6px;
   min-width: 0;
   max-width: 100%;
+  width: 100%;
 }
 
 .prisoner-detail-actions .info-btn {
