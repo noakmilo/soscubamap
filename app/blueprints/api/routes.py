@@ -209,13 +209,22 @@ def _safe_float(value):
 
 
 def _resolve_territory_centroid(province_name=None, municipality_name=None):
-    province_text = canonicalize_province_name(province_name) or str(province_name or "").strip()
+    raw_province_text = str(province_name or "").strip()
+    province_text = canonicalize_province_name(province_name) or raw_province_text
     municipality_text = (
         canonicalize_location_names(province_name, municipality_name)[1]
         if municipality_name
         else None
     )
-    province_key = normalize_location_key(province_text)
+    province_keys: list[str] = []
+    for value in (province_text, raw_province_text):
+        key = normalize_location_key(value)
+        if key and key not in province_keys:
+            province_keys.append(key)
+    if province_text == "La Habana" and "ciudaddelahabana" not in province_keys:
+        province_keys.append("ciudaddelahabana")
+
+    province_key = province_keys[0] if province_keys else ""
     municipality_key = normalize_location_key(municipality_text)
 
     gazetteer = {}
@@ -242,14 +251,14 @@ def _resolve_territory_centroid(province_name=None, municipality_name=None):
             if str(entry.get("type") or "").strip() != "municipality":
                 continue
             entry_province_key = normalize_location_key(entry.get("province"))
-            if province_key and entry_province_key and entry_province_key != province_key:
+            if province_keys and entry_province_key and entry_province_key not in province_keys:
                 continue
             lat, lng = _pick_lat_lng(entry)
             if lat is not None and lng is not None:
                 return lat, lng
 
-    if province_key:
-        entries = gazetteer_all.get(province_key) or []
+    for candidate_key in province_keys:
+        entries = gazetteer_all.get(candidate_key) or []
         for entry in entries:
             if str(entry.get("type") or "").strip() != "province":
                 continue
@@ -257,12 +266,21 @@ def _resolve_territory_centroid(province_name=None, municipality_name=None):
             if lat is not None and lng is not None:
                 return lat, lng
 
-    fallback = PROVINCE_CENTER_FALLBACKS.get(province_text)
-    if isinstance(fallback, (list, tuple)) and len(fallback) >= 2:
-        lat = _safe_float(fallback[0])
-        lng = _safe_float(fallback[1])
-        if lat is not None and lng is not None:
-            return lat, lng
+    fallback_candidates = []
+    for value in (province_text, raw_province_text):
+        text = str(value or "").strip()
+        if text and text not in fallback_candidates:
+            fallback_candidates.append(text)
+    if province_text == "La Habana":
+        fallback_candidates.append("Ciudad de La Habana")
+
+    for candidate in fallback_candidates:
+        fallback = PROVINCE_CENTER_FALLBACKS.get(candidate)
+        if isinstance(fallback, (list, tuple)) and len(fallback) >= 2:
+            lat = _safe_float(fallback[0])
+            lng = _safe_float(fallback[1])
+            if lat is not None and lng is not None:
+                return lat, lng
 
     return None, None
 
@@ -2425,6 +2443,11 @@ def prisoner_stats_v1():
     requested_province = canonicalize_province_name((request.args.get("province") or "").strip()) or None
     requested_municipality = (request.args.get("municipality") or "").strip() or None
     requested_prison = (request.args.get("prison") or "").strip() or None
+    requested_province_values = (
+        _matching_stored_province_values(Prisoner.province_name, requested_province)
+        if requested_province
+        else []
+    )
 
     query = db.session.query(
         Prisoner.province_name,
@@ -2433,7 +2456,10 @@ def prisoner_stats_v1():
         func.count(Prisoner.id),
     )
     if requested_province:
-        query = query.filter(Prisoner.province_name == requested_province)
+        if requested_province_values:
+            query = query.filter(Prisoner.province_name.in_(requested_province_values))
+        else:
+            query = query.filter(Prisoner.province_name == requested_province)
     if requested_municipality:
         query = query.filter(Prisoner.municipality_name == requested_municipality)
     if requested_prison:
@@ -2545,10 +2571,18 @@ def prisoner_map_layer_v1():
     requested_province = canonicalize_province_name((request.args.get("province") or "").strip()) or ""
     requested_municipality = (request.args.get("municipality") or "").strip()
     requested_prison = (request.args.get("prison") or "").strip()
+    requested_province_values = (
+        _matching_stored_province_values(Prisoner.province_name, requested_province)
+        if requested_province
+        else []
+    )
 
     base_query = Prisoner.query
     if requested_province:
-        base_query = base_query.filter(Prisoner.province_name == requested_province)
+        if requested_province_values:
+            base_query = base_query.filter(Prisoner.province_name.in_(requested_province_values))
+        else:
+            base_query = base_query.filter(Prisoner.province_name == requested_province)
     if requested_municipality:
         base_query = base_query.filter(Prisoner.municipality_name == requested_municipality)
     if requested_prison:
@@ -2561,7 +2595,10 @@ def prisoner_map_layer_v1():
         func.count(Prisoner.id),
     )
     if requested_province:
-        rows_query = rows_query.filter(Prisoner.province_name == requested_province)
+        if requested_province_values:
+            rows_query = rows_query.filter(Prisoner.province_name.in_(requested_province_values))
+        else:
+            rows_query = rows_query.filter(Prisoner.province_name == requested_province)
     if requested_municipality:
         rows_query = rows_query.filter(Prisoner.municipality_name == requested_municipality)
     if requested_prison:
@@ -2660,9 +2697,14 @@ def prisoner_map_layer_v1():
         Prisoner.municipality_name != "",
     )
     if requested_province:
-        municipality_filter_query = municipality_filter_query.filter(
-            Prisoner.province_name == requested_province
-        )
+        if requested_province_values:
+            municipality_filter_query = municipality_filter_query.filter(
+                Prisoner.province_name.in_(requested_province_values)
+            )
+        else:
+            municipality_filter_query = municipality_filter_query.filter(
+                Prisoner.province_name == requested_province
+            )
     municipality_options = sorted(
         {
             str(row[0]).strip()
@@ -2676,7 +2718,14 @@ def prisoner_map_layer_v1():
         Prisoner.prison_name != "",
     )
     if requested_province:
-        prison_filter_query = prison_filter_query.filter(Prisoner.province_name == requested_province)
+        if requested_province_values:
+            prison_filter_query = prison_filter_query.filter(
+                Prisoner.province_name.in_(requested_province_values)
+            )
+        else:
+            prison_filter_query = prison_filter_query.filter(
+                Prisoner.province_name == requested_province
+            )
     if requested_municipality:
         prison_filter_query = prison_filter_query.filter(
             Prisoner.municipality_name == requested_municipality
@@ -2734,15 +2783,22 @@ def prisoners_territory_v1():
     if scope == "municipality" and not canonical_municipality:
         return jsonify({"ok": False, "error": "municipality es obligatorio para scope=municipality."}), 400
 
+    province_filter_values = _matching_stored_province_values(
+        Prisoner.province_name,
+        canonical_province,
+    )
+    if not province_filter_values:
+        province_filter_values = [canonical_province]
+
     query = Prisoner.query
     if scope == "municipality":
         query = query.filter(
-            Prisoner.province_name == canonical_province,
+            Prisoner.province_name.in_(province_filter_values),
             Prisoner.municipality_name == canonical_municipality,
         )
     else:
         query = query.filter(
-            Prisoner.province_name == canonical_province,
+            Prisoner.province_name.in_(province_filter_values),
             or_(Prisoner.municipality_name.is_(None), Prisoner.municipality_name == ""),
         )
     if prison:
