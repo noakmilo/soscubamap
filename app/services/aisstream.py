@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import math
 import re
 import unicodedata
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from flask import current_app, has_app_context
 from sqlalchemy import or_
@@ -15,6 +17,8 @@ from sqlalchemy import or_
 from app.extensions import db
 from app.models.ais_cuba_target_vessel import AISCubaTargetVessel
 from app.models.ais_ingestion_run import AISIngestionRun
+
+logger = logging.getLogger(__name__)
 
 
 POSITION_MESSAGE_TYPES = {
@@ -302,6 +306,16 @@ def get_ais_max_messages_per_run() -> int:
     return max(_safe_int(_config_value("AISSTREAM_MAX_MESSAGES_PER_RUN", 120000), 120000), 1000)
 
 
+def get_ais_progress_log_every() -> int:
+    raw = _safe_int(_config_value("AISSTREAM_PROGRESS_LOG_EVERY", 250), 250)
+    return max(raw, 1)
+
+
+def get_ais_idle_log_seconds() -> int:
+    raw = _safe_int(_config_value("AISSTREAM_IDLE_LOG_SECONDS", 20), 20)
+    return max(raw, 1)
+
+
 def get_ais_ingestion_interval_seconds() -> int:
     raw = _safe_int(_config_value("AISSTREAM_INGESTION_INTERVAL_SECONDS", 86400), 86400)
     return max(raw, 3600)
@@ -379,6 +393,21 @@ def get_ais_subscription_bounding_boxes() -> list[list[list[float]]]:
         valid_boxes.append([[float(lat1), float(lon1)], [float(lat2), float(lon2)]])
 
     return valid_boxes or [[[17.5, -88.5], [25.8, -73.0]]]
+
+
+def _sanitize_ws_url(url: str) -> str:
+    text = str(url or "").strip()
+    if not text:
+        return ""
+    try:
+        parsed = urlsplit(text)
+    except Exception:
+        return text
+
+    safe_netloc = parsed.hostname or ""
+    if parsed.port:
+        safe_netloc = f"{safe_netloc}:{parsed.port}"
+    return urlunsplit((parsed.scheme, safe_netloc, parsed.path, "", ""))
 
 
 def _angle_delta_deg(a_deg: float, b_deg: float) -> float:
@@ -916,38 +945,125 @@ async def _consume_ais_stream(
     capture_minutes = get_ais_capture_minutes()
     max_seconds = max(10, capture_minutes * 60)
     max_messages = get_ais_max_messages_per_run()
-    deadline = asyncio.get_running_loop().time() + max_seconds
+    progress_every = get_ais_progress_log_every()
+    idle_log_seconds = float(get_ais_idle_log_seconds())
+    loop = asyncio.get_running_loop()
+    start_monotonic = loop.time()
+    deadline = start_monotonic + max_seconds
+    bounding_boxes = get_ais_subscription_bounding_boxes()
 
     subscription_message = {
         "APIKey": api_key,
-        "BoundingBoxes": get_ais_subscription_bounding_boxes(),
+        "BoundingBoxes": bounding_boxes,
         "FilterMessageTypes": AIS_MESSAGE_TYPES,
     }
 
-    async with websockets.connect(ws_url, ping_interval=20, ping_timeout=20, close_timeout=6) as websocket:
-        await websocket.send(json.dumps(subscription_message))
+    logger.info(
+        "AISStream run starting ws_url=%s capture_minutes=%s max_messages=%s bboxes=%s message_types=%s cache_seed=%s",
+        _sanitize_ws_url(ws_url),
+        capture_minutes,
+        max_messages,
+        len(bounding_boxes),
+        len(AIS_MESSAGE_TYPES),
+        len(state_cache),
+    )
 
-        while asyncio.get_running_loop().time() < deadline:
-            if counters["total_messages"] >= max_messages:
-                break
-            timeout_seconds = min(5.0, max(0.2, deadline - asyncio.get_running_loop().time()))
-            try:
-                raw_message = await asyncio.wait_for(websocket.recv(), timeout=timeout_seconds)
-            except asyncio.TimeoutError:
-                continue
+    try:
+        async with websockets.connect(ws_url, ping_interval=20, ping_timeout=20, close_timeout=6) as websocket:
+            logger.info("AISStream websocket connected")
+            await websocket.send(json.dumps(subscription_message))
+            logger.info("AISStream subscription sent")
 
-            counters["total_messages"] += 1
+            last_progress_log_total = 0
+            last_idle_log_at = start_monotonic
+            last_message_at = start_monotonic
 
-            try:
-                message_obj = json.loads(raw_message)
-            except Exception:
-                counters["parse_errors"] += 1
-                continue
+            while loop.time() < deadline:
+                if counters["total_messages"] >= max_messages:
+                    logger.info(
+                        "AISStream stop reason=max_messages total_messages=%s",
+                        counters["total_messages"],
+                    )
+                    break
 
-            if isinstance(message_obj, dict) and message_obj.get("error"):
-                raise RuntimeError(f"AISStream error: {message_obj.get('error')}")
+                now = loop.time()
+                timeout_seconds = min(5.0, max(0.2, deadline - now))
+                try:
+                    raw_message = await asyncio.wait_for(websocket.recv(), timeout=timeout_seconds)
+                except asyncio.TimeoutError:
+                    now = loop.time()
+                    if now - last_idle_log_at >= idle_log_seconds:
+                        logger.info(
+                            "AISStream waiting elapsed=%ss idle=%ss total=%s matched=%s parse_errors=%s",
+                            int(now - start_monotonic),
+                            int(now - last_message_at),
+                            counters["total_messages"],
+                            counters["matched_messages"],
+                            counters["parse_errors"],
+                        )
+                        last_idle_log_at = now
+                    continue
 
-            _update_state_from_message(state_cache, message_obj, counters)
+                now = loop.time()
+                last_message_at = now
+                counters["total_messages"] += 1
+
+                try:
+                    message_obj = json.loads(raw_message)
+                except Exception:
+                    counters["parse_errors"] += 1
+                    if counters["parse_errors"] <= 3 or counters["parse_errors"] % 100 == 0:
+                        logger.warning(
+                            "AISStream parse_error count=%s total_messages=%s",
+                            counters["parse_errors"],
+                            counters["total_messages"],
+                        )
+                    continue
+
+                if isinstance(message_obj, dict) and message_obj.get("error"):
+                    logger.error("AISStream error frame received: %s", message_obj.get("error"))
+                    raise RuntimeError(f"AISStream error: {message_obj.get('error')}")
+
+                _update_state_from_message(state_cache, message_obj, counters)
+
+                total_messages = counters["total_messages"]
+                if total_messages - last_progress_log_total >= progress_every:
+                    elapsed = max(now - start_monotonic, 1e-6)
+                    logger.info(
+                        "AISStream progress total=%s position=%s static=%s matched_messages=%s parse_errors=%s cache=%s rate=%.2fmsg/s",
+                        total_messages,
+                        counters["position_messages"],
+                        counters["static_messages"],
+                        counters["matched_messages"],
+                        counters["parse_errors"],
+                        len(state_cache),
+                        total_messages / elapsed,
+                    )
+                    last_progress_log_total = total_messages
+
+        if loop.time() >= deadline:
+            logger.info(
+                "AISStream stop reason=capture_window capture_minutes=%s total_messages=%s",
+                capture_minutes,
+                counters["total_messages"],
+            )
+
+        total_elapsed = max(loop.time() - start_monotonic, 0.0)
+        average_rate = counters["total_messages"] / total_elapsed if total_elapsed > 0 else 0.0
+        logger.info(
+            "AISStream run finished elapsed=%.1fs total=%s position=%s static=%s matched_messages=%s parse_errors=%s cache=%s avg_rate=%.2fmsg/s",
+            total_elapsed,
+            counters["total_messages"],
+            counters["position_messages"],
+            counters["static_messages"],
+            counters["matched_messages"],
+            counters["parse_errors"],
+            len(state_cache),
+            average_rate,
+        )
+    except Exception:
+        logger.exception("AISStream websocket consumption failed")
+        raise
 
 
 def _run_ingestion_sync(
@@ -1029,6 +1145,7 @@ def ingest_aisstream_cuba_targets(
     raise_on_error: bool = True,
 ) -> dict[str, Any]:
     if not get_ais_enabled():
+        logger.info("AISStream ingestion skipped reason=aisstream_disabled")
         return {
             "status": "skipped",
             "reason": "aisstream_disabled",
@@ -1036,6 +1153,7 @@ def ingest_aisstream_cuba_targets(
         }
 
     if not get_ais_api_key():
+        logger.warning("AISStream ingestion skipped reason=missing_api_key")
         return {
             "status": "skipped",
             "reason": "missing_api_key",
@@ -1062,6 +1180,12 @@ def ingest_aisstream_cuba_targets(
     }
 
     state_cache = _load_state_cache()
+    logger.info(
+        "AISStream ingestion run created run_id=%s scheduled_for=%s cached_vessels=%s",
+        run_id,
+        _normalize_utc_datetime(scheduled_for),
+        len(state_cache),
+    )
 
     try:
         _run_ingestion_sync(state_cache, counters)
@@ -1121,9 +1245,18 @@ def ingest_aisstream_cuba_targets(
             ],
         }
         _finalize_run_success(run_id, counters, summary_payload)
+        logger.info(
+            "AISStream ingestion run success run_id=%s total_messages=%s matched_vessels=%s stored_vessels=%s parse_errors=%s",
+            run_id,
+            counters["total_messages"],
+            counters["matched_vessels"],
+            total_rows,
+            counters["parse_errors"],
+        )
         return summary_payload
     except Exception as exc:
         db.session.rollback()
+        logger.exception("AISStream ingestion run failed run_id=%s", run_id)
         _finalize_run_failure(run_id, counters, str(exc))
         failure_payload = {
             "status": "failed",
