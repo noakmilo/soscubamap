@@ -1,0 +1,196 @@
+{% extends "shared/base.html" %}
+{% block title %} | Editar ficha de prisionero{% endblock %}
+{% block meta_description %}Edición comunitaria de fichas de prisioneros políticos con historial y trazabilidad pública.{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="admin-toolbar">
+    <h1>Editar ficha de prisionero</h1>
+    <a class="btn-secondary" href="{{ url_for('map.prisoner_detail', prisoner_id=prisoner.id) }}">← Volver a la ficha</a>
+  </div>
+
+  {% if errors.get("form") %}
+    <div class="flash error">{{ errors.get("form") }}</div>
+  {% endif %}
+
+  <form method="post" class="form-grid" id="editPrisonerForm" enctype="multipart/form-data">
+    <label>
+      Motivo de la edición *
+      <textarea name="reason" rows="3" class="{{ 'field-error' if errors.get('reason') else '' }}" required>{{ form_data.reason }}</textarea>
+      {% if errors.get("reason") %}<div class="field-error-msg">{{ errors.get("reason") }}</div>{% endif %}
+    </label>
+
+    <div class="two-col">
+      <label>
+        Nombre *
+        <input type="text" name="name" value="{{ form_data.name }}" class="{{ 'field-error' if errors.get('name') else '' }}" required />
+        {% if errors.get("name") %}<div class="field-error-msg">{{ errors.get("name") }}</div>{% endif %}
+      </label>
+      <label>
+        Apellidos
+        <input type="text" name="lastname" value="{{ form_data.lastname }}" class="{{ 'field-error' if errors.get('lastname') else '' }}" />
+      </label>
+    </div>
+
+    <div class="two-col">
+      <label>
+        Género / clasificación
+        <input type="text" name="gender_label" value="{{ form_data.gender_label }}" />
+      </label>
+      <label>
+        Tipología de detención
+        <input type="text" name="detention_typology" value="{{ form_data.detention_typology }}" />
+      </label>
+    </div>
+
+    <div class="two-col">
+      <label>
+        Edad en la detención
+        <input type="text" name="age_detention_label" value="{{ form_data.age_detention_label }}" />
+      </label>
+      <label>
+        Edad actual
+        <input type="text" name="age_current_label" value="{{ form_data.age_current_label }}" />
+      </label>
+    </div>
+
+    <div class="two-col">
+      <label>
+        Provincia
+        <select name="province_name">
+          <option value="">Seleccionar</option>
+          {% for prov in provinces %}
+            <option value="{{ prov }}" {% if prov == form_data.province_name %}selected{% endif %}>{{ prov }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Municipio
+        <select name="municipality_name" id="editPrisonerMunicipalitySelect">
+          <option value="">Seleccionar</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="two-col">
+      <label>
+        Prisión
+        <input type="text" name="prison_name" value="{{ form_data.prison_name }}" class="{{ 'field-error' if errors.get('prison_name') else '' }}" />
+        {% if errors.get("prison_name") %}<div class="field-error-msg">{{ errors.get("prison_name") }}</div>{% endif %}
+      </label>
+      <label>
+        Dirección de prisión
+        <input type="text" name="prison_address" value="{{ form_data.prison_address }}" class="{{ 'field-error' if errors.get('prison_address') else '' }}" />
+      </label>
+    </div>
+
+    <div class="two-col">
+      <label>
+        Latitud de prisión
+        <input type="text" name="prison_latitude" value="{{ form_data.prison_latitude }}" class="{{ 'field-error' if errors.get('prison_latitude') else '' }}" />
+        {% if errors.get("prison_latitude") %}<div class="field-error-msg">{{ errors.get("prison_latitude") }}</div>{% endif %}
+      </label>
+      <label>
+        Longitud de prisión
+        <input type="text" name="prison_longitude" value="{{ form_data.prison_longitude }}" class="{{ 'field-error' if errors.get('prison_longitude') else '' }}" />
+        {% if errors.get("prison_longitude") %}<div class="field-error-msg">{{ errors.get("prison_longitude") }}</div>{% endif %}
+      </label>
+    </div>
+
+    <div class="two-col">
+      <label>
+        Fecha de detención
+        <input type="text" name="detention_date" value="{{ form_data.detention_date }}" class="{{ 'field-error' if errors.get('detention_date') else '' }}" />
+      </label>
+      <label>
+        Condena
+        <input type="text" name="sentence_text" value="{{ form_data.sentence_text }}" class="{{ 'field-error' if errors.get('sentence_text') else '' }}" />
+      </label>
+    </div>
+
+    <div class="two-col">
+      <label>
+        Estado médico
+        <input type="text" name="medical_status" value="{{ form_data.medical_status }}" class="{{ 'field-error' if errors.get('medical_status') else '' }}" />
+      </label>
+      <label>
+        Estado penal
+        <input type="text" name="penal_status" value="{{ form_data.penal_status }}" class="{{ 'field-error' if errors.get('penal_status') else '' }}" />
+      </label>
+    </div>
+
+    <label>
+      Delitos imputados (separados por coma o línea)
+      <textarea name="offense_types" rows="4" class="{{ 'field-error' if errors.get('offense_types') else '' }}">{{ form_data.offense_types }}</textarea>
+      {% if errors.get("offense_types") %}<div class="field-error-msg">{{ errors.get("offense_types") }}</div>{% endif %}
+    </label>
+
+    <label>
+      Observaciones
+      <textarea name="observations" rows="6" class="{{ 'field-error' if errors.get('observations') else '' }}">{{ form_data.observations }}</textarea>
+      {% if errors.get("observations") %}<div class="field-error-msg">{{ errors.get("observations") }}</div>{% endif %}
+    </label>
+
+    <div class="two-col">
+      <label>
+        URL de imagen
+        <input type="url" name="image_url" value="{{ form_data.image_url }}" class="{{ 'field-error' if errors.get('image_url') else '' }}" />
+      </label>
+      <label>
+        Subir foto nueva (opcional)
+        <input type="file" name="photo" accept=".jpg,.jpeg,.png,.webp,.heic,image/heic,image/heif" class="{{ 'field-error' if errors.get('photo') else '' }}" />
+        {% if errors.get("photo") %}<div class="field-error-msg">{{ errors.get("photo") }}</div>{% endif %}
+      </label>
+    </div>
+
+    <label>
+      URL de ficha fuente
+      <input type="url" name="source_detail_url" value="{{ form_data.source_detail_url }}" class="{{ 'field-error' if errors.get('source_detail_url') else '' }}" />
+    </label>
+
+    {% if recaptcha_site_key %}
+      <div class="recaptcha-wrap">
+        <div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div>
+      </div>
+      {% if errors.get("recaptcha") %}<div class="field-error-msg">{{ errors.get("recaptcha") }}</div>{% endif %}
+    {% endif %}
+
+    <button type="submit" class="btn-primary">Guardar edición</button>
+  </form>
+</section>
+
+<script>
+  window.CUBA_MUNICIPALITIES = {{ municipalities_map|tojson }};
+</script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const form = document.getElementById("editPrisonerForm");
+    if (!form || !window.CUBA_MUNICIPALITIES) return;
+    const provinceSelect = form.querySelector('select[name="province_name"]');
+    const municipalitySelect = document.getElementById("editPrisonerMunicipalitySelect");
+    if (!provinceSelect || !municipalitySelect) return;
+    const initialMunicipality = {{ form_data.municipality_name|tojson }};
+
+    const renderMunicipalities = (preferredMunicipality = "") => {
+      let options = [];
+      if (provinceSelect.value && window.CUBA_MUNICIPALITIES[provinceSelect.value]) {
+        options = window.CUBA_MUNICIPALITIES[provinceSelect.value];
+      } else {
+        Object.values(window.CUBA_MUNICIPALITIES).forEach((items) => {
+          options = options.concat(items || []);
+        });
+      }
+      options = Array.from(new Set(options)).sort();
+      const selected = options.includes(preferredMunicipality) ? preferredMunicipality : "";
+      municipalitySelect.innerHTML =
+        '<option value="">Seleccionar</option>' +
+        options.map((name) => `<option value="${name}" ${name === selected ? "selected" : ""}>${name}</option>`).join("");
+    };
+
+    renderMunicipalities(initialMunicipality || "");
+    provinceSelect.addEventListener("change", () => renderMunicipalities(""));
+  });
+</script>
+{% if recaptcha_site_key %}
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,165 @@
+{% extends "shared/base.html" %}
+{% block title %} | Prisioneros políticos{% endblock %}
+{% block meta_description %}Catálogo de prisioneros políticos por provincia, municipio y prisión, con fichas editables e historial público.{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="admin-toolbar">
+    <h1>Catálogo de prisioneros políticos</h1>
+    <a class="btn-primary" href="{{ url_for('map.add_prisoner') }}">Agregar ficha</a>
+  </div>
+  <p class="muted">
+    Datos de referencia de <strong>prisonersdefenders.org</strong> y aportes de la comunidad.
+    Puedes filtrar por provincia, municipio y prisión.
+  </p>
+
+  <form method="get" class="filter-controls" id="prisonerFilters">
+    <label>
+      Buscar
+      <input type="text" name="q" value="{{ q }}" placeholder="Nombre, prisión, estado penal o ID externo" />
+    </label>
+    <label>
+      Provincia
+      <select name="provincia">
+        <option value="">Todas</option>
+        {% for prov in provinces %}
+          <option value="{{ prov }}" {% if prov == selected_province %}selected{% endif %}>{{ prov }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Municipio
+      <select name="municipio" id="prisonerMunicipalityFilterTable">
+        <option value="">Todos</option>
+        {% for mun in municipalities %}
+          <option value="{{ mun }}" {% if mun == selected_municipality %}selected{% endif %}>{{ mun }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Prisión
+      <select name="prision">
+        <option value="">Todas</option>
+        {% for prison_name in prisons %}
+          <option value="{{ prison_name }}" {% if prison_name == selected_prison %}selected{% endif %}>{{ prison_name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Resultados por página
+      <select name="per_page">
+        {% for option in per_page_options %}
+          <option value="{{ option }}" {% if option == per_page %}selected{% endif %}>{{ option }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button class="btn-primary" type="submit">Aplicar</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Resultados</h2>
+  {% if prisoners %}
+    <div class="table-wrap repressors-table-wrap">
+      <table class="admin-table repressors-table">
+        <thead>
+          <tr>
+            <th>Foto</th>
+            <th>Nombre</th>
+            <th>Provincia</th>
+            <th>Municipio</th>
+            <th>Prisión</th>
+            <th>Estado penal</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in prisoners %}
+            <tr>
+              <td>
+                {% if item.image_url %}
+                  <img src="{{ item.image_url }}" alt="{{ item.full_name }}" class="repressor-avatar" />
+                {% else %}
+                  <span class="muted">N/D</span>
+                {% endif %}
+              </td>
+              <td>
+                <strong>{{ item.full_name }}</strong>
+                <div class="muted">Ficha #{{ item.external_id }}</div>
+              </td>
+              <td>{{ item.province_name or "N/D" }}</td>
+              <td>{{ item.municipality_name or "N/D" }}</td>
+              <td>{{ item.prison_name or "N/D" }}</td>
+              <td>{{ item.penal_status or "N/D" }}</td>
+              <td class="repressor-actions-cell">
+                <div class="repressor-row-actions">
+                  <a class="btn-secondary repressor-action-btn" href="{{ url_for('map.prisoner_detail', prisoner_id=item.id) }}">Ver ficha</a>
+                  <a class="btn-primary repressor-action-btn" href="{{ url_for('map.edit_prisoner_public', prisoner_id=item.id) }}">Editar</a>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if pages > 1 %}
+      <div class="admin-links" style="margin-top:12px;">
+        {% if page > 1 %}
+          <a href="{{ url_for('map.prisoners', q=q, provincia=selected_province, municipio=selected_municipality, prision=selected_prison, per_page=per_page, page=1) }}">« Primera</a>
+          <a href="{{ url_for('map.prisoners', q=q, provincia=selected_province, municipio=selected_municipality, prision=selected_prison, per_page=per_page, page=page-1) }}">← Anterior</a>
+        {% endif %}
+        {% for page_number in page_numbers %}
+          {% if page_number == page %}
+            <span><strong>{{ page_number }}</strong></span>
+          {% else %}
+            <a href="{{ url_for('map.prisoners', q=q, provincia=selected_province, municipio=selected_municipality, prision=selected_prison, per_page=per_page, page=page_number) }}">{{ page_number }}</a>
+          {% endif %}
+        {% endfor %}
+        {% if page < pages %}
+          <a href="{{ url_for('map.prisoners', q=q, provincia=selected_province, municipio=selected_municipality, prision=selected_prison, per_page=per_page, page=page+1) }}">Siguiente →</a>
+          <a href="{{ url_for('map.prisoners', q=q, provincia=selected_province, municipio=selected_municipality, prision=selected_prison, per_page=per_page, page=pages) }}">Última »</a>
+        {% endif %}
+      </div>
+    {% endif %}
+  {% else %}
+    <div class="muted">No se encontraron prisioneros políticos.</div>
+  {% endif %}
+</section>
+
+<script>
+  window.CUBA_MUNICIPALITIES = {{ municipalities_map|tojson }};
+</script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const filters = document.getElementById("prisonerFilters");
+    if (!filters || !window.CUBA_MUNICIPALITIES) return;
+    const provSelect = filters.querySelector('select[name="provincia"]');
+    const munSelect = document.getElementById("prisonerMunicipalityFilterTable");
+    if (!provSelect || !munSelect) return;
+    const source = window.CUBA_MUNICIPALITIES;
+
+    const renderMunicipalities = (preferredMunicipality = "") => {
+      let items = [];
+      if (provSelect.value && source[provSelect.value]) {
+        items = source[provSelect.value];
+      } else {
+        Object.values(source).forEach((list) => {
+          items = items.concat(list || []);
+        });
+      }
+      items = Array.from(new Set(items)).sort();
+      const selectedMun = items.includes(preferredMunicipality) ? preferredMunicipality : "";
+      munSelect.innerHTML =
+        '<option value="">Todos</option>' +
+        items
+          .map((name) => `<option value="${name}" ${name === selectedMun ? "selected" : ""}>${name}</option>`)
+          .join("");
+    };
+
+    renderMunicipalities(munSelect.value || "");
+    provSelect.addEventListener("change", () => {
+      renderMunicipalities("");
+    });
+  });
+</script>
+{% endblock %}

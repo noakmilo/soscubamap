@@ -1,0 +1,7 @@
+[
+  {
+    "detail_url": "https://lista.prisonersdefenders.org/prisioneros/islandy-torres-marchado/",
+    "error": "HTTPSConnectionPool(host='lista.prisonersdefenders.org', port=443): Read timed out. (read timeout=30.0)",
+    "captured_at": "2026-03-27T16:47:19.403253+00:00"
+  }
+]

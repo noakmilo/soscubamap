@@ -42,6 +42,7 @@ from app.models.repressor import (
     RepressorRevision,
     RepressorSubmission,
 )
+from app.models.prisoner import Prisoner, PrisonerRevision
 from app.models.role import Role
 from app.models.site_setting import SiteSetting
 from app.models.user import User
@@ -78,6 +79,7 @@ from app.services.repressors import (
     build_residence_post_title,
     serialize_repressor,
 )
+from app.services.prisoners import serialize_prisoner
 from app.services.repressor_submissions import (
     get_repressor_type_names,
     get_repressor_type_options,
@@ -90,6 +92,7 @@ from app.services.repressor_edits import (
     apply_repressor_edit_request,
     snapshot_repressor,
 )
+from app.services.prisoner_edits import apply_prisoner_payload, snapshot_prisoner
 from app.services.vote_identity import get_voter_hash
 from app.services.map_providers import get_map_provider_forms, get_map_provider_main
 
@@ -115,6 +118,8 @@ _MAP_LAYER_ALIASES = {
     "conectividad": "connectivity",
     "repressors": "repressors",
     "represores": "repressors",
+    "prisoners": "prisoners",
+    "prisioneros": "prisoners",
     "protests": "protests",
     "protestas": "protests",
 }
@@ -2259,6 +2264,7 @@ def repressors_viewer():
     total_repressors = int(db.session.query(func.count(Repressor.id)).scalar() or 0)
     nav_action = (request.args.get("nav") or "").strip().lower()
     stack, index = _load_viewer_history_state()
+    had_existing_stack = bool(stack)
 
     if total_repressors <= 0:
         stack = []
@@ -2288,6 +2294,15 @@ def repressors_viewer():
     if nav_action == "prev" and stack:
         index = max(0, index - 1)
     elif nav_action == "next" and stack:
+        current_id = stack[index]
+        next_id = _pick_random_repressor_id(
+            exclude_id=current_id if total_repressors > 1 else None
+        )
+        if next_id is not None:
+            stack = stack[: index + 1]
+            stack.append(next_id)
+            index += 1
+    elif not nav_action and had_existing_stack and stack:
         current_id = stack[index]
         next_id = _pick_random_repressor_id(
             exclude_id=current_id if total_repressors > 1 else None
@@ -2526,3 +2541,591 @@ def report_repressor_residence(repressor_id):
         google_maps_api_key=_google_maps_api_key(),
         recaptcha_site_key=current_app.config.get("RECAPTCHA_V2_SITE_KEY"),
     )
+
+
+def _next_local_prisoner_external_id() -> int:
+    current_min = (
+        db.session.query(func.min(Prisoner.external_id))
+        .filter(Prisoner.external_id < 0)
+        .scalar()
+    )
+    if current_min is None:
+        return -1
+    try:
+        return int(current_min) - 1
+    except Exception:
+        return -1
+
+
+def _available_prison_names(
+    selected_province: str = "",
+    selected_municipality: str = "",
+) -> list[str]:
+    query = db.session.query(Prisoner.prison_name).filter(
+        Prisoner.prison_name.isnot(None),
+        Prisoner.prison_name != "",
+    )
+    if selected_province:
+        query = query.filter(Prisoner.province_name == selected_province)
+    if selected_municipality:
+        query = query.filter(Prisoner.municipality_name == selected_municipality)
+    rows = query.distinct().order_by(Prisoner.prison_name.asc()).all()
+    return [str(row[0]).strip() for row in rows if str(row[0] or "").strip()]
+
+
+def _prisoner_form_defaults(prisoner: Prisoner | None = None) -> dict[str, Any]:
+    if prisoner is None:
+        return {
+            "name": "",
+            "lastname": "",
+            "gender_label": "",
+            "detention_typology": "",
+            "age_detention_label": "",
+            "age_current_label": "",
+            "province_name": "",
+            "municipality_name": "",
+            "prison_name": "",
+            "prison_latitude": "",
+            "prison_longitude": "",
+            "prison_address": "",
+            "detention_date": "",
+            "offense_types": "",
+            "sentence_text": "",
+            "medical_status": "",
+            "penal_status": "",
+            "observations": "",
+            "image_url": "",
+            "source_detail_url": "",
+            "reason": "",
+        }
+
+    return {
+        "name": prisoner.name or "",
+        "lastname": prisoner.lastname or "",
+        "gender_label": prisoner.gender_label or "",
+        "detention_typology": prisoner.detention_typology or "",
+        "age_detention_label": prisoner.age_detention_label or "",
+        "age_current_label": prisoner.age_current_label or "",
+        "province_name": prisoner.province_name or "",
+        "municipality_name": prisoner.municipality_name or "",
+        "prison_name": prisoner.prison_name or "",
+        "prison_latitude": str(prisoner.prison_latitude) if prisoner.prison_latitude is not None else "",
+        "prison_longitude": str(prisoner.prison_longitude) if prisoner.prison_longitude is not None else "",
+        "prison_address": prisoner.prison_address or "",
+        "detention_date": prisoner.detention_date or "",
+        "offense_types": prisoner.offense_types or "",
+        "sentence_text": prisoner.sentence_text or "",
+        "medical_status": prisoner.medical_status or "",
+        "penal_status": prisoner.penal_status or "",
+        "observations": prisoner.observations or "",
+        "image_url": prisoner.image_url or "",
+        "source_detail_url": prisoner.source_detail_url or "",
+        "reason": "",
+    }
+
+
+def _normalize_prisoner_form_data() -> dict[str, Any]:
+    return {
+        "name": request.form.get("name", "").strip(),
+        "lastname": request.form.get("lastname", "").strip(),
+        "gender_label": request.form.get("gender_label", "").strip(),
+        "detention_typology": request.form.get("detention_typology", "").strip(),
+        "age_detention_label": request.form.get("age_detention_label", "").strip(),
+        "age_current_label": request.form.get("age_current_label", "").strip(),
+        "province_name": request.form.get("province_name", "").strip(),
+        "municipality_name": request.form.get("municipality_name", "").strip(),
+        "prison_name": request.form.get("prison_name", "").strip(),
+        "prison_latitude": request.form.get("prison_latitude", "").strip(),
+        "prison_longitude": request.form.get("prison_longitude", "").strip(),
+        "prison_address": request.form.get("prison_address", "").strip(),
+        "detention_date": request.form.get("detention_date", "").strip(),
+        "offense_types": request.form.get("offense_types", "").strip(),
+        "sentence_text": request.form.get("sentence_text", "").strip(),
+        "medical_status": request.form.get("medical_status", "").strip(),
+        "penal_status": request.form.get("penal_status", "").strip(),
+        "observations": request.form.get("observations", "").strip(),
+        "image_url": request.form.get("image_url", "").strip(),
+        "source_detail_url": request.form.get("source_detail_url", "").strip(),
+        "reason": request.form.get("reason", "").strip(),
+    }
+
+
+def _validate_prisoner_form_data(
+    form_data: dict[str, Any],
+    *,
+    require_reason: bool = False,
+) -> dict[str, str]:
+    errors: dict[str, str] = {}
+
+    province_name, municipality_name = canonicalize_location_names(
+        form_data.get("province_name"),
+        form_data.get("municipality_name"),
+    )
+    form_data["province_name"] = province_name or ""
+    form_data["municipality_name"] = municipality_name or ""
+
+    if not form_data.get("name"):
+        errors["name"] = "El nombre es obligatorio."
+
+    if require_reason and not form_data.get("reason"):
+        errors["reason"] = "Debes explicar el motivo de la edición."
+    if len(form_data.get("reason") or "") > 2000:
+        errors["reason"] = "El motivo no puede exceder 2000 caracteres."
+
+    for field_key, max_len in (
+        ("lastname", 200),
+        ("gender_label", 120),
+        ("detention_typology", 200),
+        ("age_detention_label", 120),
+        ("age_current_label", 120),
+        ("province_name", 120),
+        ("municipality_name", 120),
+        ("prison_name", 200),
+        ("prison_address", 255),
+        ("detention_date", 50),
+        ("sentence_text", 300),
+        ("medical_status", 300),
+        ("penal_status", 300),
+        ("image_url", 1000),
+        ("source_detail_url", 500),
+    ):
+        value = str(form_data.get(field_key) or "")
+        if len(value) > max_len:
+            errors[field_key] = f"El campo excede {max_len} caracteres."
+
+    if len(str(form_data.get("offense_types") or "")) > 6000:
+        errors["offense_types"] = "Los delitos no pueden exceder 6000 caracteres."
+    if len(str(form_data.get("observations") or "")) > 24000:
+        errors["observations"] = "Las observaciones no pueden exceder 24000 caracteres."
+
+    lat_raw = form_data.get("prison_latitude")
+    lng_raw = form_data.get("prison_longitude")
+    has_lat = bool(str(lat_raw or "").strip())
+    has_lng = bool(str(lng_raw or "").strip())
+    if has_lat != has_lng:
+        errors["prison_latitude"] = "Debes indicar latitud y longitud juntas."
+        errors["prison_longitude"] = "Debes indicar latitud y longitud juntas."
+    elif has_lat and has_lng:
+        try:
+            lat = Decimal(str(lat_raw))
+            lng = Decimal(str(lng_raw))
+        except Exception:
+            errors["prison_latitude"] = "Latitud inválida."
+            errors["prison_longitude"] = "Longitud inválida."
+        else:
+            if not is_within_cuba_bounds(lat, lng):
+                errors["prison_latitude"] = "La prisión debe ubicarse dentro de Cuba."
+                errors["prison_longitude"] = "La prisión debe ubicarse dentro de Cuba."
+
+    malicious_values = [
+        form_data.get("name"),
+        form_data.get("lastname"),
+        form_data.get("gender_label"),
+        form_data.get("detention_typology"),
+        form_data.get("age_detention_label"),
+        form_data.get("age_current_label"),
+        form_data.get("province_name"),
+        form_data.get("municipality_name"),
+        form_data.get("prison_name"),
+        form_data.get("prison_address"),
+        form_data.get("detention_date"),
+        form_data.get("offense_types"),
+        form_data.get("sentence_text"),
+        form_data.get("medical_status"),
+        form_data.get("penal_status"),
+        form_data.get("observations"),
+        form_data.get("image_url"),
+        form_data.get("source_detail_url"),
+        form_data.get("reason"),
+    ]
+    if has_malicious_input(malicious_values):
+        errors["form"] = "Se detectó contenido sospechoso en el formulario."
+
+    return errors
+
+
+def _has_prisoner_changes(
+    prisoner: Prisoner,
+    form_data: dict[str, Any],
+    *,
+    image_url: str | None,
+) -> bool:
+    current_province, current_municipality = canonicalize_location_names(
+        prisoner.province_name,
+        prisoner.municipality_name,
+    )
+    candidate_province, candidate_municipality = canonicalize_location_names(
+        form_data.get("province_name"),
+        form_data.get("municipality_name"),
+    )
+
+    comparisons = (
+        ((prisoner.name or ""), (form_data.get("name") or "")),
+        ((prisoner.lastname or ""), (form_data.get("lastname") or "")),
+        ((prisoner.gender_label or ""), (form_data.get("gender_label") or "")),
+        ((prisoner.detention_typology or ""), (form_data.get("detention_typology") or "")),
+        ((prisoner.age_detention_label or ""), (form_data.get("age_detention_label") or "")),
+        ((prisoner.age_current_label or ""), (form_data.get("age_current_label") or "")),
+        ((current_province or ""), (candidate_province or "")),
+        ((current_municipality or ""), (candidate_municipality or "")),
+        ((prisoner.prison_name or ""), (form_data.get("prison_name") or "")),
+        ((str(prisoner.prison_latitude or "")), (form_data.get("prison_latitude") or "")),
+        ((str(prisoner.prison_longitude or "")), (form_data.get("prison_longitude") or "")),
+        ((prisoner.prison_address or ""), (form_data.get("prison_address") or "")),
+        ((prisoner.detention_date or ""), (form_data.get("detention_date") or "")),
+        ((prisoner.offense_types or ""), (form_data.get("offense_types") or "")),
+        ((prisoner.sentence_text or ""), (form_data.get("sentence_text") or "")),
+        ((prisoner.medical_status or ""), (form_data.get("medical_status") or "")),
+        ((prisoner.penal_status or ""), (form_data.get("penal_status") or "")),
+        ((prisoner.observations or ""), (form_data.get("observations") or "")),
+        ((prisoner.source_detail_url or ""), (form_data.get("source_detail_url") or "")),
+    )
+    for current_value, incoming_value in comparisons:
+        if str(current_value or "") != str(incoming_value or ""):
+            return True
+
+    if (prisoner.image_url or "") != (image_url or ""):
+        return True
+    return False
+
+
+@map_bp.route("/prisioneros")
+def prisoners():
+    q = request.args.get("q", "").strip()
+    selected_province = canonicalize_province_name(request.args.get("provincia", "").strip()) or ""
+    selected_municipality = request.args.get("municipio", "").strip()
+    selected_prison = request.args.get("prision", "").strip()
+
+    per_page_options = [20, 50, 100, 500]
+    try:
+        page = max(int(request.args.get("page", "1")), 1)
+    except Exception:
+        page = 1
+    try:
+        requested_per_page = int(request.args.get("per_page", "20"))
+    except Exception:
+        requested_per_page = 20
+    per_page = requested_per_page if requested_per_page in per_page_options else 20
+
+    query = Prisoner.query
+    if q:
+        token = f"%{q}%"
+        filters = [
+            Prisoner.name.ilike(token),
+            Prisoner.lastname.ilike(token),
+            Prisoner.prison_name.ilike(token),
+            Prisoner.penal_status.ilike(token),
+            Prisoner.offense_types.ilike(token),
+        ]
+        if q.lstrip("-").isdigit():
+            filters.append(Prisoner.external_id == int(q))
+        query = query.filter(or_(*filters))
+
+    if selected_province:
+        query = query.filter(Prisoner.province_name == selected_province)
+    if selected_municipality:
+        query = query.filter(Prisoner.municipality_name == selected_municipality)
+    if selected_prison:
+        query = query.filter(Prisoner.prison_name == selected_prison)
+
+    total = query.count()
+    pages = max((total + per_page - 1) // per_page, 1)
+    page = min(page, pages)
+    rows = (
+        query.order_by(Prisoner.updated_at.desc(), Prisoner.id.desc())
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
+
+    page_window = 2
+    first_page_in_window = max(1, page - page_window)
+    last_page_in_window = min(pages, page + page_window)
+    page_numbers = list(range(first_page_in_window, last_page_in_window + 1))
+
+    provinces = list_provinces()
+    municipalities = (
+        list_municipalities(selected_province) if selected_province else list_municipalities()
+    )
+    prisons = _available_prison_names(selected_province, selected_municipality)
+
+    return render_template(
+        "map/prisoners.html",
+        prisoners=rows,
+        total=total,
+        page=page,
+        pages=pages,
+        page_numbers=page_numbers,
+        per_page=per_page,
+        per_page_options=per_page_options,
+        q=q,
+        provinces=provinces,
+        municipalities=municipalities,
+        prisons=prisons,
+        selected_province=selected_province,
+        selected_municipality=selected_municipality,
+        selected_prison=selected_prison,
+        municipalities_map=municipalities_map(),
+    )
+
+
+@map_bp.route("/prisioneros/agregar", methods=["GET", "POST"])
+@limiter.limit("3/minute; 20/day", methods=["POST"])
+def add_prisoner():
+    cloudinary_enabled = bool(
+        (current_app.config.get("CLOUDINARY_CLOUD_NAME") or "").strip()
+        and (current_app.config.get("CLOUDINARY_API_KEY") or "").strip()
+        and (current_app.config.get("CLOUDINARY_API_SECRET") or "").strip()
+    )
+    errors: dict[str, str] = {}
+    form_data = _prisoner_form_defaults()
+
+    if request.method == "POST":
+        form_data = _normalize_prisoner_form_data()
+        photo_files = [
+            file
+            for file in request.files.getlist("photo")
+            if file and (file.filename or "").strip()
+        ]
+
+        if recaptcha_enabled():
+            token = request.form.get("g-recaptcha-response", "")
+            if not verify_recaptcha(token, request.remote_addr):
+                errors["recaptcha"] = "Verificación reCAPTCHA falló."
+
+        errors.update(_validate_prisoner_form_data(form_data, require_reason=False))
+
+        if len(photo_files) > 1:
+            errors["photo"] = "Solo puedes subir una foto."
+        elif photo_files and not cloudinary_enabled:
+            errors["photo"] = "Subida no disponible: falta configuración de Cloudinary."
+        elif photo_files:
+            ok, error = validate_files(photo_files)
+            if not ok:
+                errors["photo"] = error
+
+        uploaded_photo_url = None
+        if not errors and photo_files:
+            try:
+                uploaded_urls = upload_files(photo_files)
+                uploaded_photo_url = uploaded_urls[0] if uploaded_urls else None
+            except Exception:
+                current_app.logger.exception("Error al subir foto de prisionero")
+                errors["photo"] = "No se pudo subir la foto a Cloudinary."
+            if not uploaded_photo_url and "photo" not in errors:
+                errors["photo"] = "No se pudo subir la foto a Cloudinary."
+
+        if not errors:
+            try:
+                prisoner = Prisoner(
+                    external_id=_next_local_prisoner_external_id(),
+                    source_payload_json=json.dumps(
+                        {
+                            "source": "community_manual",
+                            "created_via": "prisoner_add_form",
+                        },
+                        ensure_ascii=False,
+                    ),
+                    source_created_at=datetime.utcnow(),
+                    source_updated_at=datetime.utcnow(),
+                    first_seen_at=datetime.utcnow(),
+                    last_synced_at=datetime.utcnow(),
+                )
+                apply_prisoner_payload(
+                    prisoner,
+                    name=form_data.get("name") or "",
+                    lastname=form_data.get("lastname"),
+                    gender_label=form_data.get("gender_label"),
+                    detention_typology=form_data.get("detention_typology"),
+                    age_detention_label=form_data.get("age_detention_label"),
+                    age_current_label=form_data.get("age_current_label"),
+                    province_name=form_data.get("province_name"),
+                    municipality_name=form_data.get("municipality_name"),
+                    prison_name=form_data.get("prison_name"),
+                    prison_latitude=form_data.get("prison_latitude"),
+                    prison_longitude=form_data.get("prison_longitude"),
+                    prison_address=form_data.get("prison_address"),
+                    detention_date=form_data.get("detention_date"),
+                    offense_types=form_data.get("offense_types"),
+                    sentence_text=form_data.get("sentence_text"),
+                    medical_status=form_data.get("medical_status"),
+                    penal_status=form_data.get("penal_status"),
+                    observations=form_data.get("observations"),
+                    image_url=uploaded_photo_url or form_data.get("image_url"),
+                    source_detail_url=form_data.get("source_detail_url"),
+                )
+                db.session.add(prisoner)
+                db.session.commit()
+                flash("Prisionero agregado al catálogo.", "success")
+                return redirect(url_for("map.prisoner_detail", prisoner_id=prisoner.id))
+            except Exception:
+                db.session.rollback()
+                current_app.logger.exception("Error guardando prisionero")
+                errors["form"] = "No se pudo guardar la ficha. Inténtalo nuevamente."
+
+    return render_template(
+        "map/prisoner_new.html",
+        form_data=form_data,
+        errors=errors,
+        provinces=list_provinces(),
+        municipalities_map=municipalities_map(),
+        recaptcha_site_key=current_app.config.get("RECAPTCHA_V2_SITE_KEY"),
+    )
+
+
+@map_bp.route("/prisioneros/<int:prisoner_id>")
+def prisoner_detail(prisoner_id):
+    prisoner = Prisoner.query.filter_by(id=prisoner_id).first_or_404()
+    return render_template(
+        "map/prisoner_detail.html",
+        prisoner=prisoner,
+        prisoner_payload=serialize_prisoner(prisoner, include_source=True),
+        show_profile_actions=True,
+    )
+
+
+@map_bp.route("/prisioneros/<int:prisoner_id>/editar", methods=["GET", "POST"])
+@limiter.limit("3/minute; 20/day", methods=["POST"])
+def edit_prisoner_public(prisoner_id):
+    prisoner = Prisoner.query.filter_by(id=prisoner_id).first_or_404()
+    cloudinary_enabled = bool(
+        (current_app.config.get("CLOUDINARY_CLOUD_NAME") or "").strip()
+        and (current_app.config.get("CLOUDINARY_API_KEY") or "").strip()
+        and (current_app.config.get("CLOUDINARY_API_SECRET") or "").strip()
+    )
+    errors: dict[str, str] = {}
+    form_data = _prisoner_form_defaults(prisoner)
+
+    if request.method == "POST":
+        form_data = _normalize_prisoner_form_data()
+        photo_files = [
+            file
+            for file in request.files.getlist("photo")
+            if file and (file.filename or "").strip()
+        ]
+
+        if recaptcha_enabled():
+            token = request.form.get("g-recaptcha-response", "")
+            if not verify_recaptcha(token, request.remote_addr):
+                errors["recaptcha"] = "Verificación reCAPTCHA falló."
+
+        errors.update(_validate_prisoner_form_data(form_data, require_reason=True))
+
+        if len(photo_files) > 1:
+            errors["photo"] = "Solo puedes subir una foto."
+        elif photo_files and not cloudinary_enabled:
+            errors["photo"] = "Subida no disponible: falta configuración de Cloudinary."
+        elif photo_files:
+            ok, error = validate_files(photo_files)
+            if not ok:
+                errors["photo"] = error
+
+        uploaded_photo_url = None
+        if not errors and photo_files:
+            try:
+                uploaded_urls = upload_files(photo_files)
+                uploaded_photo_url = uploaded_urls[0] if uploaded_urls else None
+            except Exception:
+                current_app.logger.exception("Error al subir foto de edición de prisionero")
+                errors["photo"] = "No se pudo subir la foto a Cloudinary."
+            if not uploaded_photo_url and "photo" not in errors:
+                errors["photo"] = "No se pudo subir la foto a Cloudinary."
+
+        final_image_url = uploaded_photo_url or form_data.get("image_url") or prisoner.image_url
+        if not errors and not _has_prisoner_changes(
+            prisoner,
+            form_data,
+            image_url=final_image_url,
+        ):
+            errors["form"] = "No se detectaron cambios en la ficha."
+
+        if not errors:
+            try:
+                editor, editor_label = _get_editor_identity()
+                snapshot_prisoner(
+                    prisoner,
+                    reason=form_data.get("reason") or "",
+                    editor_id=editor.id if editor else None,
+                    editor_label=editor_label,
+                    payload={
+                        "source": "community_prisoner_edit",
+                        "photo_replaced": bool(uploaded_photo_url),
+                    },
+                )
+                apply_prisoner_payload(
+                    prisoner,
+                    name=form_data.get("name") or "",
+                    lastname=form_data.get("lastname"),
+                    gender_label=form_data.get("gender_label"),
+                    detention_typology=form_data.get("detention_typology"),
+                    age_detention_label=form_data.get("age_detention_label"),
+                    age_current_label=form_data.get("age_current_label"),
+                    province_name=form_data.get("province_name"),
+                    municipality_name=form_data.get("municipality_name"),
+                    prison_name=form_data.get("prison_name"),
+                    prison_latitude=form_data.get("prison_latitude"),
+                    prison_longitude=form_data.get("prison_longitude"),
+                    prison_address=form_data.get("prison_address"),
+                    detention_date=form_data.get("detention_date"),
+                    offense_types=form_data.get("offense_types"),
+                    sentence_text=form_data.get("sentence_text"),
+                    medical_status=form_data.get("medical_status"),
+                    penal_status=form_data.get("penal_status"),
+                    observations=form_data.get("observations"),
+                    image_url=final_image_url,
+                    source_detail_url=form_data.get("source_detail_url"),
+                )
+                db.session.commit()
+                flash("Ficha de prisionero actualizada.", "success")
+                return redirect(url_for("map.prisoner_detail", prisoner_id=prisoner.id))
+            except Exception:
+                db.session.rollback()
+                current_app.logger.exception("Error guardando edición de prisionero")
+                errors["form"] = "No se pudo guardar la edición. Inténtalo nuevamente."
+
+    return render_template(
+        "map/edit_prisoner.html",
+        prisoner=prisoner,
+        form_data=form_data,
+        errors=errors,
+        provinces=list_provinces(),
+        municipalities_map=municipalities_map(),
+        recaptcha_site_key=current_app.config.get("RECAPTCHA_V2_SITE_KEY"),
+    )
+
+
+@map_bp.route("/prisioneros/<int:prisoner_id>/historial")
+def prisoner_history(prisoner_id):
+    prisoner = Prisoner.query.filter_by(id=prisoner_id).first_or_404()
+    revisions = (
+        PrisonerRevision.query.filter_by(prisoner_id=prisoner.id)
+        .order_by(PrisonerRevision.created_at.desc())
+        .all()
+    )
+    latest_reason = revisions[0].reason if revisions else None
+    return render_template(
+        "map/prisoner_history.html",
+        prisoner=prisoner,
+        prisoner_payload=serialize_prisoner(prisoner, include_source=True),
+        revisions=revisions,
+        latest_reason=latest_reason,
+    )
+
+
+@map_bp.route("/prisioneros/<int:prisoner_id>/eliminar", methods=["POST"])
+def delete_prisoner(prisoner_id):
+    if not _is_admin_user():
+        abort(403)
+
+    prisoner = Prisoner.query.get_or_404(prisoner_id)
+    full_name = prisoner.full_name
+    try:
+        db.session.delete(prisoner)
+        db.session.commit()
+        flash(f"Ficha eliminada: {full_name}.", "success")
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Error eliminando prisionero id=%s", prisoner_id)
+        flash("No se pudo eliminar la ficha del prisionero.", "error")
+
+    return redirect(url_for("map.prisoners"))

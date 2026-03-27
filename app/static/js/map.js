@@ -63,6 +63,16 @@ let repressorSummary;
 let repressorStatsPanel;
 let repressorDetailRequestSeq = 0;
 let repressorStatsPayload = null;
+let prisonerLayerGroup;
+let prisonerLastPayload = null;
+let prisonerOverlay;
+let prisonerSummary;
+let prisonerStatsPanel;
+let prisonerDetailRequestSeq = 0;
+let prisonerStatsPayload = null;
+let prisonerProvinceFilter;
+let prisonerMunicipalityFilter;
+let prisonerPrisonFilter;
 let protestLayerGroup;
 let protestRefreshTimer;
 let protestRefreshPromise;
@@ -142,6 +152,7 @@ const MAP_MODE_TO_ROUTE_SLUG = {
   satellite: "satelite",
   connectivity: "conectividad",
   repressors: "represores",
+  prisoners: "prisioneros",
   protests: "protestas",
 };
 const ROUTE_SLUG_TO_MAP_MODE = {
@@ -153,6 +164,8 @@ const ROUTE_SLUG_TO_MAP_MODE = {
   conectividad: "connectivity",
   repressors: "repressors",
   represores: "repressors",
+  prisoners: "prisoners",
+  prisioneros: "prisoners",
   protests: "protests",
   protestas: "protests",
 };
@@ -205,6 +218,8 @@ const PROTEST_EVENT_COLORS = {
 const REPRESSOR_CONFIRMED_COLOR = "#16a34a";
 const REPRESSOR_UNRESOLVED_COLOR = "#dc2626";
 const repressorUnresolvedDetailCache = new Map();
+const PRISONER_COUNT_COLOR = "#22c55e";
+const prisonerTerritoryDetailCache = new Map();
 const MAP_POPUP_OPTIONS = {
   maxWidth: 320,
   maxHeight: 320,
@@ -246,6 +261,10 @@ function buildMainBaseLayers(provider) {
       type: "roadmap",
       maxZoom: 20,
     });
+    const prisonerLayer = L.gridLayer.googleMutant({
+      type: "roadmap",
+      maxZoom: 20,
+    });
     const protestLayer = L.gridLayer.googleMutant({
       type: "roadmap",
       maxZoom: 20,
@@ -257,6 +276,7 @@ function buildMainBaseLayers(provider) {
       satelliteLabelsLayer: null,
       connectivityBaseLayer: connectivityLayer,
       repressorBaseLayer: repressorLayer,
+      prisonerBaseLayer: prisonerLayer,
       protestBaseLayer: protestLayer,
     };
   }
@@ -289,6 +309,10 @@ function buildMainBaseLayers(provider) {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19,
   });
+  const prisonerBaseLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19,
+  });
   const protestBaseLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19,
@@ -300,6 +324,7 @@ function buildMainBaseLayers(provider) {
     satelliteLabelsLayer,
     connectivityBaseLayer,
     repressorBaseLayer,
+    prisonerBaseLayer,
     protestBaseLayer,
   };
 }
@@ -449,11 +474,13 @@ function baseLayerForMode(mode) {
     satelliteLayer,
     connectivityBaseLayer,
     repressorBaseLayer,
+    prisonerBaseLayer,
     protestBaseLayer,
   } = mainBaseLayers || {};
   if (normalized === "satellite") return satelliteLayer;
   if (normalized === "connectivity") return connectivityBaseLayer;
   if (normalized === "repressors") return repressorBaseLayer;
+  if (normalized === "prisoners") return prisonerBaseLayer;
   if (normalized === "protests") return protestBaseLayer;
   return streetsLayer;
 }
@@ -465,11 +492,13 @@ function modeForBaseLayer(layer) {
     satelliteLayer,
     connectivityBaseLayer,
     repressorBaseLayer,
+    prisonerBaseLayer,
     protestBaseLayer,
   } = mainBaseLayers || {};
   if (layer === satelliteLayer) return "satellite";
   if (layer === connectivityBaseLayer) return "connectivity";
   if (layer === repressorBaseLayer) return "repressors";
+  if (layer === prisonerBaseLayer) return "prisoners";
   if (layer === protestBaseLayer) return "protests";
   if (layer === streetsLayer) return "map";
   return "map";
@@ -917,11 +946,19 @@ async function switchBaseMode(nextMode, options = {}) {
     satelliteLabelsLayer,
     connectivityBaseLayer,
     repressorBaseLayer,
+    prisonerBaseLayer,
     protestBaseLayer,
   } = mainBaseLayers;
   const targetLayer = baseLayerForMode(mode);
 
-  [streetsLayer, satelliteLayer, connectivityBaseLayer, repressorBaseLayer, protestBaseLayer]
+  [
+    streetsLayer,
+    satelliteLayer,
+    connectivityBaseLayer,
+    repressorBaseLayer,
+    prisonerBaseLayer,
+    protestBaseLayer,
+  ]
     .filter(Boolean)
     .forEach((layer) => {
       if (layer !== targetLayer && map.hasLayer(layer)) {
@@ -940,6 +977,9 @@ async function switchBaseMode(nextMode, options = {}) {
     if (activeBaseMode === "repressors") {
       disableRepressorMode();
     }
+    if (activeBaseMode === "prisoners") {
+      disablePrisonerMode();
+    }
     if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
       map.removeLayer(satelliteLabelsLayer);
     }
@@ -956,6 +996,9 @@ async function switchBaseMode(nextMode, options = {}) {
     }
     if (activeBaseMode === "protests") {
       disableProtestMode();
+    }
+    if (activeBaseMode === "prisoners") {
+      disablePrisonerMode();
     }
     if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
       map.removeLayer(satelliteLabelsLayer);
@@ -974,12 +1017,35 @@ async function switchBaseMode(nextMode, options = {}) {
     if (activeBaseMode === "repressors") {
       disableRepressorMode();
     }
+    if (activeBaseMode === "prisoners") {
+      disablePrisonerMode();
+    }
     if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
       map.removeLayer(satelliteLabelsLayer);
     }
     await enableProtestMode();
     if (options.syncRoute !== false) {
       syncBaseModeRoute("protests", { replace: options.replaceRoute === true });
+    }
+    return;
+  }
+
+  if (mode === "prisoners") {
+    if (activeBaseMode === "connectivity") {
+      disableConnectivityMode();
+    }
+    if (activeBaseMode === "repressors") {
+      disableRepressorMode();
+    }
+    if (activeBaseMode === "protests") {
+      disableProtestMode();
+    }
+    if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
+      map.removeLayer(satelliteLabelsLayer);
+    }
+    await enablePrisonerMode();
+    if (options.syncRoute !== false) {
+      syncBaseModeRoute("prisoners", { replace: options.replaceRoute === true });
     }
     return;
   }
@@ -992,6 +1058,9 @@ async function switchBaseMode(nextMode, options = {}) {
   }
   if (activeBaseMode === "repressors") {
     disableRepressorMode();
+  }
+  if (activeBaseMode === "prisoners") {
+    disablePrisonerMode();
   }
 
   activeBaseMode = mode === "satellite" ? "satellite" : "map";
@@ -1007,6 +1076,7 @@ async function switchBaseMode(nextMode, options = {}) {
   setConnectivityLegendVisible(false);
   setProtestOverlayVisible(false);
   setRepressorOverlayVisible(false);
+  setPrisonerOverlayVisible(false);
   await applyFilters();
 
   if (options.syncRoute !== false) {
@@ -1047,6 +1117,11 @@ function setProtestOverlayVisible(visible) {
 function setRepressorOverlayVisible(visible) {
   if (!repressorOverlay) return;
   repressorOverlay.hidden = !visible;
+}
+
+function setPrisonerOverlayVisible(visible) {
+  if (!prisonerOverlay) return;
+  prisonerOverlay.hidden = !visible;
 }
 
 function setActiveConnectivityWindow(hours) {
@@ -1952,7 +2027,8 @@ window.handleNewReport = function (payload) {
   if (
     activeBaseMode === "connectivity" ||
     activeBaseMode === "protests" ||
-    activeBaseMode === "repressors"
+    activeBaseMode === "repressors" ||
+    activeBaseMode === "prisoners"
   ) {
     if (Array.isArray(allPosts) && payload.status === "approved") {
       allPosts.unshift(payload);
@@ -1961,6 +2037,10 @@ window.handleNewReport = function (payload) {
     if (activeBaseMode === "repressors") {
       refreshRepressorLayer();
       refreshRepressorStats();
+    }
+    if (activeBaseMode === "prisoners") {
+      refreshPrisonerLayer();
+      refreshPrisonerStats();
     }
     refreshAlerts();
     return;
@@ -2631,6 +2711,7 @@ async function enableConnectivityMode() {
   setConnectivityLegendVisible(true);
   setProtestOverlayVisible(false);
   setRepressorOverlayVisible(false);
+  setPrisonerOverlayVisible(false);
   ensureContextPanelVisible({ mobileState: "mid" });
   await refreshConnectivityLayer();
   startConnectivityPolling();
@@ -2649,6 +2730,7 @@ function disableConnectivityMode() {
   connectivityRegionFocused = "";
   setConnectivityLegendVisible(false);
   setRepressorOverlayVisible(false);
+  setPrisonerOverlayVisible(false);
   setReportLegendVisible(true);
   setReportDetailVisible(true);
   setMapHintVisible(true);
@@ -3155,6 +3237,7 @@ async function enableRepressorMode() {
   setConnectivityLegendVisible(false);
   setProtestOverlayVisible(false);
   setRepressorOverlayVisible(true);
+  setPrisonerOverlayVisible(false);
   ensureContextPanelVisible({ mobileState: "mid" });
   renderRepressorStats(repressorStatsPayload, "Cargando gráfico de represores...");
   refreshRepressorStats();
@@ -3172,6 +3255,475 @@ function disableRepressorMode() {
   repressorStatsPayload = null;
   renderRepressorStats(null, "Selecciona la capa de represores para cargar el gráfico.");
   setRepressorOverlayVisible(false);
+  setPrisonerOverlayVisible(false);
+  setReportLegendVisible(true);
+  setReportDetailVisible(true);
+  setMapHintVisible(true);
+}
+
+function clearPrisonerLayer() {
+  if (prisonerLayerGroup && map) {
+    map.removeLayer(prisonerLayerGroup);
+  }
+  prisonerLayerGroup = null;
+}
+
+function buildPrisonerCountIcon(count) {
+  const numeric = Math.max(1, Number(count) || 0);
+  const label = numeric > 999 ? "999+" : String(numeric);
+  return L.divIcon({
+    className: "prisoner-count-marker-wrap",
+    html: `<span class="prisoner-count-marker" style="background:${PRISONER_COUNT_COLOR};">${escapeHtml(
+      label
+    )}</span>`,
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+    popupAnchor: [0, -18],
+  });
+}
+
+function prisonerTerritoryLabel(item) {
+  const province = String(item?.province || "").trim();
+  const municipality = String(item?.municipality || "").trim();
+  const scope = String(item?.scope || "").trim().toLowerCase();
+  if (scope === "municipality" && province && municipality) {
+    return `${province} · ${municipality}`;
+  }
+  return province || "Territorio sin nombre";
+}
+
+function normalizePrisonerTerritoryRequest(item) {
+  const scope = String(item?.scope || "").trim().toLowerCase();
+  const province = String(item?.province || "").trim();
+  const municipality = String(item?.municipality || "").trim();
+  if (!["province", "municipality"].includes(scope)) return null;
+  if (!province) return null;
+  if (scope === "municipality" && !municipality) return null;
+  const currentPrison = String(prisonerPrisonFilter?.value || "").trim();
+  const key = `${scope}|${province.toLowerCase()}|${municipality.toLowerCase()}|${currentPrison.toLowerCase()}`;
+  return { scope, province, municipality, prison: currentPrison, key };
+}
+
+function prisonerCountPopupHtml(item) {
+  const territory = escapeHtml(prisonerTerritoryLabel(item));
+  const count = Math.max(0, Number(item?.count) || 0);
+  const prisons = Array.isArray(item?.prisons) ? item.prisons.filter(Boolean) : [];
+  const countLabel =
+    count === 1
+      ? "1 prisionero político"
+      : `${count.toLocaleString("es-ES")} prisioneros políticos`;
+  const prisonsLabel = prisons.length
+    ? `Prisiones registradas: ${escapeHtml(prisons.slice(0, 3).join(", "))}${
+        prisons.length > 3 ? "..." : ""
+      }`
+    : "Sin prisión especificada";
+  return `
+    <div class="prisoner-popup">
+      <div class="prisoner-popup-title">${territory}</div>
+      <div class="prisoner-popup-meta">${countLabel}</div>
+      <div class="prisoner-popup-meta">${prisonsLabel}</div>
+    </div>
+  `;
+}
+
+function renderPrisonerTerritoryDetailEmpty(message = "") {
+  if (!reportDetailPanel) return;
+  const text = message || "Haz click en un territorio para ver fichas de prisioneros.";
+  reportDetailPanel.classList.remove("is-revealing");
+  reportDetailPanel.innerHTML = `<div class="report-detail-empty">${escapeHtml(text)}</div>`;
+}
+
+function renderPrisonerTerritoryDetailLoading(territoryLabel) {
+  if (!reportDetailPanel) return;
+  reportDetailPanel.innerHTML = `
+    <div class="report-detail-content">
+      <h3 class="report-detail-title">${escapeHtml(territoryLabel)}</h3>
+      <div class="report-detail-meta">Cargando fichas de prisioneros...</div>
+    </div>
+  `;
+  triggerReportDetailReveal();
+}
+
+function renderPrisonerTerritoryDetail(item, payload) {
+  if (!reportDetailPanel) return;
+  const territoryLabel = String(payload?.territory_label || prisonerTerritoryLabel(item) || "").trim();
+  const entries = Array.isArray(payload?.items) ? payload.items : [];
+  const count = Math.max(0, Number(payload?.count) || entries.length);
+  const countLabel =
+    count === 1
+      ? "1 prisionero político"
+      : `${count.toLocaleString("es-ES")} prisioneros políticos`;
+
+  if (!entries.length) {
+    reportDetailPanel.innerHTML = `
+      <div class="report-detail-content">
+        <h3 class="report-detail-title">${escapeHtml(territoryLabel || "Territorio")}</h3>
+        <div class="report-detail-meta">${countLabel}</div>
+        <div class="prisoner-detail-empty">No hay fichas registradas para este territorio.</div>
+      </div>
+    `;
+    triggerReportDetailReveal();
+    return;
+  }
+
+  const cardsHtml = entries
+    .map((entry) => {
+      const prisonerId = Number(entry?.id);
+      if (!Number.isFinite(prisonerId) || prisonerId <= 0) return "";
+      const fullName = escapeHtml(entry?.full_name || "Prisionero");
+      const externalId = Number(entry?.external_id);
+      const prisonName = escapeHtml(entry?.prison_name || "N/D");
+      const penalStatus = escapeHtml(entry?.penal_status || "N/D");
+      const imageUrl = safeUrl(entry?.image_url || "");
+      const lat = Number(entry?.prison_latitude);
+      const lng = Number(entry?.prison_longitude);
+      const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
+      const detailUrl = `/prisioneros/${prisonerId}`;
+      const editUrl = `/prisioneros/${prisonerId}/editar`;
+      const mapUrl = hasCoords
+        ? `/map=prisioneros?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}`
+        : "";
+      const metadata = [];
+      if (Number.isFinite(externalId)) {
+        metadata.push(`Ficha #${externalId}`);
+      }
+      metadata.push(`Prisión: ${prisonName}`);
+      const imageThumbHtml = imageUrl
+        ? `
+            <button
+              class="info-media-thumb prisoner-detail-thumb"
+              type="button"
+              data-image="${imageUrl}"
+              data-caption="${fullName}"
+            >
+              <img src="${imageUrl}" alt="${fullName}" class="prisoner-detail-avatar" />
+            </button>
+          `
+        : '<div class="prisoner-detail-avatar prisoner-detail-avatar-empty" aria-hidden="true">?</div>';
+      return `
+        <article class="prisoner-detail-card">
+          <div class="prisoner-detail-head">
+            ${imageThumbHtml}
+            <div class="prisoner-detail-identity">
+              <div class="prisoner-detail-name">${fullName}</div>
+              <div class="prisoner-detail-meta">${metadata.join(" · ")}</div>
+              <div class="prisoner-detail-meta">Estado penal: ${penalStatus}</div>
+            </div>
+          </div>
+          <div class="prisoner-detail-actions">
+            <a class="info-btn info-btn-outline" href="${detailUrl}">Ver ficha</a>
+            <a class="info-btn info-btn-outline" href="${editUrl}">Editar ficha</a>
+            ${
+              mapUrl
+                ? `<a class="info-btn" href="${mapUrl}">Ubicar prisión</a>`
+                : `<span class="muted">Sin coordenadas de prisión</span>`
+            }
+          </div>
+        </article>
+      `;
+    })
+    .filter(Boolean)
+    .join("");
+
+  reportDetailPanel.innerHTML = `
+    <div class="report-detail-content">
+      <h3 class="report-detail-title">${escapeHtml(territoryLabel || "Territorio")}</h3>
+      <div class="report-detail-meta">${countLabel}</div>
+      <div class="prisoner-detail-list">${cardsHtml}</div>
+    </div>
+  `;
+  triggerReportDetailReveal();
+  attachMediaThumbHandlers(reportDetailPanel);
+  if (mapSideScroll) {
+    mapSideScroll.scrollTop = 0;
+  }
+}
+
+async function fetchPrisonerTerritoryDetail(item) {
+  const requestData = normalizePrisonerTerritoryRequest(item);
+  if (!requestData) {
+    renderPrisonerTerritoryDetailEmpty("No se pudo determinar el territorio seleccionado.");
+    return;
+  }
+  const territoryLabel = prisonerTerritoryLabel(requestData);
+  const cached = prisonerTerritoryDetailCache.get(requestData.key);
+  if (cached) {
+    renderPrisonerTerritoryDetail(requestData, cached);
+    return;
+  }
+
+  const requestSeq = ++prisonerDetailRequestSeq;
+  renderPrisonerTerritoryDetailLoading(territoryLabel);
+  const params = new URLSearchParams({
+    scope: requestData.scope,
+    province: requestData.province,
+  });
+  if (requestData.scope === "municipality") {
+    params.set("municipality", requestData.municipality);
+  }
+  if (requestData.prison) {
+    params.set("prison", requestData.prison);
+  }
+
+  try {
+    const response = await fetch(`/api/v1/prisoners/territory?${params.toString()}`, {
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      throw new Error("No se pudo cargar el detalle territorial.");
+    }
+    const payload = await response.json();
+    if (requestSeq !== prisonerDetailRequestSeq) return;
+    prisonerTerritoryDetailCache.set(requestData.key, payload);
+    renderPrisonerTerritoryDetail(requestData, payload);
+  } catch (_error) {
+    if (requestSeq !== prisonerDetailRequestSeq) return;
+    renderPrisonerTerritoryDetailEmpty(
+      `No fue posible cargar la lista para ${territoryLabel}. Intenta nuevamente.`
+    );
+  }
+}
+
+function renderPrisonerSummary(payload, errorText = "") {
+  if (!prisonerSummary) return;
+  if (errorText) {
+    prisonerSummary.textContent = errorText;
+    return;
+  }
+  const summary = payload?.summary || {};
+  const total = Number(summary.total_prisoners) || 0;
+  const territories = Number(summary.territories_points) || 0;
+  const withLocation = Number(summary.with_prison_location) || 0;
+  const withoutLocation = Number(summary.without_prison_location) || 0;
+  prisonerSummary.textContent = `Total: ${total.toLocaleString(
+    "es-ES"
+  )} · Territorios: ${territories.toLocaleString(
+    "es-ES"
+  )} · Con prisión localizada: ${withLocation.toLocaleString(
+    "es-ES"
+  )} · Sin ubicación de prisión: ${withoutLocation.toLocaleString("es-ES")}.`;
+}
+
+function renderPrisonerStats(payload, errorText = "") {
+  if (!prisonerStatsPanel) return;
+  if (errorText) {
+    prisonerStatsPanel.innerHTML = `<div class="prisoner-stats-empty">${escapeHtml(errorText)}</div>`;
+    return;
+  }
+  const total = Math.max(0, Number(payload?.total_prisoners) || 0);
+  const byProvince = Array.isArray(payload?.by_province) ? payload.by_province : [];
+  if (!byProvince.length) {
+    prisonerStatsPanel.innerHTML = `
+      <div class="prisoner-stats-total">Total país: ${total.toLocaleString("es-ES")}</div>
+      <div class="prisoner-stats-empty">Sin datos provinciales disponibles.</div>
+    `;
+    return;
+  }
+
+  const topRows = byProvince.slice(0, 16);
+  const maxCount = Math.max(...topRows.map((item) => Number(item?.count) || 0), 1);
+  const rowsHtml = topRows
+    .map((item) => {
+      const province = escapeHtml(item?.province || "N/D");
+      const count = Math.max(0, Number(item?.count) || 0);
+      const width = Math.max(4, Math.round((count / maxCount) * 100));
+      return `
+        <div class="prisoner-stats-row">
+          <div class="prisoner-stats-label">${province}</div>
+          <div class="prisoner-stats-bar">
+            <span style="width:${width}%"></span>
+          </div>
+          <div class="prisoner-stats-value">${count.toLocaleString("es-ES")}</div>
+        </div>
+      `;
+    })
+    .join("");
+
+  prisonerStatsPanel.innerHTML = `
+    <div class="prisoner-stats-total">Total país: ${total.toLocaleString("es-ES")}</div>
+    <div class="prisoner-stats-list">${rowsHtml}</div>
+  `;
+}
+
+function getPrisonerFilterValues() {
+  return {
+    province: prisonerProvinceFilter?.value || "",
+    municipality: prisonerMunicipalityFilter?.value || "",
+    prison: prisonerPrisonFilter?.value || "",
+  };
+}
+
+function syncPrisonerFilterOptions(filters) {
+  if (!filters || typeof filters !== "object") return;
+  const provinceOptions = Array.isArray(filters.provinces) ? filters.provinces : [];
+  const municipalityOptions = Array.isArray(filters.municipalities) ? filters.municipalities : [];
+  const prisonOptions = Array.isArray(filters.prisons) ? filters.prisons : [];
+
+  const updateSelect = (selectEl, options, placeholder, selected) => {
+    if (!selectEl) return;
+    const selectedValue = String(selected || "").trim();
+    const html =
+      `<option value="">${placeholder}</option>` +
+      options
+        .map((value) => {
+          const text = String(value || "").trim();
+          if (!text) return "";
+          const isSelected = text === selectedValue ? " selected" : "";
+          return `<option value="${escapeHtml(text)}"${isSelected}>${escapeHtml(text)}</option>`;
+        })
+        .join("");
+    selectEl.innerHTML = html;
+  };
+
+  const selectedProvince = String(filters.selected_province || prisonerProvinceFilter?.value || "").trim();
+  const selectedMunicipality = String(
+    filters.selected_municipality || prisonerMunicipalityFilter?.value || ""
+  ).trim();
+  const selectedPrison = String(filters.selected_prison || prisonerPrisonFilter?.value || "").trim();
+
+  updateSelect(prisonerProvinceFilter, provinceOptions, "Todas", selectedProvince);
+  updateSelect(prisonerMunicipalityFilter, municipalityOptions, "Todos", selectedMunicipality);
+  updateSelect(prisonerPrisonFilter, prisonOptions, "Todas", selectedPrison);
+}
+
+function buildPrisonerQueryString() {
+  const params = new URLSearchParams();
+  const { province, municipality, prison } = getPrisonerFilterValues();
+  if (province) params.set("province", province);
+  if (municipality) params.set("municipality", municipality);
+  if (prison) params.set("prison", prison);
+  return params.toString();
+}
+
+async function fetchPrisonerStatsData() {
+  const query = buildPrisonerQueryString();
+  const url = query ? `/api/v1/prisoners/stats?${query}` : "/api/v1/prisoners/stats";
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error("No se pudo cargar el gráfico de prisioneros.");
+  }
+  return await response.json();
+}
+
+async function refreshPrisonerStats() {
+  if (activeBaseMode !== "prisoners") return;
+  try {
+    const payload = await fetchPrisonerStatsData();
+    prisonerStatsPayload = payload;
+    renderPrisonerStats(payload);
+  } catch (_error) {
+    renderPrisonerStats(
+      prisonerStatsPayload,
+      "No fue posible actualizar el gráfico por provincia."
+    );
+  }
+}
+
+function renderPrisonerLayer(payload) {
+  if (!map) return;
+  clearPrisonerLayer();
+  prisonerLayerGroup = L.layerGroup();
+  const points = Array.isArray(payload?.points) ? payload.points : [];
+  points.forEach((item) => {
+    const lat = Number(item?.latitude);
+    const lng = Number(item?.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const marker = L.marker([lat, lng], {
+      icon: buildPrisonerCountIcon(item?.count),
+      title: `Prisioneros políticos: ${Number(item?.count) || 0}`,
+    });
+    marker.bindPopup(prisonerCountPopupHtml(item), MAP_POPUP_OPTIONS);
+    marker.on("click", () => {
+      ensureContextPanelVisible({ mobileState: "full" });
+      fetchPrisonerTerritoryDetail(item);
+    });
+    marker.addTo(prisonerLayerGroup);
+  });
+  prisonerLayerGroup.addTo(map);
+}
+
+async function fetchPrisonerLayerData() {
+  const query = buildPrisonerQueryString();
+  const url = query ? `/api/v1/prisoners/map-layer?${query}` : "/api/v1/prisoners/map-layer";
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error("No se pudo cargar la capa de prisioneros");
+  }
+  return await response.json();
+}
+
+async function refreshPrisonerLayer() {
+  if (activeBaseMode !== "prisoners") return;
+  try {
+    const payload = await fetchPrisonerLayerData();
+    prisonerLastPayload = payload;
+    prisonerTerritoryDetailCache.clear();
+    syncPrisonerFilterOptions(payload?.filters);
+    renderPrisonerLayer(payload);
+    renderPrisonerSummary(payload);
+  } catch (_error) {
+    if (!prisonerLastPayload) {
+      clearPrisonerLayer();
+    }
+    renderPrisonerSummary(
+      prisonerLastPayload,
+      "No fue posible actualizar la capa de prisioneros."
+    );
+  }
+}
+
+function wirePrisonerFilters() {
+  const triggerRefresh = () => {
+    if (activeBaseMode !== "prisoners") return;
+    prisonerTerritoryDetailCache.clear();
+    refreshPrisonerLayer();
+    refreshPrisonerStats();
+  };
+
+  const bindOnce = (el) => {
+    if (!el || el.dataset.bound === "1") return;
+    el.dataset.bound = "1";
+    el.addEventListener("change", triggerRefresh);
+  };
+
+  bindOnce(prisonerProvinceFilter);
+  bindOnce(prisonerMunicipalityFilter);
+  bindOnce(prisonerPrisonFilter);
+}
+
+async function enablePrisonerMode() {
+  activeBaseMode = "prisoners";
+  prisonerDetailRequestSeq += 1;
+  prisonerTerritoryDetailCache.clear();
+  renderPrisonerTerritoryDetailEmpty();
+  clearMarkers();
+  closeActivePopup();
+  selectedReportId = null;
+  setMapHintVisible(false);
+  setReportLegendVisible(false);
+  setReportDetailVisible(true);
+  setConnectivityLegendVisible(false);
+  setProtestOverlayVisible(false);
+  setRepressorOverlayVisible(false);
+  setPrisonerOverlayVisible(true);
+  ensureContextPanelVisible({ mobileState: "mid" });
+  wirePrisonerFilters();
+  renderPrisonerStats(prisonerStatsPayload, "Cargando gráfico de prisioneros...");
+  refreshPrisonerStats();
+  await refreshPrisonerLayer();
+}
+
+function disablePrisonerMode() {
+  if (activeBaseMode !== "prisoners") return;
+  activeBaseMode = "map";
+  prisonerDetailRequestSeq += 1;
+  prisonerTerritoryDetailCache.clear();
+  renderPrisonerTerritoryDetailEmpty();
+  clearPrisonerLayer();
+  prisonerLastPayload = null;
+  prisonerStatsPayload = null;
+  renderPrisonerStats(null, "Selecciona la capa de prisioneros para cargar el gráfico.");
+  setPrisonerOverlayVisible(false);
   setReportLegendVisible(true);
   setReportDetailVisible(true);
   setMapHintVisible(true);
@@ -3642,6 +4194,7 @@ async function enableProtestMode() {
   setConnectivityLegendVisible(false);
   setProtestOverlayVisible(true);
   setRepressorOverlayVisible(false);
+  setPrisonerOverlayVisible(false);
   ensureContextPanelVisible({ mobileState: "mid" });
   await refreshProtestLayer();
   startProtestPolling();
@@ -3659,6 +4212,7 @@ function disableProtestMode() {
   protestSelectedEndDay = "";
   setProtestOverlayVisible(false);
   setRepressorOverlayVisible(false);
+  setPrisonerOverlayVisible(false);
   setReportLegendVisible(true);
   setReportDetailVisible(true);
   setMapHintVisible(true);
@@ -3669,7 +4223,8 @@ async function applyFilters() {
   if (
     activeBaseMode === "connectivity" ||
     activeBaseMode === "protests" ||
-    activeBaseMode === "repressors"
+    activeBaseMode === "repressors" ||
+    activeBaseMode === "prisoners"
   ) {
     clearMarkers();
     updateLegendCounts(allPosts);
@@ -4320,6 +4875,12 @@ async function initMap() {
   repressorOverlay = document.getElementById("repressorOverlay");
   repressorSummary = document.getElementById("repressorSummary");
   repressorStatsPanel = document.getElementById("repressorStatsPanel");
+  prisonerOverlay = document.getElementById("prisonerOverlay");
+  prisonerSummary = document.getElementById("prisonerSummary");
+  prisonerStatsPanel = document.getElementById("prisonerStatsPanel");
+  prisonerProvinceFilter = document.getElementById("prisonerProvinceFilter");
+  prisonerMunicipalityFilter = document.getElementById("prisonerMunicipalityFilter");
+  prisonerPrisonFilter = document.getElementById("prisonerPrisonFilter");
   reportDetailPanel = document.getElementById("reportDetailPanel");
   setActiveConnectivityWindow(connectivityWindowHours);
   renderReportDetail(null);
@@ -4328,9 +4889,12 @@ async function initMap() {
   renderProtestDetail(null);
   renderRepressorTerritoryDetailEmpty();
   renderRepressorStats(null, "Selecciona la capa de represores para cargar el gráfico.");
+  renderPrisonerTerritoryDetailEmpty();
+  renderPrisonerStats(null, "Selecciona la capa de prisioneros para cargar el gráfico.");
   setReportDetailVisible(true);
   setProtestOverlayVisible(false);
   setRepressorOverlayVisible(false);
+  setPrisonerOverlayVisible(false);
 
   const nowUtc = new Date();
   const currentDayUtc = `${nowUtc.getUTCFullYear()}-${String(nowUtc.getUTCMonth() + 1).padStart(
@@ -4433,6 +4997,7 @@ async function initMap() {
   const satelliteLabelsLayer = layerSet.satelliteLabelsLayer;
   const connectivityBaseLayer = layerSet.connectivityBaseLayer;
   const repressorBaseLayer = layerSet.repressorBaseLayer;
+  const prisonerBaseLayer = layerSet.prisonerBaseLayer;
   const protestBaseLayer = layerSet.protestBaseLayer;
   mainBaseLayers = {
     streetsLayer,
@@ -4440,6 +5005,7 @@ async function initMap() {
     satelliteLabelsLayer,
     connectivityBaseLayer,
     repressorBaseLayer,
+    prisonerBaseLayer,
     protestBaseLayer,
   };
 
@@ -4451,6 +5017,7 @@ async function initMap() {
         Satelite: satelliteLayer,
         Conectividad: connectivityBaseLayer,
         Represores: repressorBaseLayer,
+        Prisioneros: prisonerBaseLayer,
         Protestas: protestBaseLayer,
       },
       {},
@@ -4462,6 +5029,7 @@ async function initMap() {
   setConnectivityLegendVisible(false);
   setProtestOverlayVisible(false);
   setRepressorOverlayVisible(false);
+  setPrisonerOverlayVisible(false);
 
   map.on("baselayerchange", (event) => {
     const nextMode = modeForBaseLayer(event.layer);
@@ -4539,7 +5107,8 @@ async function initMap() {
     if (
       activeBaseMode === "connectivity" ||
       activeBaseMode === "protests" ||
-      activeBaseMode === "repressors"
+      activeBaseMode === "repressors" ||
+      activeBaseMode === "prisoners"
     ) {
       closeActivePopup();
       return;

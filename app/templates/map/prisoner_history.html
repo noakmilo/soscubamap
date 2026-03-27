@@ -1,0 +1,64 @@
+{% extends "shared/base.html" %}
+{% block title %} | Historial de ficha de prisionero{% endblock %}
+{% block meta_description %}Historial público de cambios en fichas de prisioneros políticos para transparencia y auditoría comunitaria.{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="admin-toolbar">
+    <h1>Historial de ficha de prisionero</h1>
+    <a class="btn-secondary" href="{{ url_for('map.prisoner_detail', prisoner_id=prisoner.id) }}">← Volver a la ficha</a>
+  </div>
+  <p>Prisionero: <strong>{{ prisoner.full_name }}</strong></p>
+
+  <div class="history-section">
+    <h2>Versión actual</h2>
+    <div class="history-card">
+      <div class="muted">Actual</div>
+      {% if latest_reason %}<div class="muted"><strong>Motivo última edición:</strong> {{ latest_reason }}</div>{% endif %}
+      <div><strong>Nombre:</strong> {{ prisoner_payload.full_name }}</div>
+      <div><strong>Provincia:</strong> {{ prisoner_payload.province_name or "N/D" }} · <strong>Municipio:</strong> {{ prisoner_payload.municipality_name or "N/D" }}</div>
+      <div><strong>Prisión:</strong> {{ prisoner_payload.prison_name or "N/D" }}</div>
+      <div><strong>Estado penal:</strong> {{ prisoner_payload.penal_status or "N/D" }}</div>
+      <div><strong>Condena:</strong> {{ prisoner_payload.sentence_text or "N/D" }}</div>
+      <div><strong>Delitos:</strong> {{ prisoner_payload.offense_types or "N/D" }}</div>
+      {% if prisoner_payload.observations %}
+        <div><strong>Observaciones:</strong> {{ prisoner_payload.observations }}</div>
+      {% endif %}
+      {% if prisoner_payload.image_url %}
+        <div class="history-media">
+          <img src="{{ prisoner_payload.image_url }}" alt="{{ prisoner_payload.full_name }}" />
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="history-section">
+    <h2>Ediciones anteriores</h2>
+    {% if revisions %}
+      <div class="history-list">
+        {% for rev in revisions %}
+          <div class="history-card" id="rev-{{ rev.id }}">
+            <div class="muted">{{ rev.created_at }} · {{ rev.editor_label or 'Anon' }}</div>
+            {% if rev.reason %}<div class="muted"><strong>Motivo:</strong> {{ rev.reason }}</div>{% endif %}
+            <div><strong>Nombre:</strong> {{ rev.full_name }}</div>
+            <div><strong>Provincia:</strong> {{ rev.province_name or "N/D" }} · <strong>Municipio:</strong> {{ rev.municipality_name or "N/D" }}</div>
+            <div><strong>Prisión:</strong> {{ rev.prison_name or "N/D" }}</div>
+            <div><strong>Estado penal:</strong> {{ rev.penal_status or "N/D" }}</div>
+            <div><strong>Condena:</strong> {{ rev.sentence_text or "N/D" }}</div>
+            <div><strong>Delitos:</strong> {{ rev.offense_types or "N/D" }}</div>
+            {% if rev.observations %}
+              <div><strong>Observaciones:</strong> {{ rev.observations }}</div>
+            {% endif %}
+            {% if rev.image_url %}
+              <div class="history-media">
+                <img src="{{ rev.image_url }}" alt="{{ rev.full_name }}" />
+              </div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="muted">No hay revisiones anteriores registradas.</div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

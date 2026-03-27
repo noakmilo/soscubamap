@@ -367,6 +367,44 @@
           <div class="repressor-stats-empty">Selecciona la capa de represores para cargar el gráfico.</div>
         </div>
       </div>
+
+      <div id="prisonerOverlay" class="prisoner-overlay" hidden>
+        <div class="prisoner-title">Prisioneros Políticos</div>
+        <div class="prisoner-subtitle">
+          Contadores por provincia y municipio. Haz clic en un círculo para ver fichas.
+        </div>
+        <div class="prisoner-legend">
+          <div class="prisoner-legend-item">
+            <span class="dot dot-count"></span>
+            <span>Conteo territorial</span>
+          </div>
+        </div>
+        <div class="prisoner-filter-grid">
+          <label>
+            Provincia
+            <select id="prisonerProvinceFilter">
+              <option value="">Todas</option>
+            </select>
+          </label>
+          <label>
+            Municipio
+            <select id="prisonerMunicipalityFilter">
+              <option value="">Todos</option>
+            </select>
+          </label>
+          <label>
+            Prisión
+            <select id="prisonerPrisonFilter">
+              <option value="">Todas</option>
+            </select>
+          </label>
+        </div>
+        <div id="prisonerSummary" class="prisoner-summary">Cargando capa de prisioneros...</div>
+        <div class="prisoner-stats-heading">Distribución por provincia</div>
+        <div id="prisonerStatsPanel" class="prisoner-stats-panel">
+          <div class="prisoner-stats-empty">Selecciona la capa de prisioneros para cargar el gráfico.</div>
+        </div>
+      </div>
     </div>
   </aside>
 </section>

@@ -33,6 +33,7 @@ from .repressor import (
     RepressorEditRequest,
     RepressorRevision,
 )
+from .prisoner import Prisoner, PrisonerRevision
 
 __all__ = [
     "User",
@@ -69,4 +70,6 @@ __all__ = [
     "RepressorSubmission",
     "RepressorEditRequest",
     "RepressorRevision",
+    "Prisoner",
+    "PrisonerRevision",
 ]

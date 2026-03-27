@@ -44,6 +44,7 @@ from app.models.repressor import (
     RepressorIngestionRun,
     RepressorResidenceReport,
 )
+from app.models.prisoner import Prisoner
 from app.services.connectivity import (
     STATUS_CRITICAL,
     STATUS_COLORS,
@@ -84,6 +85,7 @@ from app.services.repressors import (
     build_residence_post_title,
     serialize_repressor,
 )
+from app.services.prisoners import serialize_prisoner
 
 from app.models.post import Post
 from sqlalchemy.orm import selectinload
@@ -2347,6 +2349,446 @@ def repressor_detail_v1(repressor_id):
         for item in approved_residence_reports
     ]
     return jsonify(payload)
+
+
+@api_bp.route("/v1/prisoners")
+@limiter.limit("120/minute")
+def prisoners_v1():
+    q = (request.args.get("q") or "").strip()
+    province = canonicalize_province_name((request.args.get("province") or "").strip()) or ""
+    municipality = (request.args.get("municipality") or "").strip()
+    prison = (request.args.get("prison") or "").strip()
+
+    query = Prisoner.query
+    if q:
+        token = f"%{q}%"
+        filters = [
+            Prisoner.name.ilike(token),
+            Prisoner.lastname.ilike(token),
+            Prisoner.prison_name.ilike(token),
+            Prisoner.penal_status.ilike(token),
+            Prisoner.offense_types.ilike(token),
+        ]
+        if q.lstrip("-").isdigit():
+            filters.append(Prisoner.external_id == int(q))
+        query = query.filter(or_(*filters))
+
+    if province:
+        query = query.filter(Prisoner.province_name == province)
+    if municipality:
+        query = query.filter(Prisoner.municipality_name == municipality)
+    if prison:
+        query = query.filter(Prisoner.prison_name == prison)
+
+    try:
+        page = max(int(request.args.get("page", 1)), 1)
+    except ValueError:
+        page = 1
+    try:
+        per_page = max(int(request.args.get("per_page", 50)), 1)
+    except ValueError:
+        per_page = 50
+    per_page = min(per_page, 100)
+
+    total = query.count()
+    pages = max(math.ceil(total / per_page), 1) if per_page else 1
+    items = (
+        query.order_by(Prisoner.updated_at.desc(), Prisoner.id.desc())
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
+
+    return jsonify(
+        {
+            "page": page,
+            "per_page": per_page,
+            "total": total,
+            "pages": pages,
+            "has_next": page < pages,
+            "has_prev": page > 1,
+            "items": [serialize_prisoner(item, include_source=False) for item in items],
+        }
+    )
+
+
+@api_bp.route("/v1/prisoners/<int:prisoner_id>")
+@limiter.limit("120/minute")
+def prisoner_detail_v1(prisoner_id):
+    prisoner = Prisoner.query.filter_by(id=prisoner_id).first_or_404()
+    return jsonify(serialize_prisoner(prisoner, include_source=True))
+
+
+@api_bp.route("/v1/prisoners/stats")
+@limiter.limit("120/minute")
+def prisoner_stats_v1():
+    requested_province = canonicalize_province_name((request.args.get("province") or "").strip()) or None
+    requested_municipality = (request.args.get("municipality") or "").strip() or None
+    requested_prison = (request.args.get("prison") or "").strip() or None
+
+    query = db.session.query(
+        Prisoner.province_name,
+        Prisoner.municipality_name,
+        Prisoner.prison_name,
+        func.count(Prisoner.id),
+    )
+    if requested_province:
+        query = query.filter(Prisoner.province_name == requested_province)
+    if requested_municipality:
+        query = query.filter(Prisoner.municipality_name == requested_municipality)
+    if requested_prison:
+        query = query.filter(Prisoner.prison_name == requested_prison)
+    raw_rows = query.group_by(
+        Prisoner.province_name,
+        Prisoner.municipality_name,
+        Prisoner.prison_name,
+    ).all()
+
+    total = 0
+    by_province: dict[str, dict[str, int | str | None]] = {}
+    by_province_municipality: dict[str, dict[str, int | str | None]] = {}
+    by_prison: dict[str, dict[str, int | str | None]] = {}
+    for raw_province, raw_municipality, raw_prison, raw_count in raw_rows:
+        count = int(raw_count or 0)
+        if count <= 0:
+            continue
+        province_name, municipality_name = canonicalize_location_names(
+            raw_province,
+            raw_municipality,
+        )
+        prison_name = str(raw_prison or "").strip() or None
+
+        total += count
+        province_key = normalize_location_key(province_name) or "__nd__"
+        province_bucket = by_province.get(province_key)
+        if province_bucket is None:
+            province_bucket = {"province": province_name, "count": 0}
+            by_province[province_key] = province_bucket
+        province_bucket["count"] = int(province_bucket["count"] or 0) + count
+
+        municipality_key = normalize_location_key(municipality_name) or "__nd__"
+        pair_key = f"{province_key}|{municipality_key}"
+        pair_bucket = by_province_municipality.get(pair_key)
+        if pair_bucket is None:
+            pair_bucket = {
+                "province": province_name,
+                "municipality": municipality_name,
+                "count": 0,
+            }
+            by_province_municipality[pair_key] = pair_bucket
+        pair_bucket["count"] = int(pair_bucket["count"] or 0) + count
+
+        if prison_name:
+            prison_key = normalize_location_key(prison_name) or prison_name.lower()
+            prison_bucket = by_prison.get(prison_key)
+            if prison_bucket is None:
+                prison_bucket = {
+                    "prison": prison_name,
+                    "province": province_name,
+                    "municipality": municipality_name,
+                    "count": 0,
+                }
+                by_prison[prison_key] = prison_bucket
+            prison_bucket["count"] = int(prison_bucket["count"] or 0) + count
+
+    province_rows = sorted(
+        by_province.values(),
+        key=lambda item: (-int(item["count"] or 0), str(item["province"] or "")),
+    )
+    municipality_rows = sorted(
+        by_province_municipality.values(),
+        key=lambda item: (
+            -int(item["count"] or 0),
+            str(item["province"] or ""),
+            str(item["municipality"] or ""),
+        ),
+    )
+    prison_rows = sorted(
+        by_prison.values(),
+        key=lambda item: (
+            -int(item["count"] or 0),
+            str(item["prison"] or ""),
+        ),
+    )
+
+    return jsonify(
+        {
+            "total_prisoners": total,
+            "by_province": [
+                {"province": row["province"], "count": int(row["count"] or 0)}
+                for row in province_rows
+            ],
+            "by_province_municipality": [
+                {
+                    "province": row["province"],
+                    "municipality": row["municipality"],
+                    "count": int(row["count"] or 0),
+                }
+                for row in municipality_rows
+            ],
+            "by_prison": [
+                {
+                    "prison": row["prison"],
+                    "province": row["province"],
+                    "municipality": row["municipality"],
+                    "count": int(row["count"] or 0),
+                }
+                for row in prison_rows
+            ],
+        }
+    )
+
+
+@api_bp.route("/v1/prisoners/map-layer")
+@limiter.limit("120/minute")
+def prisoner_map_layer_v1():
+    requested_province = canonicalize_province_name((request.args.get("province") or "").strip()) or ""
+    requested_municipality = (request.args.get("municipality") or "").strip()
+    requested_prison = (request.args.get("prison") or "").strip()
+
+    base_query = Prisoner.query
+    if requested_province:
+        base_query = base_query.filter(Prisoner.province_name == requested_province)
+    if requested_municipality:
+        base_query = base_query.filter(Prisoner.municipality_name == requested_municipality)
+    if requested_prison:
+        base_query = base_query.filter(Prisoner.prison_name == requested_prison)
+
+    rows_query = db.session.query(
+        Prisoner.province_name,
+        Prisoner.municipality_name,
+        Prisoner.prison_name,
+        func.count(Prisoner.id),
+    )
+    if requested_province:
+        rows_query = rows_query.filter(Prisoner.province_name == requested_province)
+    if requested_municipality:
+        rows_query = rows_query.filter(Prisoner.municipality_name == requested_municipality)
+    if requested_prison:
+        rows_query = rows_query.filter(Prisoner.prison_name == requested_prison)
+    rows = rows_query.group_by(
+        Prisoner.province_name,
+        Prisoner.municipality_name,
+        Prisoner.prison_name,
+    ).all()
+
+    buckets = {}
+    without_territory_reference = 0
+    for raw_province, raw_municipality, raw_prison, raw_count in rows:
+        count = int(raw_count or 0)
+        if count <= 0:
+            continue
+
+        province_name, municipality_name = canonicalize_location_names(
+            raw_province,
+            raw_municipality,
+        )
+        prison_name = str(raw_prison or "").strip() or None
+        scope = "municipality" if (province_name and municipality_name) else ("province" if province_name else "")
+        if not scope:
+            without_territory_reference += count
+            continue
+
+        province_key = normalize_location_key(province_name) or "__nd__"
+        municipality_key = normalize_location_key(municipality_name) if municipality_name else "__nd__"
+        bucket_key = f"{scope}|{province_key}|{municipality_key}"
+        bucket = buckets.get(bucket_key)
+        if bucket is None:
+            bucket = {
+                "scope": scope,
+                "province": province_name,
+                "municipality": municipality_name if scope == "municipality" else None,
+                "count": 0,
+                "prisons": set(),
+            }
+            buckets[bucket_key] = bucket
+        bucket["count"] = int(bucket["count"] or 0) + count
+        if prison_name:
+            bucket["prisons"].add(prison_name)
+
+    points = []
+    for bucket in buckets.values():
+        lat, lng = _resolve_territory_centroid(
+            bucket.get("province"),
+            bucket.get("municipality"),
+        )
+        if lat is None or lng is None:
+            without_territory_reference += int(bucket.get("count") or 0)
+            continue
+        points.append(
+            {
+                "scope": bucket.get("scope"),
+                "province": bucket.get("province"),
+                "municipality": bucket.get("municipality"),
+                "count": int(bucket.get("count") or 0),
+                "prisons": sorted(bucket.get("prisons") or []),
+                "latitude": lat,
+                "longitude": lng,
+            }
+        )
+    points.sort(
+        key=lambda item: (
+            -int(item.get("count") or 0),
+            str(item.get("province") or ""),
+            str(item.get("municipality") or ""),
+        )
+    )
+
+    total_prisoners = int(base_query.count() or 0)
+    with_prison_location = int(
+        base_query.filter(
+            Prisoner.prison_latitude.isnot(None),
+            Prisoner.prison_longitude.isnot(None),
+        ).count()
+        or 0
+    )
+
+    province_filter_query = db.session.query(Prisoner.province_name).filter(
+        Prisoner.province_name.isnot(None),
+        Prisoner.province_name != "",
+    )
+    province_options = sorted(
+        {
+            canonicalize_province_name(str(row[0] or "").strip()) or str(row[0] or "").strip()
+            for row in province_filter_query.distinct().all()
+            if str(row[0] or "").strip()
+        }
+    )
+
+    municipality_filter_query = db.session.query(Prisoner.municipality_name).filter(
+        Prisoner.municipality_name.isnot(None),
+        Prisoner.municipality_name != "",
+    )
+    if requested_province:
+        municipality_filter_query = municipality_filter_query.filter(
+            Prisoner.province_name == requested_province
+        )
+    municipality_options = sorted(
+        {
+            str(row[0]).strip()
+            for row in municipality_filter_query.distinct().all()
+            if str(row[0] or "").strip()
+        }
+    )
+
+    prison_filter_query = db.session.query(Prisoner.prison_name).filter(
+        Prisoner.prison_name.isnot(None),
+        Prisoner.prison_name != "",
+    )
+    if requested_province:
+        prison_filter_query = prison_filter_query.filter(Prisoner.province_name == requested_province)
+    if requested_municipality:
+        prison_filter_query = prison_filter_query.filter(
+            Prisoner.municipality_name == requested_municipality
+        )
+    prison_options = sorted(
+        {
+            str(row[0]).strip()
+            for row in prison_filter_query.distinct().all()
+            if str(row[0] or "").strip()
+        }
+    )
+
+    return jsonify(
+        {
+            "points": points,
+            "summary": {
+                "total_prisoners": total_prisoners,
+                "territories_points": len(points),
+                "with_prison_location": with_prison_location,
+                "without_prison_location": max(total_prisoners - with_prison_location, 0),
+                "without_territory_reference": without_territory_reference,
+            },
+            "filters": {
+                "selected_province": requested_province or "",
+                "selected_municipality": requested_municipality or "",
+                "selected_prison": requested_prison or "",
+                "provinces": province_options,
+                "municipalities": municipality_options,
+                "prisons": prison_options,
+            },
+        }
+    )
+
+
+@api_bp.route("/v1/prisoners/territory")
+@limiter.limit("120/minute")
+def prisoners_territory_v1():
+    scope = (request.args.get("scope") or "").strip().lower()
+    province = (request.args.get("province") or "").strip()
+    municipality = (request.args.get("municipality") or "").strip()
+    prison = (request.args.get("prison") or "").strip()
+
+    if scope not in {"province", "municipality"}:
+        return (
+            jsonify({"ok": False, "error": "scope inválido. Usa 'province' o 'municipality'."}),
+            400,
+        )
+
+    canonical_province, canonical_municipality = canonicalize_location_names(
+        province,
+        municipality,
+    )
+    if not canonical_province:
+        return jsonify({"ok": False, "error": "province es obligatorio."}), 400
+    if scope == "municipality" and not canonical_municipality:
+        return jsonify({"ok": False, "error": "municipality es obligatorio para scope=municipality."}), 400
+
+    query = Prisoner.query
+    if scope == "municipality":
+        query = query.filter(
+            Prisoner.province_name == canonical_province,
+            Prisoner.municipality_name == canonical_municipality,
+        )
+    else:
+        query = query.filter(
+            Prisoner.province_name == canonical_province,
+            or_(Prisoner.municipality_name.is_(None), Prisoner.municipality_name == ""),
+        )
+    if prison:
+        query = query.filter(Prisoner.prison_name == prison)
+
+    rows = (
+        query.order_by(
+            Prisoner.lastname.asc(),
+            Prisoner.name.asc(),
+            Prisoner.id.asc(),
+        )
+        .all()
+    )
+    items = []
+    for prisoner in rows:
+        items.append(
+            {
+                "id": prisoner.id,
+                "external_id": prisoner.external_id,
+                "full_name": prisoner.full_name,
+                "province_name": prisoner.province_name,
+                "municipality_name": prisoner.municipality_name,
+                "prison_name": prisoner.prison_name,
+                "prison_latitude": _safe_float(prisoner.prison_latitude),
+                "prison_longitude": _safe_float(prisoner.prison_longitude),
+                "penal_status": prisoner.penal_status,
+                "image_url": prisoner.image_url,
+            }
+        )
+
+    territory_label = (
+        f"{canonical_province} · {canonical_municipality}"
+        if scope == "municipality"
+        else canonical_province
+    )
+    return jsonify(
+        {
+            "ok": True,
+            "scope": scope,
+            "province": canonical_province,
+            "municipality": canonical_municipality if scope == "municipality" else None,
+            "territory_label": territory_label,
+            "count": len(items),
+            "items": items,
+        }
+    )
 
 
 @api_bp.route("/v1/repressors/stats")

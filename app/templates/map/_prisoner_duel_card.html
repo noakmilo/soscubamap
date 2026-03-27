@@ -1,0 +1,133 @@
+{% if prisoner and prisoner_payload %}
+  <article
+    class="repressor-duel-card"
+    data-prisoner-card
+    data-prisoner-id="{{ prisoner.id }}"
+    data-prisoner-name="{{ prisoner_payload.full_name }}"
+    data-prisoner-prison="{{ prisoner_payload.prison_name or '' }}"
+    data-prisoner-url="{{ url_for('map.prisoner_detail', prisoner_id=prisoner.id) }}"
+  >
+    <div class="repressor-duel-head">
+      <h2 class="repressor-duel-name">{{ prisoner_payload.full_name }}</h2>
+      <div class="repressor-duel-code">Ficha #{{ prisoner_payload.external_id }}</div>
+    </div>
+
+    <div class="repressor-duel-type-row">
+      <span class="repressor-duel-type-chip" style="background: linear-gradient(145deg, #d7ffe6 0%, #b8f5cc 100%); border-color: #4caf72; color: #0f3b22;">
+        Víctima de prisión política
+      </span>
+    </div>
+
+    <div class="repressor-duel-art-frame">
+      {% if prisoner_payload.image_url %}
+        <img
+          src="{{ prisoner_payload.image_url }}"
+          alt="{{ prisoner_payload.full_name }}"
+          class="repressor-duel-art"
+          data-prisoner-image="{{ prisoner_payload.image_url }}"
+          data-prisoner-caption="{{ prisoner_payload.full_name }}"
+          role="button"
+          tabindex="0"
+          aria-label="Ampliar imagen"
+          crossorigin="anonymous"
+          referrerpolicy="no-referrer"
+        />
+      {% else %}
+        <div class="repressor-duel-art-empty">Sin fotografía disponible</div>
+      {% endif %}
+    </div>
+
+    <div class="repressor-duel-grid">
+      <div class="repressor-duel-item">
+        <span class="repressor-duel-label">Género / tipología</span>
+        <strong>{{ prisoner_payload.gender_label or prisoner_payload.detention_typology or "N/D" }}</strong>
+      </div>
+      <div class="repressor-duel-item">
+        <span class="repressor-duel-label">Edad en detención</span>
+        <strong>{{ prisoner_payload.age_detention_label or "N/D" }}</strong>
+      </div>
+      <div class="repressor-duel-item">
+        <span class="repressor-duel-label">Edad actual</span>
+        <strong>{{ prisoner_payload.age_current_label or "N/D" }}</strong>
+      </div>
+      <div class="repressor-duel-item">
+        <span class="repressor-duel-label">Provincia</span>
+        <strong>{{ prisoner_payload.province_name or "N/D" }}</strong>
+      </div>
+      <div class="repressor-duel-item">
+        <span class="repressor-duel-label">Municipio</span>
+        <strong>{{ prisoner_payload.municipality_name or "N/D" }}</strong>
+      </div>
+      <div class="repressor-duel-item">
+        <span class="repressor-duel-label">Prisión</span>
+        <strong>{{ prisoner_payload.prison_name or "N/D" }}</strong>
+      </div>
+      <div class="repressor-duel-item">
+        <span class="repressor-duel-label">Fecha de detención</span>
+        <strong>{{ prisoner_payload.detention_date or "N/D" }}</strong>
+      </div>
+      <div class="repressor-duel-item">
+        <span class="repressor-duel-label">Condena</span>
+        <strong>{{ prisoner_payload.sentence_text or "N/D" }}</strong>
+      </div>
+      <div class="repressor-duel-item">
+        <span class="repressor-duel-label">Estado médico</span>
+        <strong>{{ prisoner_payload.medical_status or "N/D" }}</strong>
+      </div>
+      <div class="repressor-duel-item">
+        <span class="repressor-duel-label">Estado penal</span>
+        <strong>{{ prisoner_payload.penal_status or "N/D" }}</strong>
+      </div>
+    </div>
+
+    <div class="repressor-duel-crimes">
+      <h3>Delitos imputados</h3>
+      {% if prisoner_payload.offense_types_list %}
+        <ul class="repressor-duel-crimes-list">
+          {% for offense in prisoner_payload.offense_types_list %}
+            <li>{{ offense }}</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="muted">No hay delitos registrados.</div>
+      {% endif %}
+    </div>
+
+    {% if prisoner_payload.observations %}
+      <div class="repressor-duel-crimes">
+        <h3>Observaciones</h3>
+        <p>{{ prisoner_payload.observations }}</p>
+      </div>
+    {% endif %}
+
+    <div class="repressor-duel-actions">
+      {% if prisoner_payload.prison_latitude is not none and prisoner_payload.prison_longitude is not none %}
+        <a
+          class="btn-primary"
+          href="{{ url_for('map.dashboard', layer_slug='prisioneros', lat=('%.6f'|format(prisoner_payload.prison_latitude)), lng=('%.6f'|format(prisoner_payload.prison_longitude))) }}"
+        >
+          Ubicar prisión en el mapa
+        </a>
+      {% endif %}
+      {% if show_profile_actions %}
+        <a class="btn-secondary" href="{{ url_for('map.edit_prisoner_public', prisoner_id=prisoner.id) }}">Editar ficha</a>
+        <a class="btn-secondary" href="{{ url_for('map.prisoner_history', prisoner_id=prisoner.id) }}">Ver historial</a>
+      {% endif %}
+      {% if prisoner_payload.source_detail_url %}
+        <a class="btn-secondary" href="{{ prisoner_payload.source_detail_url }}" target="_blank" rel="noopener">Ver fuente original</a>
+      {% endif %}
+      <button class="btn-secondary" type="button" data-prisoner-download-btn>Descargar ficha PNG</button>
+      <button class="btn-primary" type="button" data-prisoner-share-btn>Compartir</button>
+      {% if current_user.is_authenticated and current_user.has_role('administrador') %}
+        <form
+          method="post"
+          action="{{ url_for('map.delete_prisoner', prisoner_id=prisoner.id) }}"
+          class="repressor-delete-form"
+          onsubmit="return confirm('¿Eliminar esta ficha de prisionero? Esta acción no se puede deshacer.');"
+        >
+          <button class="btn-secondary repressor-delete-btn" type="submit">Eliminar ficha</button>
+        </form>
+      {% endif %}
+    </div>
+  </article>
+{% endif %}

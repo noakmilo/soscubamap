@@ -1,0 +1,25 @@
+{% extends "shared/base.html" %}
+{% block title %} | Ficha de prisionero{% endblock %}
+{% block meta_description %}Ficha visual del prisionero político con datos penales, prisión, ubicación y herramientas para compartir o descargar.{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="admin-toolbar">
+    <h1>Ficha de prisionero político</h1>
+    <a class="btn-secondary" href="{{ url_for('map.prisoners') }}">← Volver al catálogo</a>
+  </div>
+
+  <div class="repressor-duel-shell">
+    {% include "map/_prisoner_duel_card.html" %}
+  </div>
+</section>
+
+<div id="prisonerImageModal" class="image-modal" aria-hidden="true" data-allow-zoom="1">
+  <div class="image-modal-backdrop" data-close-prisoner-image></div>
+  <div class="image-modal-content">
+    <button class="image-modal-close" type="button" data-close-prisoner-image>&times;</button>
+    <img id="prisonerImageModalImg" src="" alt="Imagen ampliada" />
+    <div class="image-modal-caption" id="prisonerImageModalCaption"></div>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='js/prisoner_card_share.js') }}?v={{ config.ASSET_VERSION }}"></script>
+{% endblock %}
