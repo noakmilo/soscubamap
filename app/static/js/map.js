@@ -96,6 +96,13 @@ let protestApplyRangeBtn;
 let protestResetRangeBtn;
 let protestSummary;
 let protestDetailPanel;
+let aisLayerGroup;
+let aisRefreshTimer;
+let aisRefreshSeconds = 1800;
+let aisLastPayload = null;
+let aisOverlay;
+let aisSummary;
+let aisPortList;
 let reportDetailPanel;
 let activePopup;
 let alertTimer;
@@ -154,6 +161,7 @@ const MAP_MODE_TO_ROUTE_SLUG = {
   repressors: "represores",
   prisoners: "prisioneros",
   protests: "protestas",
+  ais: "buques-cuba",
 };
 const ROUTE_SLUG_TO_MAP_MODE = {
   map: "map",
@@ -168,6 +176,11 @@ const ROUTE_SLUG_TO_MAP_MODE = {
   prisioneros: "prisoners",
   protests: "protests",
   protestas: "protests",
+  ais: "ais",
+  buques: "ais",
+  "buques-cuba": "ais",
+  ships: "ais",
+  vessels: "ais",
 };
 const CONNECTIVITY_STATUS_COLORS = {
   normal: "#2E7D32",
@@ -220,6 +233,7 @@ const REPRESSOR_UNRESOLVED_COLOR = "#dc2626";
 const repressorUnresolvedDetailCache = new Map();
 const PRISONER_COUNT_COLOR = "#22c55e";
 const prisonerTerritoryDetailCache = new Map();
+const AIS_MARKER_COLOR = "#0ea5e9";
 const MAP_POPUP_OPTIONS = {
   maxWidth: 320,
   maxHeight: 320,
@@ -269,6 +283,10 @@ function buildMainBaseLayers(provider) {
       type: "roadmap",
       maxZoom: 20,
     });
+    const aisLayer = L.gridLayer.googleMutant({
+      type: "roadmap",
+      maxZoom: 20,
+    });
     return {
       useGoogle,
       streetsLayer: mapLayer,
@@ -278,6 +296,7 @@ function buildMainBaseLayers(provider) {
       repressorBaseLayer: repressorLayer,
       prisonerBaseLayer: prisonerLayer,
       protestBaseLayer: protestLayer,
+      aisBaseLayer: aisLayer,
     };
   }
 
@@ -317,6 +336,10 @@ function buildMainBaseLayers(provider) {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19,
   });
+  const aisBaseLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19,
+  });
   return {
     useGoogle,
     streetsLayer,
@@ -326,6 +349,7 @@ function buildMainBaseLayers(provider) {
     repressorBaseLayer,
     prisonerBaseLayer,
     protestBaseLayer,
+    aisBaseLayer,
   };
 }
 
@@ -476,12 +500,14 @@ function baseLayerForMode(mode) {
     repressorBaseLayer,
     prisonerBaseLayer,
     protestBaseLayer,
+    aisBaseLayer,
   } = mainBaseLayers || {};
   if (normalized === "satellite") return satelliteLayer;
   if (normalized === "connectivity") return connectivityBaseLayer;
   if (normalized === "repressors") return repressorBaseLayer;
   if (normalized === "prisoners") return prisonerBaseLayer;
   if (normalized === "protests") return protestBaseLayer;
+  if (normalized === "ais") return aisBaseLayer;
   return streetsLayer;
 }
 
@@ -494,12 +520,14 @@ function modeForBaseLayer(layer) {
     repressorBaseLayer,
     prisonerBaseLayer,
     protestBaseLayer,
+    aisBaseLayer,
   } = mainBaseLayers || {};
   if (layer === satelliteLayer) return "satellite";
   if (layer === connectivityBaseLayer) return "connectivity";
   if (layer === repressorBaseLayer) return "repressors";
   if (layer === prisonerBaseLayer) return "prisoners";
   if (layer === protestBaseLayer) return "protests";
+  if (layer === aisBaseLayer) return "ais";
   if (layer === streetsLayer) return "map";
   return "map";
 }
@@ -939,7 +967,10 @@ function closeActivePopup() {
 async function switchBaseMode(nextMode, options = {}) {
   if (!map || !mainBaseLayers) return;
 
-  const mode = normalizeBaseMode(nextMode);
+  let mode = normalizeBaseMode(nextMode);
+  if (mode === "ais" && !isAdmin) {
+    mode = "map";
+  }
   const {
     streetsLayer,
     satelliteLayer,
@@ -948,6 +979,7 @@ async function switchBaseMode(nextMode, options = {}) {
     repressorBaseLayer,
     prisonerBaseLayer,
     protestBaseLayer,
+    aisBaseLayer,
   } = mainBaseLayers;
   const targetLayer = baseLayerForMode(mode);
 
@@ -958,6 +990,7 @@ async function switchBaseMode(nextMode, options = {}) {
     repressorBaseLayer,
     prisonerBaseLayer,
     protestBaseLayer,
+    aisBaseLayer,
   ]
     .filter(Boolean)
     .forEach((layer) => {
@@ -980,6 +1013,9 @@ async function switchBaseMode(nextMode, options = {}) {
     if (activeBaseMode === "prisoners") {
       disablePrisonerMode();
     }
+    if (activeBaseMode === "ais") {
+      disableAISMode();
+    }
     if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
       map.removeLayer(satelliteLabelsLayer);
     }
@@ -999,6 +1035,9 @@ async function switchBaseMode(nextMode, options = {}) {
     }
     if (activeBaseMode === "prisoners") {
       disablePrisonerMode();
+    }
+    if (activeBaseMode === "ais") {
+      disableAISMode();
     }
     if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
       map.removeLayer(satelliteLabelsLayer);
@@ -1020,6 +1059,9 @@ async function switchBaseMode(nextMode, options = {}) {
     if (activeBaseMode === "prisoners") {
       disablePrisonerMode();
     }
+    if (activeBaseMode === "ais") {
+      disableAISMode();
+    }
     if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
       map.removeLayer(satelliteLabelsLayer);
     }
@@ -1040,12 +1082,38 @@ async function switchBaseMode(nextMode, options = {}) {
     if (activeBaseMode === "protests") {
       disableProtestMode();
     }
+    if (activeBaseMode === "ais") {
+      disableAISMode();
+    }
     if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
       map.removeLayer(satelliteLabelsLayer);
     }
     await enablePrisonerMode();
     if (options.syncRoute !== false) {
       syncBaseModeRoute("prisoners", { replace: options.replaceRoute === true });
+    }
+    return;
+  }
+
+  if (mode === "ais") {
+    if (activeBaseMode === "connectivity") {
+      disableConnectivityMode();
+    }
+    if (activeBaseMode === "repressors") {
+      disableRepressorMode();
+    }
+    if (activeBaseMode === "protests") {
+      disableProtestMode();
+    }
+    if (activeBaseMode === "prisoners") {
+      disablePrisonerMode();
+    }
+    if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
+      map.removeLayer(satelliteLabelsLayer);
+    }
+    await enableAISMode();
+    if (options.syncRoute !== false) {
+      syncBaseModeRoute("ais", { replace: options.replaceRoute === true });
     }
     return;
   }
@@ -1062,6 +1130,9 @@ async function switchBaseMode(nextMode, options = {}) {
   if (activeBaseMode === "prisoners") {
     disablePrisonerMode();
   }
+  if (activeBaseMode === "ais") {
+    disableAISMode();
+  }
 
   activeBaseMode = mode === "satellite" ? "satellite" : "map";
   if (satelliteLabelsLayer && activeBaseMode === "satellite") {
@@ -1077,6 +1148,7 @@ async function switchBaseMode(nextMode, options = {}) {
   setProtestOverlayVisible(false);
   setRepressorOverlayVisible(false);
   setPrisonerOverlayVisible(false);
+  setAISOverlayVisible(false);
   await applyFilters();
 
   if (options.syncRoute !== false) {
@@ -1122,6 +1194,11 @@ function setRepressorOverlayVisible(visible) {
 function setPrisonerOverlayVisible(visible) {
   if (!prisonerOverlay) return;
   prisonerOverlay.hidden = !visible;
+}
+
+function setAISOverlayVisible(visible) {
+  if (!aisOverlay) return;
+  aisOverlay.hidden = !visible;
 }
 
 function setActiveConnectivityWindow(hours) {
@@ -2028,7 +2105,8 @@ window.handleNewReport = function (payload) {
     activeBaseMode === "connectivity" ||
     activeBaseMode === "protests" ||
     activeBaseMode === "repressors" ||
-    activeBaseMode === "prisoners"
+    activeBaseMode === "prisoners" ||
+    activeBaseMode === "ais"
   ) {
     if (Array.isArray(allPosts) && payload.status === "approved") {
       allPosts.unshift(payload);
@@ -2712,6 +2790,7 @@ async function enableConnectivityMode() {
   setProtestOverlayVisible(false);
   setRepressorOverlayVisible(false);
   setPrisonerOverlayVisible(false);
+  setAISOverlayVisible(false);
   ensureContextPanelVisible({ mobileState: "mid" });
   await refreshConnectivityLayer();
   startConnectivityPolling();
@@ -2731,6 +2810,7 @@ function disableConnectivityMode() {
   setConnectivityLegendVisible(false);
   setRepressorOverlayVisible(false);
   setPrisonerOverlayVisible(false);
+  setAISOverlayVisible(false);
   setReportLegendVisible(true);
   setReportDetailVisible(true);
   setMapHintVisible(true);
@@ -3238,6 +3318,7 @@ async function enableRepressorMode() {
   setProtestOverlayVisible(false);
   setRepressorOverlayVisible(true);
   setPrisonerOverlayVisible(false);
+  setAISOverlayVisible(false);
   ensureContextPanelVisible({ mobileState: "mid" });
   renderRepressorStats(repressorStatsPayload, "Cargando gráfico de represores...");
   refreshRepressorStats();
@@ -3256,6 +3337,7 @@ function disableRepressorMode() {
   renderRepressorStats(null, "Selecciona la capa de represores para cargar el gráfico.");
   setRepressorOverlayVisible(false);
   setPrisonerOverlayVisible(false);
+  setAISOverlayVisible(false);
   setReportLegendVisible(true);
   setReportDetailVisible(true);
   setMapHintVisible(true);
@@ -3706,6 +3788,7 @@ async function enablePrisonerMode() {
   setProtestOverlayVisible(false);
   setRepressorOverlayVisible(false);
   setPrisonerOverlayVisible(true);
+  setAISOverlayVisible(false);
   ensureContextPanelVisible({ mobileState: "mid" });
   wirePrisonerFilters();
   renderPrisonerStats(prisonerStatsPayload, "Cargando gráfico de prisioneros...");
@@ -3724,6 +3807,220 @@ function disablePrisonerMode() {
   prisonerStatsPayload = null;
   renderPrisonerStats(null, "Selecciona la capa de prisioneros para cargar el gráfico.");
   setPrisonerOverlayVisible(false);
+  setAISOverlayVisible(false);
+  setReportLegendVisible(true);
+  setReportDetailVisible(true);
+  setMapHintVisible(true);
+}
+
+function clearAISLayer() {
+  if (aisLayerGroup && map) {
+    map.removeLayer(aisLayerGroup);
+  }
+  aisLayerGroup = null;
+}
+
+function stopAISPolling() {
+  if (!aisRefreshTimer) return;
+  clearInterval(aisRefreshTimer);
+  aisRefreshTimer = null;
+}
+
+function startAISPolling() {
+  stopAISPolling();
+  const intervalMs = Math.max(60, Number(aisRefreshSeconds) || 1800) * 1000;
+  aisRefreshTimer = setInterval(() => {
+    refreshAISLayer();
+  }, intervalMs);
+}
+
+function buildAISMarkerIcon(confidence) {
+  const safeConfidence = Math.max(0, Math.min(1, Number(confidence) || 0));
+  const borderAlpha = 0.55 + safeConfidence * 0.45;
+  const color = `rgba(14, 165, 233, ${Math.max(0.65, safeConfidence).toFixed(2)})`;
+  return L.divIcon({
+    className: "ais-marker-wrap",
+    html: `<span class="ais-marker-dot" style="background:${color};border-color:rgba(255,255,255,${borderAlpha.toFixed(
+      2
+    )});"></span>`,
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+    popupAnchor: [0, -10],
+  });
+}
+
+function formatAISValue(value, unit = "") {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "N/D";
+  return `${numeric.toFixed(1)}${unit}`;
+}
+
+function formatAISConfidence(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "N/D";
+  return `${Math.round(Math.max(0, Math.min(1, numeric)) * 100)}%`;
+}
+
+function aisPopupHtml(item) {
+  const vesselName = escapeHtml(item?.ship_name || "Buque sin nombre");
+  const destination = escapeHtml(item?.destination_raw || "N/D");
+  const portName = escapeHtml(item?.matched_port_name || "Puerto no resuelto");
+  const confidence = escapeHtml(formatAISConfidence(item?.match_confidence));
+  const speed = escapeHtml(formatAISValue(item?.sog, " kn"));
+  const course = escapeHtml(formatAISValue(item?.cog, "°"));
+  const mmsi = escapeHtml(item?.mmsi || "N/D");
+  return `
+    <div class="ais-popup">
+      <div class="ais-popup-title">${vesselName}</div>
+      <div class="ais-popup-meta">MMSI: ${mmsi}</div>
+      <div class="ais-popup-meta">Destino: ${destination}</div>
+      <div class="ais-popup-meta">Puerto objetivo: ${portName}</div>
+      <div class="ais-popup-meta">Confianza: ${confidence}</div>
+      <div class="ais-popup-meta">Velocidad: ${speed} · Rumbo: ${course}</div>
+    </div>
+  `;
+}
+
+function renderAISVesselDetail(item) {
+  if (!reportDetailPanel) return;
+  const vesselName = escapeHtml(item?.ship_name || "Buque sin nombre");
+  const destination = escapeHtml(item?.destination_raw || "N/D");
+  const portName = escapeHtml(item?.matched_port_name || "Puerto no resuelto");
+  const confidence = escapeHtml(formatAISConfidence(item?.match_confidence));
+  const speed = escapeHtml(formatAISValue(item?.sog, " kn"));
+  const course = escapeHtml(formatAISValue(item?.cog, "°"));
+  const heading = escapeHtml(formatAISValue(item?.heading, "°"));
+  const mmsi = escapeHtml(item?.mmsi || "N/D");
+  const imo = escapeHtml(item?.imo || "N/D");
+  const callSign = escapeHtml(item?.call_sign || "N/D");
+  const updatedAt = escapeHtml(formatUtcAndCuba(item?.last_seen_at_utc || ""));
+
+  reportDetailPanel.innerHTML = `
+    <div class="report-detail-content">
+      <h3 class="report-detail-title">${vesselName}</h3>
+      <div class="report-detail-meta">MMSI: ${mmsi} · IMO: ${imo} · Call Sign: ${callSign}</div>
+      <div class="report-detail-meta">Destino reportado: ${destination}</div>
+      <div class="report-detail-meta">Puerto cubano detectado: ${portName}</div>
+      <div class="report-detail-meta">Confianza de match: ${confidence}</div>
+      <div class="report-detail-meta">SOG: ${speed} · COG: ${course} · Heading: ${heading}</div>
+      <div class="report-detail-meta">Última señal: ${updatedAt || "N/D"}</div>
+    </div>
+  `;
+  triggerReportDetailReveal();
+  if (mapSideScroll) mapSideScroll.scrollTop = 0;
+}
+
+function renderAISPortList(payload) {
+  if (!aisPortList) return;
+  const rows = Array.isArray(payload?.summary?.by_port) ? payload.summary.by_port : [];
+  if (!rows.length) {
+    aisPortList.innerHTML = `<div class="ais-port-empty">No hay puertos detectados en este snapshot.</div>`;
+    return;
+  }
+  aisPortList.innerHTML = rows
+    .slice(0, 20)
+    .map((row) => {
+      const port = escapeHtml(row?.port || "N/D");
+      const count = Math.max(0, Number(row?.count) || 0).toLocaleString("es-ES");
+      return `<div class="ais-port-row"><span>${port}</span><strong>${count}</strong></div>`;
+    })
+    .join("");
+}
+
+function renderAISSummary(payload, errorText = "") {
+  if (!aisSummary) return;
+  if (errorText) {
+    aisSummary.textContent = errorText;
+    return;
+  }
+  const total = Math.max(0, Number(payload?.summary?.total_points) || 0);
+  const latestRun = payload?.latest_run || {};
+  const matchedVessels = Math.max(0, Number(latestRun?.matched_vessels) || 0);
+  const status = String(latestRun?.status || "N/D").trim();
+  const stale = Boolean(payload?.stale);
+  const staleLabel = stale ? "desactualizado" : "vigente";
+  aisSummary.textContent = `Puntos en mapa: ${total.toLocaleString(
+    "es-ES"
+  )} · Match diarios: ${matchedVessels.toLocaleString("es-ES")} · Run: ${status} (${staleLabel}).`;
+}
+
+function renderAISLayer(payload) {
+  if (!map) return;
+  clearAISLayer();
+  aisLayerGroup = L.layerGroup();
+
+  const points = Array.isArray(payload?.points) ? payload.points : [];
+  points.forEach((item) => {
+    const lat = Number(item?.latitude);
+    const lng = Number(item?.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const marker = L.marker([lat, lng], {
+      icon: buildAISMarkerIcon(item?.match_confidence),
+      title: item?.ship_name || item?.mmsi || "Buque",
+    });
+    marker.bindPopup(aisPopupHtml(item), MAP_POPUP_OPTIONS);
+    marker.on("click", () => {
+      ensureContextPanelVisible({ mobileState: "full" });
+      renderAISVesselDetail(item);
+    });
+    marker.addTo(aisLayerGroup);
+  });
+
+  aisLayerGroup.addTo(map);
+  renderAISPortList(payload);
+}
+
+async function fetchAISLayerData() {
+  const response = await fetch("/api/v1/ais/cuba-targets", { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error("No se pudo cargar la capa AIS");
+  }
+  return await response.json();
+}
+
+async function refreshAISLayer() {
+  if (activeBaseMode !== "ais") return;
+  try {
+    const payload = await fetchAISLayerData();
+    aisLastPayload = payload;
+    renderAISLayer(payload);
+    renderAISSummary(payload);
+  } catch (_error) {
+    if (!aisLastPayload) {
+      clearAISLayer();
+    }
+    renderAISSummary(aisLastPayload, "No fue posible actualizar la capa AIS.");
+  }
+}
+
+async function enableAISMode() {
+  if (!isAdmin) return;
+  activeBaseMode = "ais";
+  clearMarkers();
+  closeActivePopup();
+  selectedReportId = null;
+  renderReportDetail(null);
+  setMapHintVisible(false);
+  setReportLegendVisible(false);
+  setReportDetailVisible(true);
+  setConnectivityLegendVisible(false);
+  setProtestOverlayVisible(false);
+  setRepressorOverlayVisible(false);
+  setPrisonerOverlayVisible(false);
+  setAISOverlayVisible(true);
+  ensureContextPanelVisible({ mobileState: "mid" });
+  renderAISSummary(aisLastPayload, "Cargando capa AIS...");
+  await refreshAISLayer();
+  startAISPolling();
+}
+
+function disableAISMode() {
+  if (activeBaseMode !== "ais") return;
+  activeBaseMode = "map";
+  stopAISPolling();
+  clearAISLayer();
+  aisLastPayload = null;
+  setAISOverlayVisible(false);
   setReportLegendVisible(true);
   setReportDetailVisible(true);
   setMapHintVisible(true);
@@ -4195,6 +4492,7 @@ async function enableProtestMode() {
   setProtestOverlayVisible(true);
   setRepressorOverlayVisible(false);
   setPrisonerOverlayVisible(false);
+  setAISOverlayVisible(false);
   ensureContextPanelVisible({ mobileState: "mid" });
   await refreshProtestLayer();
   startProtestPolling();
@@ -4213,6 +4511,7 @@ function disableProtestMode() {
   setProtestOverlayVisible(false);
   setRepressorOverlayVisible(false);
   setPrisonerOverlayVisible(false);
+  setAISOverlayVisible(false);
   setReportLegendVisible(true);
   setReportDetailVisible(true);
   setMapHintVisible(true);
@@ -4811,11 +5110,13 @@ async function initMap() {
   isAdmin = mapEl.dataset.isAdmin === "1";
   connectivityRefreshSeconds = Number(mapEl.dataset.connectivityRefreshSeconds || 300);
   protestRefreshSeconds = Number(mapEl.dataset.protestRefreshSeconds || 300);
+  aisRefreshSeconds = Number(mapEl.dataset.aisRefreshSeconds || 1800);
   const preferredProvider = (mapEl.dataset.mapProvider || MAP_PROVIDER_LEAFLET).toLowerCase();
   mapLayerRouteTemplate = String(mapEl.dataset.layerRouteTemplate || "/map=__layer__").trim();
-  const requestedBaseMode = normalizeBaseMode(
+  const requestedBaseModeRaw = normalizeBaseMode(
     mapEl.dataset.initialBaseMode || parseBaseModeFromPath(window.location.pathname)
   );
+  const requestedBaseMode = !isAdmin && requestedBaseModeRaw === "ais" ? "map" : requestedBaseModeRaw;
   mapHintElement = document.getElementById("mapHint");
   reportLegendSection = document.getElementById("reportLegendSection");
   connectivityLegendOverlay = document.getElementById("connectivityLegendOverlay");
@@ -4881,6 +5182,9 @@ async function initMap() {
   prisonerProvinceFilter = document.getElementById("prisonerProvinceFilter");
   prisonerMunicipalityFilter = document.getElementById("prisonerMunicipalityFilter");
   prisonerPrisonFilter = document.getElementById("prisonerPrisonFilter");
+  aisOverlay = document.getElementById("aisOverlay");
+  aisSummary = document.getElementById("aisSummary");
+  aisPortList = document.getElementById("aisPortList");
   reportDetailPanel = document.getElementById("reportDetailPanel");
   setActiveConnectivityWindow(connectivityWindowHours);
   renderReportDetail(null);
@@ -4895,6 +5199,7 @@ async function initMap() {
   setProtestOverlayVisible(false);
   setRepressorOverlayVisible(false);
   setPrisonerOverlayVisible(false);
+  setAISOverlayVisible(false);
 
   const nowUtc = new Date();
   const currentDayUtc = `${nowUtc.getUTCFullYear()}-${String(nowUtc.getUTCMonth() + 1).padStart(
@@ -4999,6 +5304,7 @@ async function initMap() {
   const repressorBaseLayer = layerSet.repressorBaseLayer;
   const prisonerBaseLayer = layerSet.prisonerBaseLayer;
   const protestBaseLayer = layerSet.protestBaseLayer;
+  const aisBaseLayer = layerSet.aisBaseLayer;
   mainBaseLayers = {
     streetsLayer,
     satelliteLayer,
@@ -5007,19 +5313,24 @@ async function initMap() {
     repressorBaseLayer,
     prisonerBaseLayer,
     protestBaseLayer,
+    aisBaseLayer,
   };
 
   streetsLayer.addTo(map);
+  const baseLayerOptions = {
+    Mapa: streetsLayer,
+    Satelite: satelliteLayer,
+    Conectividad: connectivityBaseLayer,
+    Represores: repressorBaseLayer,
+    Prisioneros: prisonerBaseLayer,
+    Protestas: protestBaseLayer,
+  };
+  if (isAdmin) {
+    baseLayerOptions["Buques Cuba (beta)"] = aisBaseLayer;
+  }
   L.control
     .layers(
-      {
-        Mapa: streetsLayer,
-        Satelite: satelliteLayer,
-        Conectividad: connectivityBaseLayer,
-        Represores: repressorBaseLayer,
-        Prisioneros: prisonerBaseLayer,
-        Protestas: protestBaseLayer,
-      },
+      baseLayerOptions,
       {},
       { collapsed: true }
     )
@@ -5030,6 +5341,7 @@ async function initMap() {
   setProtestOverlayVisible(false);
   setRepressorOverlayVisible(false);
   setPrisonerOverlayVisible(false);
+  setAISOverlayVisible(false);
 
   map.on("baselayerchange", (event) => {
     const nextMode = modeForBaseLayer(event.layer);
@@ -5108,7 +5420,8 @@ async function initMap() {
       activeBaseMode === "connectivity" ||
       activeBaseMode === "protests" ||
       activeBaseMode === "repressors" ||
-      activeBaseMode === "prisoners"
+      activeBaseMode === "prisoners" ||
+      activeBaseMode === "ais"
     ) {
       closeActivePopup();
       return;

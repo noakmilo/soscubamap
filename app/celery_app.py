@@ -5,6 +5,7 @@ from app import create_app
 
 PROTEST_INGESTION_TASK = "app.tasks.protests.ingest_protests_feeds"
 CONNECTIVITY_POLL_TASK = "app.tasks.connectivity.poll_connectivity_and_create_reports"
+AIS_INGESTION_TASK = "app.tasks.ais.ingest_aisstream_cuba_targets"
 REPRESSOR_INGESTION_TASK = "app.tasks.repressors.ingest_repressors_catalog"
 POST_EXPIRATION_TASK = "app.tasks.posts.expire_map_alert_posts"
 
@@ -53,6 +54,34 @@ def _build_beat_schedule(flask_app):
 
         schedule["connectivity-polling-auto-reports"] = {
             "task": CONNECTIVITY_POLL_TASK,
+            "schedule": interval_seconds,
+            "options": {"queue": queue_name},
+        }
+
+    ais_enabled = bool(flask_app.config.get("AISSTREAM_ENABLED", False)) and bool(
+        flask_app.config.get("CELERY_AIS_INGESTION_ENABLED", True)
+    )
+    if ais_enabled:
+        interval_seconds = 86400
+        try:
+            with flask_app.app_context():
+                from app.services.aisstream import get_ais_ingestion_interval_seconds
+
+                interval_seconds = get_ais_ingestion_interval_seconds()
+        except Exception:
+            interval_raw = flask_app.config.get("AISSTREAM_INGESTION_INTERVAL_SECONDS", 86400)
+            try:
+                interval_seconds = int(interval_raw)
+            except Exception:
+                interval_seconds = 86400
+            interval_seconds = max(3600, interval_seconds)
+
+        queue_name = (flask_app.config.get("CELERY_AIS_QUEUE") or "ingestion").strip()
+        if not queue_name:
+            queue_name = "ingestion"
+
+        schedule["aisstream-cuba-target-ingestion"] = {
+            "task": AIS_INGESTION_TASK,
             "schedule": interval_seconds,
             "options": {"queue": queue_name},
         }
@@ -151,5 +180,6 @@ celery = create_celery()
 # Importa tasks para registrar decoradores @celery.task.
 import app.tasks.protests  # noqa: E402,F401
 import app.tasks.connectivity  # noqa: E402,F401
+import app.tasks.ais  # noqa: E402,F401
 import app.tasks.repressors  # noqa: E402,F401
 import app.tasks.posts  # noqa: E402,F401

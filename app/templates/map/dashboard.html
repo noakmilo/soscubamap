@@ -59,6 +59,7 @@
         data-is-admin="{{ 1 if current_user.is_authenticated and current_user.has_role('administrador') else 0 }}"
         data-connectivity-refresh-seconds="{{ connectivity_refresh_seconds }}"
         data-protest-refresh-seconds="{{ protest_refresh_seconds }}"
+        data-ais-refresh-seconds="{{ ais_refresh_seconds }}"
         data-map-provider="{{ map_provider_main }}"
         data-initial-base-mode="{{ initial_base_mode }}"
         data-layer-route-template="{{ map_layer_route_template }}"
@@ -405,6 +406,20 @@
           <div class="prisoner-stats-empty">Selecciona la capa de prisioneros para cargar el gráfico.</div>
         </div>
       </div>
+
+      {% if current_user.is_authenticated and current_user.has_role('administrador') %}
+        <div id="aisOverlay" class="ais-overlay" hidden>
+          <div class="ais-title">Buques rumbo a Cuba (beta)</div>
+          <div class="ais-subtitle">
+            Capa de pruebas para administración usando AISStream.
+          </div>
+          <div id="aisSummary" class="ais-summary">Cargando capa AIS...</div>
+          <div class="ais-ports-heading">Puertos objetivo detectados</div>
+          <div id="aisPortList" class="ais-port-list">
+            <div class="ais-port-empty">Sin datos todavía.</div>
+          </div>
+        </div>
+      {% endif %}
     </div>
   </aside>
 </section>

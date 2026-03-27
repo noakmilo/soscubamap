@@ -123,6 +123,11 @@ _MAP_LAYER_ALIASES = {
     "prisioneros": "prisoners",
     "protests": "protests",
     "protestas": "protests",
+    "ais": "ais",
+    "buques": "ais",
+    "buques-cuba": "ais",
+    "ships": "ais",
+    "vessels": "ais",
 }
 _REPRESSOR_TYPE_PALETTES = {
     "batablanca": {
@@ -451,9 +456,12 @@ def _serialize_residence_report(report: RepressorResidenceReport):
     }
 
 
-def _normalize_map_layer(value: str | None) -> str:
+def _normalize_map_layer(value: str | None, *, allow_ais: bool = False) -> str:
     raw = (value or "").strip().lower()
-    return _MAP_LAYER_ALIASES.get(raw, "map")
+    normalized = _MAP_LAYER_ALIASES.get(raw, "map")
+    if normalized == "ais" and not allow_ais:
+        return "map"
+    return normalized
 
 
 @map_bp.route("/")
@@ -462,7 +470,8 @@ def dashboard(layer_slug: str | None = None):
     categories = Category.query.order_by(Category.id.asc()).all()
     posts = Post.query.filter_by(status="approved").all()
     map_provider_main = get_map_provider_main()
-    initial_base_mode = _normalize_map_layer(layer_slug)
+    allow_ais = current_user.is_authenticated and current_user.has_role("administrador")
+    initial_base_mode = _normalize_map_layer(layer_slug, allow_ais=allow_ais)
     return render_template(
         "map/dashboard.html",
         categories=categories,
@@ -479,6 +488,9 @@ def dashboard(layer_slug: str | None = None):
         ),
         protest_refresh_seconds=current_app.config.get(
             "PROTEST_FRONTEND_REFRESH_SECONDS", 300
+        ),
+        ais_refresh_seconds=current_app.config.get(
+            "AISSTREAM_FRONTEND_REFRESH_SECONDS", 1800
         ),
         map_provider_main=map_provider_main,
         google_maps_api_key=_google_maps_api_key(),

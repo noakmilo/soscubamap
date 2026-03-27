@@ -23,6 +23,8 @@ from .connectivity_province_status import ConnectivityProvinceStatus
 from .protest_ingestion_run import ProtestIngestionRun
 from .protest_event import ProtestEvent
 from .protest_feed_source import ProtestFeedSource
+from .ais_ingestion_run import AISIngestionRun
+from .ais_cuba_target_vessel import AISCubaTargetVessel
 from .repressor import (
     Repressor,
     RepressorCrime,
@@ -62,6 +64,8 @@ __all__ = [
     "ProtestIngestionRun",
     "ProtestEvent",
     "ProtestFeedSource",
+    "AISIngestionRun",
+    "AISCubaTargetVessel",
     "Repressor",
     "RepressorCrime",
     "RepressorType",

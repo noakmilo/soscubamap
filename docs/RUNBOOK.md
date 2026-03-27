@@ -238,6 +238,7 @@ flask --app run.py db history
 | `python -m scripts.reverse_geocode_posts` | Geocodificación inversa de posts           |
 | `python -m scripts.fetch_protests` | Ingesta manual de feeds RSS de protestas |
 | `python -m scripts.fetch_connectivity --single-call` | Ingesta manual de conectividad (Cloudflare Radar) |
+| `python -m scripts.fetch_aisstream` | Ingesta manual AISStream (buques rumbo a puertos de Cuba) |
 
 ## Self-hosted maps
 

@@ -36,6 +36,8 @@ from app.services.vote_identity import get_voter_hash
 from app.models.connectivity_snapshot import ConnectivitySnapshot
 from app.models.connectivity_ingestion_run import ConnectivityIngestionRun
 from app.models.connectivity_province_status import ConnectivityProvinceStatus
+from app.models.ais_ingestion_run import AISIngestionRun
+from app.models.ais_cuba_target_vessel import AISCubaTargetVessel
 from app.models.protest_event import ProtestEvent
 from app.models.protest_ingestion_run import ProtestIngestionRun
 from app.models.repressor import (
@@ -86,6 +88,11 @@ from app.services.repressors import (
     serialize_repressor,
 )
 from app.services.prisoners import serialize_prisoner
+from app.services.aisstream import (
+    get_ais_frontend_refresh_seconds,
+    get_ais_max_target_vessels,
+    get_ais_stale_after_hours,
+)
 
 from app.models.post import Post
 from sqlalchemy.orm import selectinload
@@ -2567,6 +2574,133 @@ def prisoner_stats_v1():
                 }
                 for row in prison_rows
             ],
+        }
+    )
+
+
+@api_bp.route("/v1/ais/cuba-targets")
+@limiter.limit("120/minute")
+def ais_cuba_targets_v1():
+    if not _is_admin_user():
+        return jsonify({"error": "Acceso denegado"}), 403
+
+    try:
+        requested_limit = int(request.args.get("limit", get_ais_max_target_vessels()))
+    except Exception:
+        requested_limit = get_ais_max_target_vessels()
+    limit = max(1, min(requested_limit, 5000))
+
+    try:
+        min_confidence = float(request.args.get("min_confidence", "0") or 0)
+    except Exception:
+        min_confidence = 0.0
+    min_confidence = max(0.0, min(min_confidence, 1.0))
+
+    query = AISCubaTargetVessel.query.filter(
+        AISCubaTargetVessel.latitude.isnot(None),
+        AISCubaTargetVessel.longitude.isnot(None),
+        AISCubaTargetVessel.match_confidence >= min_confidence,
+    ).order_by(
+        AISCubaTargetVessel.match_confidence.desc(),
+        AISCubaTargetVessel.last_seen_at_utc.desc().nullslast(),
+        AISCubaTargetVessel.updated_at.desc().nullslast(),
+    )
+    rows = query.limit(limit).all()
+
+    points = []
+    by_port: dict[str, int] = {}
+    for row in rows:
+        lat = _safe_float(row.latitude)
+        lng = _safe_float(row.longitude)
+        if lat is None or lng is None:
+            continue
+
+        port_label = str(row.matched_port_name or "Sin puerto").strip() or "Sin puerto"
+        by_port[port_label] = by_port.get(port_label, 0) + 1
+        points.append(
+            {
+                "id": row.id,
+                "mmsi": row.mmsi,
+                "ship_name": row.ship_name,
+                "imo": row.imo,
+                "call_sign": row.call_sign,
+                "vessel_type": row.vessel_type,
+                "destination_raw": row.destination_raw,
+                "destination_normalized": row.destination_normalized,
+                "matched_port_key": row.matched_port_key,
+                "matched_port_name": row.matched_port_name,
+                "match_confidence": float(row.match_confidence or 0.0),
+                "match_reason": row.match_reason,
+                "latitude": lat,
+                "longitude": lng,
+                "sog": _safe_float(row.sog),
+                "cog": _safe_float(row.cog),
+                "heading": _safe_float(row.heading),
+                "navigational_status": row.navigational_status,
+                "source_message_type": row.source_message_type,
+                "last_seen_at_utc": serialize_snapshot_time(row.last_seen_at_utc),
+                "last_position_at_utc": serialize_snapshot_time(row.last_position_at_utc),
+                "last_static_at_utc": serialize_snapshot_time(row.last_static_at_utc),
+                "updated_at": serialize_snapshot_time(row.updated_at),
+            }
+        )
+
+    latest_run = (
+        AISIngestionRun.query.order_by(
+            AISIngestionRun.started_at_utc.desc(),
+            AISIngestionRun.id.desc(),
+        )
+        .limit(1)
+        .first()
+    )
+    stale_after_hours = get_ais_stale_after_hours()
+    stale_threshold = timedelta(hours=max(stale_after_hours, 1))
+    now = datetime.utcnow()
+    stale = True
+    if latest_run and latest_run.finished_at_utc:
+        stale = (now - latest_run.finished_at_utc) > stale_threshold
+
+    return jsonify(
+        {
+            "points": points,
+            "summary": {
+                "total_points": len(points),
+                "min_confidence": min_confidence,
+                "by_port": [
+                    {"port": port, "count": count}
+                    for port, count in sorted(
+                        by_port.items(),
+                        key=lambda item: (-int(item[1]), str(item[0])),
+                    )
+                ],
+            },
+            "latest_run": {
+                "id": latest_run.id if latest_run else None,
+                "status": latest_run.status if latest_run else None,
+                "scheduled_for_utc": serialize_snapshot_time(latest_run.scheduled_for_utc)
+                if latest_run
+                else None,
+                "started_at_utc": serialize_snapshot_time(latest_run.started_at_utc)
+                if latest_run
+                else None,
+                "finished_at_utc": serialize_snapshot_time(latest_run.finished_at_utc)
+                if latest_run
+                else None,
+                "total_messages": int(latest_run.total_messages or 0) if latest_run else 0,
+                "position_messages": int(latest_run.position_messages or 0) if latest_run else 0,
+                "static_messages": int(latest_run.static_messages or 0) if latest_run else 0,
+                "matched_messages": int(latest_run.matched_messages or 0) if latest_run else 0,
+                "matched_vessels": int(latest_run.matched_vessels or 0) if latest_run else 0,
+                "stale_removed": int(latest_run.stale_removed or 0) if latest_run else 0,
+                "error_message": latest_run.error_message if latest_run else None,
+            },
+            "stale": stale,
+            "stale_after_hours": stale_after_hours,
+            "source": {
+                "name": "AISStream",
+                "url": "https://aisstream.io/documentation",
+            },
+            "refresh_seconds": get_ais_frontend_refresh_seconds(),
         }
     )
 

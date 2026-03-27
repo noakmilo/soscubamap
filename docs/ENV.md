@@ -113,6 +113,27 @@ Layer de datos de conectividad a internet por provincias, alimentado por Cloudfl
 | `CONNECTIVITY_FRONTEND_REFRESH_SECONDS`    | Frecuencia de refresco del layer en el navegador.         | `300`    |
 | `CONNECTIVITY_RADAR_ENRICHMENT_COOLDOWN_SECONDS` | Reutiliza el último enrichment (audiencia/speed/alertas) durante este cooldown para reducir 429. | `21600` |
 
+## AIS buques rumbo a Cuba (AISStream)
+
+Layer administrativo (beta) para visualizar buques con destino a puertos de Cuba detectados por AIS.
+
+| Variable                                   | Descripción                                                               | Default |
+|--------------------------------------------|---------------------------------------------------------------------------|---------|
+| `AISSTREAM_ENABLED`                        | `1` habilita ingesta AISStream y capa admin; `0` la desactiva.           | `0` |
+| `AISSTREAM_API_KEY`                        | API key de AISStream (websocket).                                         | (vacío) |
+| `AISSTREAM_WS_URL`                         | URL websocket de AISStream.                                               | `wss://stream.aisstream.io/v0/stream` |
+| `AISSTREAM_SUBSCRIPTION_BBOXES_JSON`       | Bounding boxes JSON para suscripción AIS.                                 | `[[[17.5,-88.5],[25.8,-73.0]]]` |
+| `AISSTREAM_CAPTURE_MINUTES`                | Duración de cada corrida de captura en minutos.                           | `30` |
+| `AISSTREAM_MAX_MESSAGES_PER_RUN`           | Límite de mensajes procesados por corrida para evitar sobrecarga.         | `120000` |
+| `AISSTREAM_INGESTION_INTERVAL_SECONDS`     | Intervalo de ingesta automática en Celery Beat.                           | `86400` |
+| `AISSTREAM_FRONTEND_REFRESH_SECONDS`       | Refresco del layer AIS en frontend (admin).                               | `1800` |
+| `AISSTREAM_STALE_AFTER_HOURS`              | Marca como stale cuando la última corrida supera este umbral.             | `48` |
+| `AISSTREAM_VESSEL_STALE_HOURS`             | Elimina buques no vistos después de N horas.                              | `168` |
+| `AISSTREAM_MAX_TARGET_VESSELS`             | Máximo de puntos retornados por `/api/v1/ais/cuba-targets`.               | `1500` |
+| `AISSTREAM_MIN_SOG_FOR_DIRECTION_KNOTS`    | Velocidad mínima para inferencia direccional de destinos genéricos.       | `1.0` |
+| `AISSTREAM_MAX_DIRECTION_DELTA_DEG`        | Diferencia angular máxima COG→puerto para aceptar destino genérico.       | `70` |
+| `AISSTREAM_MAX_DIRECTION_DISTANCE_NM`      | Distancia máxima al puerto (millas náuticas) para destino genérico.       | `1200` |
+
 ## Protestas (RSS / NLP)
 
 Layer de eventos de protesta inferidos automáticamente desde fuentes RSS.
@@ -166,6 +187,8 @@ Notas de rango de ingesta:
 | `CELERY_CONNECTIVITY_POLLING_INTERVAL_SECONDS` | Intervalo del polling de conectividad.                     | `7200` |
 | `CELERY_CONNECTIVITY_SINGLE_CALL` | `1` usa una sola ronda por ciclo (menos llamadas a Radar); `0` usa dos rondas con delay. | `1` |
 | `CELERY_CONNECTIVITY_QUEUE`        | Cola usada por el polling de conectividad.                           | `ingestion` |
+| `CELERY_AIS_INGESTION_ENABLED`     | `1` habilita la ingesta periódica AIS (si `AISSTREAM_ENABLED=1`).    | `1` |
+| `CELERY_AIS_QUEUE`                 | Cola usada por la ingesta AIS.                                        | `ingestion` |
 | `CELERY_REPRESSOR_INGESTION_ENABLED` | `1` habilita la ingesta periódica de represores.                   | `1` |
 | `CELERY_REPRESSOR_QUEUE`           | Cola usada por la ingesta de represores.                             | `ingestion` |
 

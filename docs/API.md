@@ -184,6 +184,52 @@ Devuelve ficha completa de represor + reportes de residencia aprobados.
 
 Devuelve tabla agregada por provincia y municipio.
 
+### `GET /api/v1/ais/cuba-targets` (solo admin)
+
+Devuelve snapshot de buques detectados por AISStream con destino a puertos de Cuba.
+
+Rate limit: `120/min`.
+
+**Parámetros query:**
+
+| Parámetro       | Tipo  | Default | Descripción |
+|-----------------|-------|---------|-------------|
+| `limit`         | int   | config  | Máximo de puntos (máx 5000) |
+| `min_confidence`| float | `0`     | Umbral de confianza (0.0–1.0) |
+
+**Respuesta:** `200`
+
+```json
+{
+  "points": [
+    {
+      "mmsi": "372003000",
+      "ship_name": "TEST VESSEL",
+      "destination_raw": "HAVANA",
+      "matched_port_key": "cuhav",
+      "matched_port_name": "La Habana",
+      "match_confidence": 0.91,
+      "latitude": 23.11,
+      "longitude": -82.35,
+      "sog": 12.4,
+      "cog": 102.2,
+      "last_seen_at_utc": "2026-03-27T22:00:00Z"
+    }
+  ],
+  "summary": {
+    "total_points": 1,
+    "by_port": [{"port": "La Habana", "count": 1}]
+  },
+  "latest_run": {
+    "id": 12,
+    "status": "success",
+    "started_at_utc": "2026-03-27T21:30:00Z",
+    "finished_at_utc": "2026-03-27T22:00:00Z"
+  },
+  "stale": false
+}
+```
+
 ### `POST /api/v1/repressors/<id>/residence-reports`
 
 Crea reporte ciudadano de posible vivienda y genera un post de mapa categoría `residencia-represor`.

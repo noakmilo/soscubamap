@@ -378,6 +378,7 @@ body.map-dashboard-page .map-canvas {
 .map-side-panel .protest-overlay,
 .map-side-panel .repressor-overlay,
 .map-side-panel .prisoner-overlay,
+.map-side-panel .ais-overlay,
 .map-side-panel .report-detail-panel {
   margin: 0;
 }
@@ -719,7 +720,8 @@ body.map-dashboard-page *::-webkit-scrollbar {
 .map-side-panel .connectivity-legend-overlay,
 .map-side-panel .protest-overlay,
 .map-side-panel .repressor-overlay,
-.map-side-panel .prisoner-overlay {
+.map-side-panel .prisoner-overlay,
+.map-side-panel .ais-overlay {
   position: static;
   inset: auto;
   width: 100%;
@@ -2442,6 +2444,120 @@ body.map-dashboard-page *::-webkit-scrollbar {
 }
 
 .prisoner-popup-meta {
+  font-size: 12px;
+  color: #334155;
+}
+
+.ais-overlay {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+  bottom: 16px;
+  width: min(360px, calc(100% - 32px));
+  background: rgba(6, 13, 24, 0.95);
+  border: 1px solid rgba(125, 211, 252, 0.35);
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+  z-index: 955;
+  display: grid;
+  gap: 8px;
+  max-height: none;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.ais-overlay[hidden] {
+  display: none !important;
+}
+
+.ais-title {
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #d7f3ff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ais-subtitle {
+  color: #b8e9ff;
+  font-size: 11px;
+}
+
+.ais-summary {
+  border-top: 1px solid rgba(125, 211, 252, 0.22);
+  padding-top: 8px;
+  color: #d7f3ff;
+  font-size: 11px;
+}
+
+.ais-ports-heading {
+  color: #eff8ff;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+}
+
+.ais-port-list {
+  border: 1px solid rgba(125, 211, 252, 0.24);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 8px;
+  display: grid;
+  gap: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.ais-port-empty {
+  color: #b8e9ff;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.ais-port-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  color: #def4ff;
+  font-size: 11px;
+}
+
+.ais-port-row strong {
+  color: #f4fbff;
+  font-variant-numeric: tabular-nums;
+}
+
+.ais-marker-wrap {
+  background: transparent;
+  border: 0;
+}
+
+.ais-marker-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.45);
+  display: inline-block;
+}
+
+.ais-popup {
+  color: #0f172a;
+  max-width: 260px;
+  display: grid;
+  gap: 6px;
+}
+
+.ais-popup-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ais-popup-meta {
   font-size: 12px;
   color: #334155;
 }
@@ -5984,6 +6100,17 @@ textarea {
     z-index: auto;
   }
 
+  .ais-overlay {
+    position: static;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    width: 100%;
+    margin-top: 12px;
+    max-height: min(56vh, 540px);
+    z-index: auto;
+  }
+
   body.map-dashboard-page .content.map-dashboard-content {
     padding: 14px 0 16px;
   }
@@ -6082,7 +6209,8 @@ textarea {
   body.map-dashboard-page .map-side-panel .connectivity-legend-overlay,
   body.map-dashboard-page .map-side-panel .protest-overlay,
   body.map-dashboard-page .map-side-panel .repressor-overlay,
-  body.map-dashboard-page .map-side-panel .prisoner-overlay {
+  body.map-dashboard-page .map-side-panel .prisoner-overlay,
+  body.map-dashboard-page .map-side-panel .ais-overlay {
     max-height: none;
   }
 
