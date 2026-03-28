@@ -15,6 +15,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-messages", type=int, default=None)
     parser.add_argument("--progress-every", type=int, default=None)
     parser.add_argument("--idle-log-seconds", type=int, default=None)
+    parser.add_argument(
+        "--debug-destinations",
+        action="store_true",
+        help="Incluye en el resumen un diagnostico de destinos observados en mensajes estaticos.",
+    )
+    parser.add_argument(
+        "--debug-destination-limit",
+        type=int,
+        default=25,
+        help="Maximo de filas por ranking de destinos en el diagnostico (1-200).",
+    )
     parser.add_argument("--log-level", default="INFO")
     return parser.parse_args()
 
@@ -57,7 +68,11 @@ def main() -> None:
         overrides = _apply_runtime_overrides(app, args)
         if overrides:
             logging.getLogger(__name__).info("AISStream runtime overrides %s", overrides)
-        summary = ingest_aisstream_cuba_targets(raise_on_error=False)
+        summary = ingest_aisstream_cuba_targets(
+            raise_on_error=False,
+            include_destination_diagnostics=bool(args.debug_destinations),
+            destination_diagnostics_limit=int(args.debug_destination_limit),
+        )
         print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 

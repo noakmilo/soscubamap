@@ -1,4 +1,13 @@
-from app.services.aisstream import match_destination_to_cuba_ports, normalize_destination_text
+from datetime import datetime
+
+from app.services.aisstream import (
+    DestinationDiagnostics,
+    VesselState,
+    _apply_static_fields,
+    _update_state_from_message,
+    match_destination_to_cuba_ports,
+    normalize_destination_text,
+)
 
 
 def test_normalize_destination_text_removes_accents_and_symbols():
@@ -35,3 +44,53 @@ def test_generic_cuba_with_direction_matches_port():
     assert match["is_match"] is True
     assert match["port_key"] in {"cuhav", "cumar", "cuqma"}
     assert match["confidence"] >= 0.45
+
+
+def test_apply_static_fields_reads_destination_from_metadata_fallback():
+    state = VesselState(mmsi="372003000")
+    destination = _apply_static_fields(
+        state=state,
+        payload={"PartA": {"Name": "TEST VESSEL"}, "PartB": {}},
+        metadata={"Destination": "CUHAV"},
+        observed_at=datetime(2026, 3, 27, 23, 18, 25),
+    )
+    assert destination == "CUHAV"
+    assert state.destination_raw == "CUHAV"
+
+
+def test_destination_diagnostics_collects_static_destinations():
+    state_cache = {}
+    counters = {
+        "total_messages": 0,
+        "position_messages": 0,
+        "static_messages": 0,
+        "matched_messages": 0,
+        "matched_vessels": 0,
+        "stale_removed": 0,
+        "parse_errors": 0,
+    }
+    diagnostics = DestinationDiagnostics(top_limit=5)
+    message_obj = {
+        "MessageType": "ShipStaticData",
+        "MetaData": {
+            "MMSI": "372003000",
+            "Destination": "Havana Cuba",
+            "time_utc": "2026-03-27T23:18:25Z",
+        },
+        "Message": {
+            "ShipStaticData": {
+                "PartA": {"Name": "TEST VESSEL"},
+                "PartB": {},
+            }
+        },
+    }
+
+    _update_state_from_message(state_cache, message_obj, counters, diagnostics)
+    payload = diagnostics.to_payload()
+
+    assert counters["static_messages"] == 1
+    assert payload["static_messages_total"] == 1
+    assert payload["static_messages_with_destination"] == 1
+    assert payload["static_messages_matched"] == 1
+    assert payload["top_normalized_destinations"][0]["destination"] == "HAVANA CUBA"
+    assert payload["match_reasons"][0]["reason"] in {"port_alias_exact", "port_alias_contains"}

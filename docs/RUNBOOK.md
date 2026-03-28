@@ -294,7 +294,7 @@ Si una migración falla, revisar el estado actual con `flask db current` y compa
 
 ### Rate limiting no funciona con múltiples workers
 
-Por defecto, Flask-Limiter usa almacenamiento en memoria, que no se comparte entre workers de Gunicorn. Para producción, configurar `RATELIMIT_STORAGE_URL=redis://localhost:6379/0`.
+Por defecto, Flask-Limiter usa almacenamiento en memoria, que no se comparte entre workers de Gunicorn. Para producción, configurar `RATELIMIT_STORAGE_URI=redis://localhost:6379/0`.
 
 ### Imágenes no se suben
 

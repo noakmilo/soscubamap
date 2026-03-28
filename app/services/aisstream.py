@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+from collections import Counter
 import json
 import logging
 import math
 import re
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
@@ -282,6 +283,84 @@ GENERIC_ALIASES_NORMALIZED = {
     for alias in GENERIC_CUBA_ALIASES
     if normalize_destination_text(alias)
 }
+
+
+@dataclass
+class DestinationDiagnostics:
+    top_limit: int = 25
+    static_messages_total: int = 0
+    static_messages_with_destination: int = 0
+    static_messages_without_destination: int = 0
+    static_messages_matched: int = 0
+    static_messages_unmatched: int = 0
+    reason_counter: Counter[str] = field(default_factory=Counter)
+    raw_counter: Counter[str] = field(default_factory=Counter)
+    normalized_counter: Counter[str] = field(default_factory=Counter)
+    unmatched_normalized_counter: Counter[str] = field(default_factory=Counter)
+
+    def __post_init__(self) -> None:
+        try:
+            limit = int(self.top_limit)
+        except Exception:
+            limit = 25
+        self.top_limit = max(1, min(limit, 200))
+
+    def observe_static_message(
+        self,
+        destination_raw: str,
+        match_reason: str,
+        is_match: bool,
+    ) -> None:
+        self.static_messages_total += 1
+        destination = str(destination_raw or "").strip()
+        if not destination:
+            self.static_messages_without_destination += 1
+            self.reason_counter["empty_destination_message"] += 1
+            return
+
+        self.static_messages_with_destination += 1
+        compact_raw = " ".join(destination.split())
+        if compact_raw:
+            compact_raw = compact_raw[:120]
+            self.raw_counter[compact_raw] += 1
+
+        normalized = normalize_destination_text(destination)
+        if normalized:
+            self.normalized_counter[normalized] += 1
+
+        if is_match:
+            self.static_messages_matched += 1
+        else:
+            self.static_messages_unmatched += 1
+            if normalized:
+                self.unmatched_normalized_counter[normalized] += 1
+
+        reason = str(match_reason or "").strip()
+        if not reason:
+            reason = "matched_without_reason" if is_match else "destination_not_matched"
+        self.reason_counter[reason] += 1
+
+    def _counter_rows(self, counter: Counter[str], key_name: str) -> list[dict[str, Any]]:
+        return [
+            {key_name: key, "count": int(value)}
+            for key, value in counter.most_common(self.top_limit)
+        ]
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "static_messages_total": int(self.static_messages_total),
+            "static_messages_with_destination": int(self.static_messages_with_destination),
+            "static_messages_without_destination": int(self.static_messages_without_destination),
+            "static_messages_matched": int(self.static_messages_matched),
+            "static_messages_unmatched": int(self.static_messages_unmatched),
+            "top_raw_destinations": self._counter_rows(self.raw_counter, "destination"),
+            "top_normalized_destinations": self._counter_rows(self.normalized_counter, "destination"),
+            "top_unmatched_normalized_destinations": self._counter_rows(
+                self.unmatched_normalized_counter,
+                "destination",
+            ),
+            "match_reasons": self._counter_rows(self.reason_counter, "reason"),
+        }
 
 
 def get_ais_enabled() -> bool:
@@ -803,7 +882,7 @@ def _apply_static_fields(
     payload: dict[str, Any],
     metadata: dict[str, Any],
     observed_at: datetime,
-) -> None:
+) -> str:
     static_payload = _extract_static_payload(payload)
 
     ship_name = static_payload.get("ship_name") or metadata.get("ShipName") or metadata.get("ship_name")
@@ -822,17 +901,24 @@ def _apply_static_fields(
     if vessel_type:
         state.vessel_type = str(vessel_type).strip()
 
-    destination = str(static_payload.get("destination") or "").strip()
+    destination = str(
+        static_payload.get("destination")
+        or metadata.get("Destination")
+        or metadata.get("destination")
+        or ""
+    ).strip()
     if destination:
         state.destination_raw = destination
 
     state.last_static_at_utc = observed_at
+    return destination
 
 
 def _update_state_from_message(
     state_cache: dict[str, VesselState],
     message_obj: dict[str, Any],
     counters: dict[str, int],
+    destination_diagnostics: DestinationDiagnostics | None = None,
 ) -> None:
     if not isinstance(message_obj, dict):
         counters["parse_errors"] += 1
@@ -875,15 +961,24 @@ def _update_state_from_message(
     if ship_name:
         state.ship_name = str(ship_name).strip()
 
+    destination_from_message = ""
+
     if message_type in POSITION_MESSAGE_TYPES:
         counters["position_messages"] += 1
         _apply_position_fields(state, payload, metadata, observed_at)
     elif message_type in STATIC_MESSAGE_TYPES:
         counters["static_messages"] += 1
-        _apply_static_fields(state, payload, metadata, observed_at)
+        destination_from_message = _apply_static_fields(state, payload, metadata, observed_at)
 
     if state.destination_raw:
         _apply_destination_match(state)
+
+    if message_type in STATIC_MESSAGE_TYPES and destination_diagnostics is not None:
+        destination_diagnostics.observe_static_message(
+            destination_raw=destination_from_message,
+            match_reason=state.match_reason,
+            is_match=bool(state.match_confidence > 0),
+        )
 
     if state.is_mappable_match:
         counters["matched_messages"] += 1
@@ -928,6 +1023,7 @@ def _upsert_target_vessel(state: VesselState, ingestion_run_id: int) -> None:
 async def _consume_ais_stream(
     state_cache: dict[str, VesselState],
     counters: dict[str, int],
+    destination_diagnostics: DestinationDiagnostics | None = None,
 ) -> None:
     try:
         import websockets
@@ -1024,7 +1120,12 @@ async def _consume_ais_stream(
                     logger.error("AISStream error frame received: %s", message_obj.get("error"))
                     raise RuntimeError(f"AISStream error: {message_obj.get('error')}")
 
-                _update_state_from_message(state_cache, message_obj, counters)
+                _update_state_from_message(
+                    state_cache,
+                    message_obj,
+                    counters,
+                    destination_diagnostics,
+                )
 
                 total_messages = counters["total_messages"]
                 if total_messages - last_progress_log_total >= progress_every:
@@ -1069,6 +1170,7 @@ async def _consume_ais_stream(
 def _run_ingestion_sync(
     state_cache: dict[str, VesselState],
     counters: dict[str, int],
+    destination_diagnostics: DestinationDiagnostics | None = None,
 ) -> None:
     try:
         loop = asyncio.get_running_loop()
@@ -1076,7 +1178,7 @@ def _run_ingestion_sync(
         loop = None
     if loop and loop.is_running():
         raise RuntimeError("No se puede ejecutar AIS ingestion dentro de un event loop activo")
-    asyncio.run(_consume_ais_stream(state_cache, counters))
+    asyncio.run(_consume_ais_stream(state_cache, counters, destination_diagnostics))
 
 
 def _finalize_run_success(run_id: int, counters: dict[str, int], summary_payload: dict[str, Any]) -> None:
@@ -1143,6 +1245,8 @@ def _prune_stale_vessels() -> int:
 def ingest_aisstream_cuba_targets(
     scheduled_for: datetime | None = None,
     raise_on_error: bool = True,
+    include_destination_diagnostics: bool = False,
+    destination_diagnostics_limit: int = 25,
 ) -> dict[str, Any]:
     if not get_ais_enabled():
         logger.info("AISStream ingestion skipped reason=aisstream_disabled")
@@ -1178,6 +1282,11 @@ def ingest_aisstream_cuba_targets(
         "stale_removed": 0,
         "parse_errors": 0,
     }
+    destination_diagnostics = (
+        DestinationDiagnostics(top_limit=destination_diagnostics_limit)
+        if include_destination_diagnostics
+        else None
+    )
 
     state_cache = _load_state_cache()
     logger.info(
@@ -1188,7 +1297,7 @@ def ingest_aisstream_cuba_targets(
     )
 
     try:
-        _run_ingestion_sync(state_cache, counters)
+        _run_ingestion_sync(state_cache, counters, destination_diagnostics)
 
         updated_vessels = 0
         cleared_non_matching = []
@@ -1244,6 +1353,8 @@ def ingest_aisstream_cuba_targets(
                 )
             ],
         }
+        if destination_diagnostics is not None:
+            summary_payload["destination_diagnostics"] = destination_diagnostics.to_payload()
         _finalize_run_success(run_id, counters, summary_payload)
         logger.info(
             "AISStream ingestion run success run_id=%s total_messages=%s matched_vessels=%s stored_vessels=%s parse_errors=%s",
@@ -1269,6 +1380,8 @@ def ingest_aisstream_cuba_targets(
             "matched_vessels": counters["matched_vessels"],
             "parse_errors": counters["parse_errors"],
         }
+        if destination_diagnostics is not None:
+            failure_payload["destination_diagnostics"] = destination_diagnostics.to_payload()
         if raise_on_error:
             raise
         return failure_payload

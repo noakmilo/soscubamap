@@ -92,9 +92,10 @@ python -c "from pywebpush import webpush; from py_vapid import Vapid; v = Vapid(
 
 | Variable                | Descripción                                        | Default    |
 |-------------------------|----------------------------------------------------|------------|
-| `RATELIMIT_STORAGE_URL` | Backend de almacenamiento para rate limits.         | `memory://` |
+| `RATELIMIT_STORAGE_URI` | Backend de almacenamiento para rate limits.         | `memory://` |
 
 En producción con múltiples workers, usar Redis: `redis://localhost:6379/0`.
+Compatibilidad: también se acepta `RATELIMIT_STORAGE_URL` como alias legado.
 
 ## Conectividad (Cloudflare Radar)
 

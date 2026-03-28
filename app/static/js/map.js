@@ -360,6 +360,20 @@ function cubaLatLngBounds() {
   );
 }
 
+function cubaPaddedLatLngBounds() {
+  const onMobileViewport = isMobileViewport();
+  return cubaLatLngBounds().pad(onMobileViewport ? 0.2 : 0.35);
+}
+
+function applyMapPanBoundsForMode(mode) {
+  if (!map) return;
+  if (mode === "ais") {
+    map.setMaxBounds(null);
+    return;
+  }
+  map.setMaxBounds(cubaPaddedLatLngBounds());
+}
+
 function enableMiddleClickPan(leafletMap) {
   const container = leafletMap?.getContainer?.();
   if (!container) return;
@@ -971,6 +985,7 @@ async function switchBaseMode(nextMode, options = {}) {
   if (mode === "ais" && !isAdmin) {
     mode = "map";
   }
+  applyMapPanBoundsForMode(mode);
   const {
     streetsLayer,
     satelliteLayer,
@@ -5356,7 +5371,7 @@ async function initMap() {
   if (onMobileViewport) {
     map.setView(HAVANA_CENTER, MOBILE_HAVANA_ZOOM);
   }
-  map.setMaxBounds(cubaBounds.pad(onMobileViewport ? 0.2 : 0.35));
+  applyMapPanBoundsForMode("map");
 
   const params = new URLSearchParams(window.location.search);
   const latParam = parseFloat(params.get("lat"));

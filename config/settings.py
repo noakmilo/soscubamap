@@ -39,7 +39,10 @@ class Config:
     POSTS_REQUIRE_MODERATION = True
     ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@soscuba.local")
     ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
-    RATELIMIT_STORAGE_URL = os.getenv("RATELIMIT_STORAGE_URL", "memory://")
+    RATELIMIT_STORAGE_URI = os.getenv(
+        "RATELIMIT_STORAGE_URI",
+        os.getenv("RATELIMIT_STORAGE_URL", "memory://"),
+    )
     RATELIMIT_HEADERS_ENABLED = True
     TRUST_PROXY_HEADERS = os.getenv("TRUST_PROXY_HEADERS", "1") == "1"
     RECAPTCHA_V2_SITE_KEY = os.getenv("RECAPTCHA_V2_SITE_KEY", "")
