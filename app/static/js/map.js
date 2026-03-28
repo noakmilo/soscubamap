@@ -1,6 +1,8 @@
 let map;
 let markers = [];
 let markerIndex = new Map();
+let markerClusterGroup = null;
+let markerClustersByCategory = {}; // Map to store cluster groups by category
 let shapeLayers = [];
 let connectivityGeoLayer;
 let connectivityRefreshTimer;
@@ -923,6 +925,35 @@ function createMarkerIcon(iconClass, imageUrl, slug, pending) {
   });
 }
 
+function createClusterIcon(cluster, slug) {
+  const childCount = cluster.getChildCount();
+  const iconClass = CATEGORY_ICONS[slug] || "fa-location-dot";
+  const imageUrl = CATEGORY_IMAGES[slug];
+  
+  // Create a div that will contain both the category icon and the count
+  let html;
+  if (imageUrl) {
+    html = `<div class="cluster-icon-content">
+      <img src="${imageUrl}" alt="" class="cluster-image" />
+      <span class="cluster-count">${childCount}</span>
+    </div>`;
+  } else {
+    html = `<div class="cluster-icon-content">
+      <i class="fa-solid ${iconClass}"></i>
+      <span class="cluster-count">${childCount}</span>
+    </div>`;
+  }
+
+  const size = childCount < 10 ? 33 : childCount < 100 ? 40 : 48;
+  
+  return L.divIcon({
+    html: html,
+    className: "cluster-icon-wrap",
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
+
 function syncLegend() {
   const items = document.querySelectorAll(".legend-item[data-slug]");
   items.forEach((item) => {
@@ -963,7 +994,14 @@ function setupLegendCategoryFilter() {
 }
 
 function clearMarkers() {
-  markers.forEach((marker) => marker.remove());
+  // Clear all category-based cluster groups
+  Object.keys(markerClustersByCategory).forEach((slug) => {
+    const cluster = markerClustersByCategory[slug];
+    if (cluster) {
+      cluster.clearLayers();
+    }
+  });
+  
   markers = [];
   pendingMarkers.forEach((marker) => marker.remove());
   pendingMarkers = [];
@@ -2051,14 +2089,21 @@ function renderMarkers(posts) {
     const lng = Number(post.longitude);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
-    const slug = post.category?.slug;
+    const slug = post.category?.slug || "otros";
     const iconClass = CATEGORY_ICONS[slug] || "fa-location-dot";
     const imageUrl = CATEGORY_IMAGES[slug];
 
     const marker = L.marker([lat, lng], {
       title: post.title,
       icon: createMarkerIcon(iconClass, imageUrl, slug, false),
-    }).addTo(map);
+    });
+
+    // Add marker to the category-specific cluster group
+    if (markerClustersByCategory[slug]) {
+      markerClustersByCategory[slug].addLayer(marker);
+    } else {
+      marker.addTo(map);
+    }
 
     marker.on("click", () => {
       closeActivePopup();
@@ -5350,6 +5395,20 @@ async function initMap() {
       { collapsed: true }
     )
     .addTo(map);
+
+  // Initialize marker cluster groups by category
+  Object.keys(CATEGORY_ICONS).forEach((slug) => {
+    const clusterGroup = L.markerClusterGroup({
+      maxClusterRadius: 80,
+      disableClusteringAtZoom: 17,
+      iconCreateFunction: function(cluster) {
+        return createClusterIcon(cluster, slug);
+      }
+    });
+    map.addLayer(clusterGroup);
+    markerClustersByCategory[slug] = clusterGroup;
+  });
+
   setMapHintVisible(true);
   setReportLegendVisible(true);
   setConnectivityLegendVisible(false);
