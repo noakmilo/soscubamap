@@ -2097,6 +2097,39 @@ def _serialize_post_repressor(post: Post, include_relationships: bool = False):
     return serialize_repressor(post.repressor, include_relationships=include_relationships)
 
 
+def _coerce_link_value(raw_link):
+    if isinstance(raw_link, str):
+        value = raw_link.strip()
+        return value or None
+
+    if isinstance(raw_link, dict):
+        for key in ("url", "href", "link", "value"):
+            candidate = raw_link.get(key)
+            if not isinstance(candidate, str):
+                continue
+            value = candidate.strip()
+            if value:
+                return value
+
+    return None
+
+
+def _deserialize_links_json(links_json):
+    if not links_json:
+        return []
+
+    try:
+        parsed = json.loads(links_json)
+    except (TypeError, ValueError):
+        return []
+
+    if isinstance(parsed, list):
+        return [value for value in (_coerce_link_value(item) for item in parsed) if value]
+
+    single = _coerce_link_value(parsed)
+    return [single] if single else []
+
+
 @api_bp.route("/posts")
 def posts():
     category_id = request.args.get("category_id")
@@ -2135,7 +2168,7 @@ def posts():
                 "created_at": p.created_at.isoformat(),
                 "anon": f"Anon-{p.author.anon_code}" if p.author and p.author.anon_code else "Anon",
                 "polygon_geojson": p.polygon_geojson,
-                "links": json.loads(p.links_json) if p.links_json else [],
+                "links": _deserialize_links_json(p.links_json),
                 "media": get_media_payload(p)[:4],
                 "verify_count": p.verify_count or 0,
                 "verified_by_me": p.id in verified_ids,
@@ -2167,7 +2200,7 @@ def _serialize_post(post: Post):
         "other_type": post.other_type,
         "status": post.status,
         "polygon_geojson": post.polygon_geojson,
-        "links": json.loads(post.links_json) if post.links_json else [],
+        "links": _deserialize_links_json(post.links_json),
         "media": get_media_payload(post),
         "verify_count": post.verify_count or 0,
         "repressor": _serialize_post_repressor(post, include_relationships=True),

@@ -441,6 +441,51 @@ function safeUrl(value) {
   return url.replaceAll('"', "%22").replaceAll("'", "%27");
 }
 
+function normalizeNameList(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (typeof item === "string") return item.trim();
+      if (!item || typeof item !== "object") return "";
+      const name = typeof item.name === "string" ? item.name.trim() : "";
+      return name;
+    })
+    .filter(Boolean);
+}
+
+function normalizeLinkList(value) {
+  const links = [];
+  const append = (rawHref, rawLabel) => {
+    const href = String(rawHref || "").trim();
+    if (!href) return;
+    const label = String(rawLabel || href).trim() || href;
+    links.push({ href, label });
+  };
+
+  if (Array.isArray(value)) {
+    value.forEach((item) => {
+      if (typeof item === "string") {
+        append(item, item);
+        return;
+      }
+      if (!item || typeof item !== "object") return;
+      append(item.url || item.href || item.link || item.value, item.label || item.title || item.text);
+    });
+    return links;
+  }
+
+  if (typeof value === "string") {
+    append(value, value);
+    return links;
+  }
+
+  if (value && typeof value === "object") {
+    append(value.url || value.href || value.link || value.value, value.label || value.title || value.text);
+  }
+
+  return links;
+}
+
 function normalizeBaseMode(value) {
   const raw = String(value || "").trim().toLowerCase();
   if (!raw) return "map";
@@ -1886,8 +1931,9 @@ function reportDetailHtmlForPost(post) {
     repressor && Number.isFinite(Number(repressor.id))
       ? `/represores/${Number(repressor.id)}`
       : "";
-  const repressorTypes = repressor && Array.isArray(repressor.types) ? repressor.types : [];
-  const repressorCrimes = repressor && Array.isArray(repressor.crimes) ? repressor.crimes : [];
+  const repressorTypes = normalizeNameList(repressor?.types);
+  const repressorCrimes = normalizeNameList(repressor?.crimes);
+  const links = normalizeLinkList(post?.links);
   const repressorBlock = repressor
     ? `
       <div class="report-repressor-card">
@@ -1977,13 +2023,13 @@ function reportDetailHtmlForPost(post) {
       ${repressorBlock}
       ${mediaHtml}
       ${
-        post.links && post.links.length
+        links.length
           ? `<div class="report-detail-links">
-               ${post.links
+               ${links
                  .map((link) => {
-                   const href = safeUrl(link);
+                   const href = safeUrl(link.href);
                    if (!href) return "";
-                   const label = escapeHtml(link);
+                   const label = escapeHtml(link.label || link.href);
                    return `<div><a href="${href}" target="_blank" rel="noopener noreferrer">${label}</a></div>`;
                  })
                  .join("")}
@@ -2035,9 +2081,22 @@ function renderReportDetail(post, options = {}) {
   }
 
   selectedReportId = Number(post.id) || null;
-  reportDetailPanel.innerHTML = reportDetailHtmlForPost(post);
-  triggerReportDetailReveal();
-  attachPopupActions(post, reportDetailPanel, null);
+  try {
+    reportDetailPanel.innerHTML = reportDetailHtmlForPost(post);
+    triggerReportDetailReveal();
+    attachPopupActions(post, reportDetailPanel, null);
+  } catch (error) {
+    console.error("No se pudo renderizar el detalle del reporte", error, post);
+    const safeTitle = escapeHtml(post.title || "Reporte");
+    const safeDescription = escapeHtml(post.description || "Sin descripcion.");
+    reportDetailPanel.classList.remove("is-revealing");
+    reportDetailPanel.innerHTML = `
+      <div class="report-detail-content">
+        <h3 class="report-detail-title">${safeTitle}</h3>
+        <p class="report-detail-description">${safeDescription}</p>
+      </div>
+    `;
+  }
   if (options.scrollToTop !== false && mapSideScroll) {
     mapSideScroll.scrollTop = 0;
   }
@@ -2060,7 +2119,10 @@ function renderMarkers(posts) {
       icon: createMarkerIcon(iconClass, imageUrl, slug, false),
     }).addTo(map);
 
-    marker.on("click", () => {
+    marker.on("click", (event) => {
+      if (event?.originalEvent) {
+        L.DomEvent.stopPropagation(event.originalEvent);
+      }
       closeActivePopup();
       renderReportDetail(post);
       ensureContextPanelVisible({ mobileState: "full" });
