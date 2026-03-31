@@ -395,6 +395,8 @@ body.map-dashboard-page .map-canvas {
   display: grid;
   gap: 10px;
   min-width: 0;
+  min-height: 92px;
+  align-content: start;
   overflow-x: hidden;
 }
 
@@ -407,6 +409,8 @@ body.map-dashboard-page .map-canvas {
   display: grid;
   gap: 8px;
   min-width: 0;
+  min-height: 24px;
+  align-content: start;
   overflow-x: hidden;
 }
 

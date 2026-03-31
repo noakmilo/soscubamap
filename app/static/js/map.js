@@ -2072,6 +2072,7 @@ function triggerReportDetailReveal() {
 
 function renderReportDetail(post, options = {}) {
   if (!reportDetailPanel) return;
+  reportDetailPanel.hidden = false;
   if (!post) {
     selectedReportId = null;
     reportDetailPanel.classList.remove("is-revealing");
