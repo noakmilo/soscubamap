@@ -177,7 +177,7 @@ def materialize_repressor_submission(
     repressor.source_created_at = submission.created_at
     repressor.source_updated_at = now
     repressor.source_status = 1
-    repressor.source_is_identifies = "manual_submission"
+    repressor.source_is_identifies = "Identificado"
     repressor.source_payload_json = json.dumps(
         {
             "submission_id": submission.id,

@@ -87,7 +87,13 @@
       </div>
       <div class="repressor-duel-item">
         <span class="repressor-duel-label">Estado fuente</span>
-        <strong>{{ repressor_payload.source_is_identifies or "N/D" }}</strong>
+        <strong>
+          {% if repressor_payload.source_is_identifies == "manual_submission" %}
+            Identificado
+          {% else %}
+            {{ repressor_payload.source_is_identifies or "N/D" }}
+          {% endif %}
+        </strong>
       </div>
     </div>
 
@@ -125,9 +131,15 @@
       <span class="verify-count" id="repressor-verify-count-{{ repressor.id }}" data-repressor-verify-count>
         {{ repressor.verify_count or 0 }}
       </span>
-      <a class="btn-primary" href="{{ url_for('map.report_repressor_residence', repressor_id=repressor.id) }}">
-        Identificar en el mapa
-      </a>
+      {% if confirmed_residence_url %}
+        <a class="btn-primary" href="{{ confirmed_residence_url }}">
+          Ver vivienda identificada
+        </a>
+      {% else %}
+        <a class="btn-primary" href="{{ url_for('map.report_repressor_residence', repressor_id=repressor.id) }}">
+          Identificar en el mapa
+        </a>
+      {% endif %}
       {% if show_profile_actions %}
         {% if not is_repressor_edit_locked %}
           <a class="btn-secondary" href="{{ url_for('map.edit_repressor_public', repressor_id=repressor.id) }}">

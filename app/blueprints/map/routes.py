@@ -291,18 +291,47 @@ def _residence_category():
     return Category.query.filter_by(slug="residencia-represor").first()
 
 
-def _initial_repressor_residence_coords(repressor: Repressor) -> tuple[float, float]:
-    latest_report = (
-        RepressorResidenceReport.query.filter_by(
-            repressor_id=repressor.id,
-            status="approved",
-        )
-        .order_by(
-            RepressorResidenceReport.created_at.desc(),
-            RepressorResidenceReport.id.desc(),
-        )
-        .first()
+def _latest_approved_repressor_residence_report(
+    repressor_id: int,
+    *,
+    include_post: bool = False,
+) -> RepressorResidenceReport | None:
+    query = RepressorResidenceReport.query.filter_by(
+        repressor_id=repressor_id,
+        status="approved",
     )
+    if include_post:
+        query = query.options(selectinload(RepressorResidenceReport.created_post))
+    return query.order_by(
+        RepressorResidenceReport.created_at.desc(),
+        RepressorResidenceReport.id.desc(),
+    ).first()
+
+
+def _repressor_confirmed_residence_url(repressor: Repressor) -> str | None:
+    latest_report = _latest_approved_repressor_residence_report(
+        repressor.id,
+        include_post=True,
+    )
+    if latest_report is None:
+        return None
+
+    created_post = latest_report.created_post
+    if created_post is not None and created_post.status == "approved":
+        return url_for("map.report_detail", post_id=created_post.id)
+
+    try:
+        lat = float(latest_report.latitude)
+        lng = float(latest_report.longitude)
+    except Exception:
+        return None
+    if not is_within_cuba_bounds(lat, lng):
+        return None
+    return url_for("map.dashboard", lat=f"{lat:.6f}", lng=f"{lng:.6f}")
+
+
+def _initial_repressor_residence_coords(repressor: Repressor) -> tuple[float, float]:
+    latest_report = _latest_approved_repressor_residence_report(repressor.id)
     if latest_report is not None:
         try:
             lat = float(latest_report.latitude)
@@ -1896,6 +1925,7 @@ def repressor_detail(repressor_id):
     )
     repressor_verified_by_me = repressor.id in _get_verified_repressor_ids([repressor.id])
     repressor_edit_locked = _is_repressor_profile_locked(repressor)
+    confirmed_residence_url = _repressor_confirmed_residence_url(repressor)
 
     return render_template(
         "map/repressor_detail.html",
@@ -1906,6 +1936,7 @@ def repressor_detail(repressor_id):
         show_profile_actions=True,
         repressor_verified_by_me=repressor_verified_by_me,
         repressor_edit_locked=repressor_edit_locked,
+        confirmed_residence_url=confirmed_residence_url,
     )
 
 
@@ -2359,6 +2390,9 @@ def repressors_viewer():
         repressor.id in _get_verified_repressor_ids([repressor.id]) if repressor else False
     )
     repressor_edit_locked = _is_repressor_profile_locked(repressor) if repressor else False
+    confirmed_residence_url = (
+        _repressor_confirmed_residence_url(repressor) if repressor else None
+    )
 
     return render_template(
         "map/repressor_random_viewer.html",
@@ -2376,6 +2410,7 @@ def repressors_viewer():
         total_repressors=total_repressors,
         repressor_verified_by_me=repressor_verified_by_me,
         repressor_edit_locked=repressor_edit_locked,
+        confirmed_residence_url=confirmed_residence_url,
     )
 
 
