@@ -131,7 +131,7 @@ let mapPanelToggle;
 let mapSheetHandle;
 let selectedReportId = null;
 let selectedLegendCategory = "all";
-let mobileSheetState = "mid";
+let mobileSheetState = "peek";
 let mobileSheetPointerStartY = null;
 let mobileSheetPointerId = null;
 let mobileSheetDragStartOffsetPct = null;
@@ -143,6 +143,12 @@ const CUBA_BOUNDS = {
   south: 19.0,
   west: -86.2,
   east: -73.0,
+};
+const CARIBBEAN_BOUNDS = {
+  north: 27.5,
+  south: 14.0,
+  west: -90.0,
+  east: -58.0,
 };
 const MOBILE_VIEWPORT_QUERY = "(max-width: 900px)";
 const ALERT_PANEL_HIDDEN_COOKIE = "soscuba_alert_panel_hidden";
@@ -362,18 +368,17 @@ function cubaLatLngBounds() {
   );
 }
 
-function cubaPaddedLatLngBounds() {
-  const onMobileViewport = isMobileViewport();
-  return cubaLatLngBounds().pad(onMobileViewport ? 0.2 : 0.35);
+function caribbeanLatLngBounds() {
+  return L.latLngBounds(
+    [CARIBBEAN_BOUNDS.south, CARIBBEAN_BOUNDS.west],
+    [CARIBBEAN_BOUNDS.north, CARIBBEAN_BOUNDS.east]
+  );
 }
 
-function applyMapPanBoundsForMode(mode) {
+function applyMapPanBoundsForMode() {
   if (!map) return;
-  if (mode === "ais") {
-    map.setMaxBounds(null);
-    return;
-  }
-  map.setMaxBounds(cubaPaddedLatLngBounds());
+  map.setMaxBounds(caribbeanLatLngBounds());
+  map.options.maxBoundsViscosity = 1.0;
 }
 
 function enableMiddleClickPan(leafletMap) {
@@ -791,7 +796,7 @@ function setupContextPanelLayout() {
     syncMapShellHeight();
     if (isMobileViewport()) {
       mapAppShell.classList.remove("is-panel-collapsed");
-      setMobileSheetState(mobileSheetState || "mid");
+      setMobileSheetState(mobileSheetState || "peek");
     } else {
       mapSidePanel.classList.remove("is-dragging");
       mapSidePanel.style.removeProperty("--mobile-sheet-offset");
