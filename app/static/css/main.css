@@ -673,8 +673,10 @@ body.map-dashboard-page .map-canvas {
 .report-repressor-image {
   width: 54px;
   height: 54px;
+  aspect-ratio: 1 / 1;
   border-radius: 8px;
   object-fit: cover;
+  object-position: center;
   border: 1px solid var(--line);
 }
 
@@ -2025,9 +2027,10 @@ body.map-dashboard-page *::-webkit-scrollbar {
 .repressor-detail-avatar {
   width: 48px;
   height: 48px;
+  aspect-ratio: 1 / 1;
   border-radius: 8px;
   object-fit: cover;
-  object-position: top center;
+  object-position: center;
   border: 1px solid rgba(214, 251, 231, 0.3);
 }
 
@@ -2123,7 +2126,7 @@ body.map-dashboard-page *::-webkit-scrollbar {
   width: 100%;
   max-height: 132px;
   object-fit: cover;
-  object-position: top center;
+  object-position: center;
   border-radius: 8px;
   border: 1px solid rgba(100, 116, 139, 0.3);
 }
@@ -2346,9 +2349,10 @@ body.map-dashboard-page *::-webkit-scrollbar {
 .prisoner-detail-avatar {
   width: 48px;
   height: 48px;
+  aspect-ratio: 1 / 1;
   border-radius: 8px;
   object-fit: cover;
-  object-position: top center;
+  object-position: center;
   border: 1px solid rgba(133, 245, 171, 0.4);
 }
 
@@ -4958,8 +4962,10 @@ textarea {
 .repressor-avatar {
   width: 52px;
   height: 52px;
+  aspect-ratio: 1 / 1;
   min-width: 52px;
   object-fit: cover;
+  object-position: center;
   border-radius: 8px;
   display: block;
 }
@@ -6364,5 +6370,4 @@ textarea {
   font-weight: bold;
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
 }
-
 
