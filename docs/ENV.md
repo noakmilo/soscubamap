@@ -144,8 +144,9 @@ Layer administrativo para visualizar vuelos con destino a aeropuertos cubanos co
 | `FLIGHTS_ENABLED` | `1` habilita ingesta/capa de vuelos; `0` la desactiva. | `0` |
 | `FLIGHTS_API_KEY` | API key de FlightRadar Explorer. | (vacío) |
 | `FLIGHTS_API_BASE_URL` | Base URL del API Explorer. | `https://fr24api.flightradar24.com/api` |
-| `FLIGHTS_API_AUTH_HEADER` | Header de autenticación. | `x-apikey` |
-| `FLIGHTS_API_AUTH_PREFIX` | Prefijo del header (ej. `Bearer `). | (vacío) |
+| `FLIGHTS_API_AUTH_HEADER` | Header de autenticación. | `Authorization` |
+| `FLIGHTS_API_AUTH_PREFIX` | Prefijo del header (ej. `Bearer`). | `Bearer` |
+| `FLIGHTS_API_ACCEPT_VERSION` | Valor de `Accept-Version` requerido por proveedor. | `v1` |
 | `FLIGHTS_API_TIMEOUT_SECONDS` | Timeout HTTP por request. | `20` |
 | `FLIGHTS_API_RESPONSE_LIMIT` | Límite por página/request (plan: `20`). | `20` |
 | `FLIGHTS_API_REQUEST_RATE_LIMIT` | Máximo de requests por segundo (plan: `10`). | `10` |

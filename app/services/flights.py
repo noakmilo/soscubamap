@@ -306,11 +306,15 @@ def get_flights_api_base_url() -> str:
 
 
 def get_flights_api_auth_header() -> str:
-    return str(_config_value("FLIGHTS_API_AUTH_HEADER", "x-apikey") or "x-apikey").strip()
+    return str(_config_value("FLIGHTS_API_AUTH_HEADER", "Authorization") or "Authorization").strip()
 
 
 def get_flights_api_auth_prefix() -> str:
-    return str(_config_value("FLIGHTS_API_AUTH_PREFIX", "") or "")
+    return str(_config_value("FLIGHTS_API_AUTH_PREFIX", "Bearer") or "Bearer")
+
+
+def get_flights_api_accept_version() -> str:
+    return str(_config_value("FLIGHTS_API_ACCEPT_VERSION", "v1") or "").strip()
 
 
 def get_flights_api_timeout_seconds() -> int:
@@ -479,10 +483,17 @@ def _api_get(path: str, params: dict[str, Any], request_ctx: RequestContext) -> 
     headers = {
         "Accept": "application/json",
     }
+    accept_version = get_flights_api_accept_version()
+    if accept_version:
+        headers["Accept-Version"] = accept_version
+
     header_name = get_flights_api_auth_header()
     header_prefix = get_flights_api_auth_prefix()
     if header_name:
-        headers[header_name] = f"{header_prefix}{api_key}" if header_prefix else api_key
+        prefix = header_prefix
+        if prefix and not prefix.endswith(" "):
+            prefix = f"{prefix} "
+        headers[header_name] = f"{prefix}{api_key}" if prefix else api_key
 
     response = requests.get(
         url,
