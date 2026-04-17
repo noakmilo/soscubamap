@@ -38,6 +38,10 @@ from app.models.connectivity_ingestion_run import ConnectivityIngestionRun
 from app.models.connectivity_province_status import ConnectivityProvinceStatus
 from app.models.ais_ingestion_run import AISIngestionRun
 from app.models.ais_cuba_target_vessel import AISCubaTargetVessel
+from app.models.flight_ingestion_run import FlightIngestionRun
+from app.models.flight_layer_snapshot import FlightLayerSnapshot
+from app.models.flight_aircraft import FlightAircraft
+from app.models.flight_event import FlightEvent
 from app.models.protest_event import ProtestEvent
 from app.models.protest_ingestion_run import ProtestIngestionRun
 from app.models.repressor import (
@@ -92,6 +96,15 @@ from app.services.aisstream import (
     get_ais_frontend_refresh_seconds,
     get_ais_max_target_vessels,
     get_ais_stale_after_hours,
+)
+from app.services.flights import (
+    build_aircraft_detail_payload,
+    build_event_track_payload,
+    decode_snapshot_json,
+    get_flights_frontend_refresh_seconds,
+    get_flights_snapshot_stale_after_seconds,
+    get_monthly_credit_usage,
+    serialize_flight_time,
 )
 
 from app.models.post import Post
@@ -1171,6 +1184,19 @@ def _minimum_numeric(values):
 
 
 def _parse_connectivity_window_hours():
+    raw = (request.args.get("window_hours") or "").strip()
+    if not raw:
+        return 24
+    try:
+        value = int(raw)
+    except Exception:
+        return 24
+    if value in (2, 6, 24):
+        return value
+    return 24
+
+
+def _parse_flights_window_hours():
     raw = (request.args.get("window_hours") or "").strip()
     if not raw:
         return 24
@@ -2734,6 +2760,198 @@ def ais_cuba_targets_v1():
                 "url": "https://aisstream.io/documentation",
             },
             "refresh_seconds": get_ais_frontend_refresh_seconds(),
+        }
+    )
+
+
+@api_bp.route("/v1/flights/cuba-layer")
+@limiter.limit("120/minute")
+def flights_cuba_layer_v1():
+    if not _is_admin_user():
+        return jsonify({"error": "Acceso denegado"}), 403
+
+    window_hours = _parse_flights_window_hours()
+    now = datetime.utcnow()
+    snapshot = (
+        FlightLayerSnapshot.query.filter_by(window_hours=window_hours)
+        .order_by(FlightLayerSnapshot.id.desc())
+        .first()
+    )
+    latest_run = (
+        FlightIngestionRun.query.order_by(
+            FlightIngestionRun.started_at_utc.desc(),
+            FlightIngestionRun.id.desc(),
+        )
+        .limit(1)
+        .first()
+    )
+
+    stale_after_seconds = get_flights_snapshot_stale_after_seconds()
+    stale = True
+    points = []
+    summary = {
+        "window_hours": int(window_hours),
+        "total_flights": 0,
+        "destination_airports": 0,
+        "by_destination_airport": [],
+    }
+
+    if snapshot:
+        points = decode_snapshot_json(snapshot.points_json, [])
+        summary = decode_snapshot_json(snapshot.summary_json, summary)
+        stale_after_seconds = int(snapshot.stale_after_seconds or stale_after_seconds)
+        if snapshot.generated_at_utc:
+            stale = (now - snapshot.generated_at_utc) > timedelta(
+                seconds=max(stale_after_seconds, 60)
+            )
+
+    monthly_used = get_monthly_credit_usage(now)
+    monthly_budget = int(current_app.config.get("FLIGHTS_MONTHLY_CREDIT_BUDGET", 60000))
+    guardrail_percent = float(current_app.config.get("FLIGHTS_GUARDRAIL_PERCENT", 85))
+    guardrail_reached = False
+    if monthly_budget > 0:
+        guardrail_reached = monthly_used >= ((monthly_budget * guardrail_percent) / 100.0)
+
+    return jsonify(
+        {
+            "window_hours": int(window_hours),
+            "points": points,
+            "summary": summary,
+            "snapshot": {
+                "id": snapshot.id if snapshot else None,
+                "generated_at_utc": serialize_flight_time(snapshot.generated_at_utc)
+                if snapshot
+                else None,
+                "stale_after_seconds": int(stale_after_seconds),
+                "points_count": int(snapshot.points_count or 0) if snapshot else 0,
+            },
+            "latest_run": {
+                "id": latest_run.id if latest_run else None,
+                "status": latest_run.status if latest_run else None,
+                "safe_mode": bool(latest_run.safe_mode) if latest_run else False,
+                "scheduled_for_utc": serialize_flight_time(latest_run.scheduled_for_utc)
+                if latest_run
+                else None,
+                "started_at_utc": serialize_flight_time(latest_run.started_at_utc)
+                if latest_run
+                else None,
+                "finished_at_utc": serialize_flight_time(latest_run.finished_at_utc)
+                if latest_run
+                else None,
+                "request_count": int(latest_run.request_count or 0) if latest_run else 0,
+                "estimated_credits": int(latest_run.estimated_credits or 0)
+                if latest_run
+                else 0,
+                "airports_synced": int(latest_run.airports_synced or 0) if latest_run else 0,
+                "events_seen": int(latest_run.events_seen or 0) if latest_run else 0,
+                "events_stored": int(latest_run.events_stored or 0) if latest_run else 0,
+                "positions_stored": int(latest_run.positions_stored or 0)
+                if latest_run
+                else 0,
+                "error_message": latest_run.error_message if latest_run else None,
+            },
+            "budget": {
+                "monthly_used": int(monthly_used),
+                "monthly_budget": int(monthly_budget),
+                "guardrail_percent": float(guardrail_percent),
+                "guardrail_reached": bool(guardrail_reached),
+            },
+            "stale": bool(stale),
+            "refresh_seconds": get_flights_frontend_refresh_seconds(),
+        }
+    )
+
+
+@api_bp.route("/v1/flights/aircraft/<int:aircraft_id>/detail")
+@limiter.limit("120/minute")
+def flights_aircraft_detail_v1(aircraft_id):
+    if not _is_admin_user():
+        return jsonify({"error": "Acceso denegado"}), 403
+
+    aircraft = FlightAircraft.query.get_or_404(aircraft_id)
+    payload = build_aircraft_detail_payload(aircraft)
+    payload["cloudinary_enabled"] = bool(
+        current_app.config.get("CLOUDINARY_CLOUD_NAME")
+        and current_app.config.get("CLOUDINARY_API_KEY")
+        and current_app.config.get("CLOUDINARY_API_SECRET")
+    )
+    return jsonify(payload)
+
+
+@api_bp.route("/v1/flights/events/<int:event_id>/track")
+@limiter.limit("120/minute")
+def flights_event_track_v1(event_id):
+    if not _is_admin_user():
+        return jsonify({"error": "Acceso denegado"}), 403
+
+    event = FlightEvent.query.options(selectinload(FlightEvent.aircraft)).get_or_404(event_id)
+    payload = build_event_track_payload(event)
+    return jsonify(payload)
+
+
+@api_bp.route("/v1/flights/aircraft/<int:aircraft_id>/photo", methods=["POST"])
+@limiter.limit("20/minute; 120/day")
+def flights_aircraft_photo_upload_v1(aircraft_id):
+    if not _is_admin_user():
+        return jsonify({"ok": False, "error": "No autorizado."}), 403
+
+    aircraft = FlightAircraft.query.get_or_404(aircraft_id)
+    files = [
+        file
+        for file in request.files.getlist("photo")
+        if file and (file.filename or "").strip()
+    ]
+
+    if not files:
+        return jsonify({"ok": False, "error": "Debes subir una foto."}), 400
+    if len(files) > 1:
+        return jsonify({"ok": False, "error": "Solo puedes subir una foto por envío."}), 400
+
+    cloudinary_enabled = bool(
+        current_app.config.get("CLOUDINARY_CLOUD_NAME")
+        and current_app.config.get("CLOUDINARY_API_KEY")
+        and current_app.config.get("CLOUDINARY_API_SECRET")
+    )
+    if not cloudinary_enabled:
+        return (
+            jsonify(
+                {
+                    "ok": False,
+                    "error": "Subida de imagen no disponible: falta configuración de Cloudinary.",
+                }
+            ),
+            400,
+        )
+
+    ok, error = validate_files(files)
+    if not ok:
+        return jsonify({"ok": False, "error": error}), 400
+
+    try:
+        urls = upload_files(files)
+    except Exception:
+        current_app.logger.exception("Error al subir foto de avión a Cloudinary")
+        return jsonify({"ok": False, "error": "No se pudo subir la foto a Cloudinary."}), 400
+
+    if not urls:
+        return jsonify({"ok": False, "error": "No se pudo subir la foto a Cloudinary."}), 400
+
+    aircraft.photo_manual_url = urls[0]
+    aircraft.photo_updated_at_utc = datetime.utcnow()
+    db.session.commit()
+
+    effective_photo = aircraft.photo_manual_url or aircraft.photo_api_url or ""
+    photo_source = "manual" if aircraft.photo_manual_url else ("api" if aircraft.photo_api_url else "none")
+
+    return jsonify(
+        {
+            "ok": True,
+            "aircraft_id": aircraft.id,
+            "photo_url": effective_photo,
+            "photo_source": photo_source,
+            "photo_manual_url": aircraft.photo_manual_url,
+            "photo_api_url": aircraft.photo_api_url,
+            "photo_updated_at_utc": serialize_flight_time(aircraft.photo_updated_at_utc),
         }
     )
 

@@ -60,6 +60,7 @@
         data-connectivity-refresh-seconds="{{ connectivity_refresh_seconds }}"
         data-protest-refresh-seconds="{{ protest_refresh_seconds }}"
         data-ais-refresh-seconds="{{ ais_refresh_seconds }}"
+        data-flights-refresh-seconds="{{ flights_refresh_seconds }}"
         data-map-provider="{{ map_provider_main }}"
         data-initial-base-mode="{{ initial_base_mode }}"
         data-layer-route-template="{{ map_layer_route_template }}"
@@ -408,6 +409,24 @@
       </div>
 
       {% if current_user.is_authenticated and current_user.has_role('administrador') %}
+        <div id="flightsOverlay" class="flights-overlay" hidden>
+          <div class="flights-title">Vuelos hacia Cuba</div>
+          <div class="flights-subtitle">
+            Snapshot administrativo procesado por Celery con ventanas de 24h, 6h y 2h.
+          </div>
+          <div class="flights-window-switch" role="group" aria-label="Ventana de vuelos">
+            <button type="button" class="flights-window-btn is-active" data-flights-window-hours="24" aria-pressed="true">24h</button>
+            <button type="button" class="flights-window-btn" data-flights-window-hours="6" aria-pressed="false">6h</button>
+            <button type="button" class="flights-window-btn" data-flights-window-hours="2" aria-pressed="false">2h</button>
+          </div>
+          <div id="flightsSummary" class="flights-summary">Cargando capa de vuelos...</div>
+          <div id="flightsMeta" class="flights-meta">Sin datos de ingesta.</div>
+          <div class="flights-airports-heading">Aeropuertos destino (ventana)</div>
+          <div id="flightsAirportsList" class="flights-airports-list">
+            <div class="flights-airports-empty">Sin datos todavía.</div>
+          </div>
+        </div>
+
         <div id="aisOverlay" class="ais-overlay" hidden>
           <div class="ais-title">Buques rumbo a Cuba (beta)</div>
           <div class="ais-subtitle">

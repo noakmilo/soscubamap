@@ -1,0 +1,193 @@
+from datetime import datetime, timedelta
+from io import BytesIO
+import json
+
+from app.extensions import db
+from app.models.flight_aircraft import FlightAircraft
+from app.models.flight_airport import FlightAirport
+from app.models.flight_event import FlightEvent
+from app.models.flight_ingestion_run import FlightIngestionRun
+from app.models.flight_layer_snapshot import FlightLayerSnapshot
+from app.models.flight_position import FlightPosition
+from app.models.role import Role
+from app.models.user import User
+
+
+def _login_admin(client, user_id: int) -> None:
+    with client.session_transaction() as session:
+        session["_user_id"] = str(user_id)
+        session["_fresh"] = True
+
+
+def _seed_flights_data(app):
+    with app.app_context():
+        admin_role = Role(name="administrador")
+        admin_user = User(email="admin-flights-api@example.com")
+        admin_user.set_password("test")
+        admin_user.roles.append(admin_role)
+
+        now = datetime.utcnow()
+        run = FlightIngestionRun(
+            started_at_utc=now - timedelta(minutes=20),
+            finished_at_utc=now - timedelta(minutes=5),
+            status="success",
+            safe_mode=False,
+            request_count=12,
+            estimated_credits=12,
+            events_seen=4,
+            events_stored=1,
+            positions_stored=3,
+        )
+        db.session.add_all([admin_role, admin_user, run])
+        db.session.flush()
+
+        airport = FlightAirport(
+            code_key="icao:MUHA",
+            airport_code_icao="MUHA",
+            airport_code_iata="HAV",
+            name="Jose Marti",
+            country_code="CU",
+            country_name="Cuba",
+            is_cuba=True,
+        )
+        aircraft = FlightAircraft(
+            identity_key="abc123|a320",
+            call_sign="ABC123",
+            model="A320",
+            registration="N123AB",
+        )
+        db.session.add_all([airport, aircraft])
+        db.session.flush()
+
+        event = FlightEvent(
+            event_key="fr24|abc123",
+            external_flight_id="abc123",
+            aircraft_id=aircraft.id,
+            destination_airport_id=airport.id,
+            ingestion_run_id=run.id,
+            identity_key=aircraft.identity_key,
+            call_sign="ABC123",
+            model="A320",
+            registration="N123AB",
+            origin_airport_name="Miami Intl",
+            origin_country="USA",
+            destination_airport_name="Jose Marti",
+            destination_country="Cuba",
+            status="en_route",
+            departure_at_utc=now - timedelta(hours=2),
+            last_seen_at_utc=now - timedelta(minutes=2),
+            latest_latitude=22.9,
+            latest_longitude=-82.6,
+            latest_speed=420,
+            latest_heading=160,
+            last_source_kind="live",
+        )
+        db.session.add(event)
+        db.session.flush()
+
+        position = FlightPosition(
+            event_id=event.id,
+            observed_at_utc=now - timedelta(minutes=2),
+            latitude=22.9,
+            longitude=-82.6,
+            speed=420,
+            heading=160,
+            source_kind="live",
+        )
+        db.session.add(position)
+
+        summary = {
+            "window_hours": 24,
+            "total_flights": 1,
+            "destination_airports": 1,
+            "by_destination_airport": [{"airport": "Jose Marti", "count": 1}],
+        }
+        points = [
+            {
+                "event_id": event.id,
+                "aircraft_id": aircraft.id,
+                "call_sign": "ABC123",
+                "model": "A320",
+                "destination_airport_name": "Jose Marti",
+                "latitude": 22.9,
+                "longitude": -82.6,
+                "observed_at_utc": (now - timedelta(minutes=2)).isoformat() + "Z",
+            }
+        ]
+        snapshot = FlightLayerSnapshot(
+            window_hours=24,
+            generated_at_utc=now - timedelta(minutes=1),
+            stale_after_seconds=1800,
+            points_count=1,
+            summary_json=json.dumps(summary),
+            points_json=json.dumps(points),
+            ingestion_run_id=run.id,
+        )
+        db.session.add(snapshot)
+        db.session.commit()
+
+        return {
+            "admin_id": admin_user.id,
+            "aircraft_id": aircraft.id,
+            "event_id": event.id,
+        }
+
+
+def test_flights_layer_api_requires_admin(client):
+    response = client.get("/api/v1/flights/cuba-layer")
+    assert response.status_code == 403
+
+
+def test_flights_layer_api_returns_snapshot_for_admin(app, client):
+    seeded = _seed_flights_data(app)
+    _login_admin(client, seeded["admin_id"])
+
+    response = client.get("/api/v1/flights/cuba-layer?window_hours=24")
+    assert response.status_code == 200
+
+    payload = response.get_json()
+    assert payload is not None
+    assert payload["window_hours"] == 24
+    assert isinstance(payload.get("points"), list)
+    assert len(payload["points"]) == 1
+    assert payload["summary"]["total_flights"] == 1
+    assert payload["latest_run"]["status"] == "success"
+
+
+def test_flights_detail_track_and_photo_upload(app, client, monkeypatch):
+    seeded = _seed_flights_data(app)
+    _login_admin(client, seeded["admin_id"])
+
+    detail_response = client.get(f"/api/v1/flights/aircraft/{seeded['aircraft_id']}/detail")
+    assert detail_response.status_code == 200
+    detail_payload = detail_response.get_json()
+    assert detail_payload["aircraft"]["call_sign"] == "ABC123"
+    assert detail_payload["summary_30d"]["trips_to_cuba"] >= 1
+
+    track_response = client.get(f"/api/v1/flights/events/{seeded['event_id']}/track")
+    assert track_response.status_code == 200
+    track_payload = track_response.get_json()
+    assert track_payload["event"]["id"] == seeded["event_id"]
+    assert track_payload["track"]["point_count"] >= 1
+
+    monkeypatch.setattr("app.blueprints.api.routes.validate_files", lambda _files: (True, ""))
+    monkeypatch.setattr(
+        "app.blueprints.api.routes.upload_files",
+        lambda _files: ["https://cdn.example.com/plane-photo.jpg"],
+    )
+
+    with app.app_context():
+        app.config["CLOUDINARY_CLOUD_NAME"] = "cloud"
+        app.config["CLOUDINARY_API_KEY"] = "key"
+        app.config["CLOUDINARY_API_SECRET"] = "secret"
+
+    upload_response = client.post(
+        f"/api/v1/flights/aircraft/{seeded['aircraft_id']}/photo",
+        data={"photo": (BytesIO(b"img-bytes"), "plane.jpg")},
+        content_type="multipart/form-data",
+    )
+    assert upload_response.status_code == 200
+    upload_payload = upload_response.get_json()
+    assert upload_payload["ok"] is True
+    assert upload_payload["photo_source"] == "manual"
+    assert upload_payload["photo_url"] == "https://cdn.example.com/plane-photo.jpg"

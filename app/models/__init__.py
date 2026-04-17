@@ -25,6 +25,12 @@ from .protest_event import ProtestEvent
 from .protest_feed_source import ProtestFeedSource
 from .ais_ingestion_run import AISIngestionRun
 from .ais_cuba_target_vessel import AISCubaTargetVessel
+from .flight_ingestion_run import FlightIngestionRun
+from .flight_airport import FlightAirport
+from .flight_aircraft import FlightAircraft
+from .flight_event import FlightEvent
+from .flight_position import FlightPosition
+from .flight_layer_snapshot import FlightLayerSnapshot
 from .repressor import (
     Repressor,
     RepressorCrime,
@@ -66,6 +72,12 @@ __all__ = [
     "ProtestFeedSource",
     "AISIngestionRun",
     "AISCubaTargetVessel",
+    "FlightIngestionRun",
+    "FlightAirport",
+    "FlightAircraft",
+    "FlightEvent",
+    "FlightPosition",
+    "FlightLayerSnapshot",
     "Repressor",
     "RepressorCrime",
     "RepressorType",

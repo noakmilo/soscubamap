@@ -105,6 +105,18 @@ let aisLastPayload = null;
 let aisOverlay;
 let aisSummary;
 let aisPortList;
+let flightsLayerGroup;
+let flightsTrackLayer;
+let flightsRefreshTimer;
+let flightsRefreshSeconds = 300;
+let flightsLastPayload = null;
+let flightsOverlay;
+let flightsSummary;
+let flightsMeta;
+let flightsAirportsList;
+let flightsWindowButtons = [];
+let flightsWindowHours = 24;
+let flightsDetailRequestSeq = 0;
 let reportDetailPanel;
 let activePopup;
 let alertTimer;
@@ -176,6 +188,7 @@ const MAP_MODE_TO_ROUTE_SLUG = {
   prisoners: "prisioneros",
   protests: "protestas",
   ais: "buques-cuba",
+  flights: "vuelos-cuba",
 };
 const ROUTE_SLUG_TO_MAP_MODE = {
   map: "map",
@@ -195,6 +208,10 @@ const ROUTE_SLUG_TO_MAP_MODE = {
   "buques-cuba": "ais",
   ships: "ais",
   vessels: "ais",
+  flights: "flights",
+  vuelos: "flights",
+  "vuelos-cuba": "flights",
+  "flights-cuba": "flights",
 };
 const CONNECTIVITY_STATUS_COLORS = {
   normal: "#2E7D32",
@@ -248,6 +265,7 @@ const repressorUnresolvedDetailCache = new Map();
 const PRISONER_COUNT_COLOR = "#22c55e";
 const prisonerTerritoryDetailCache = new Map();
 const AIS_MARKER_COLOR = "#0ea5e9";
+const FLIGHTS_MARKER_COLOR = "#f59e0b";
 const MAP_POPUP_OPTIONS = {
   maxWidth: 320,
   maxHeight: 320,
@@ -301,6 +319,10 @@ function buildMainBaseLayers(provider) {
       type: "roadmap",
       maxZoom: 20,
     });
+    const flightsLayer = L.gridLayer.googleMutant({
+      type: "roadmap",
+      maxZoom: 20,
+    });
     return {
       useGoogle,
       streetsLayer: mapLayer,
@@ -311,6 +333,7 @@ function buildMainBaseLayers(provider) {
       prisonerBaseLayer: prisonerLayer,
       protestBaseLayer: protestLayer,
       aisBaseLayer: aisLayer,
+      flightsBaseLayer: flightsLayer,
     };
   }
 
@@ -354,6 +377,10 @@ function buildMainBaseLayers(provider) {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19,
   });
+  const flightsBaseLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19,
+  });
   return {
     useGoogle,
     streetsLayer,
@@ -364,6 +391,7 @@ function buildMainBaseLayers(provider) {
     prisonerBaseLayer,
     protestBaseLayer,
     aisBaseLayer,
+    flightsBaseLayer,
   };
 }
 
@@ -393,6 +421,11 @@ function applyMapPanBoundsForMode(mode = "map") {
   if (mode === "connectivity") {
     map.setMaxBounds(connectivityLatLngBounds());
     map.options.maxBoundsViscosity = 0.55;
+    return;
+  }
+  if (mode === "flights") {
+    map.setMaxBounds(null);
+    map.options.maxBoundsViscosity = 0.0;
     return;
   }
 
@@ -645,6 +678,7 @@ function baseLayerForMode(mode) {
     prisonerBaseLayer,
     protestBaseLayer,
     aisBaseLayer,
+    flightsBaseLayer,
   } = mainBaseLayers || {};
   if (normalized === "satellite") return satelliteLayer;
   if (normalized === "connectivity") return connectivityBaseLayer;
@@ -652,6 +686,7 @@ function baseLayerForMode(mode) {
   if (normalized === "prisoners") return prisonerBaseLayer;
   if (normalized === "protests") return protestBaseLayer;
   if (normalized === "ais") return aisBaseLayer;
+  if (normalized === "flights") return flightsBaseLayer;
   return streetsLayer;
 }
 
@@ -665,6 +700,7 @@ function modeForBaseLayer(layer) {
     prisonerBaseLayer,
     protestBaseLayer,
     aisBaseLayer,
+    flightsBaseLayer,
   } = mainBaseLayers || {};
   if (layer === satelliteLayer) return "satellite";
   if (layer === connectivityBaseLayer) return "connectivity";
@@ -672,6 +708,7 @@ function modeForBaseLayer(layer) {
   if (layer === prisonerBaseLayer) return "prisoners";
   if (layer === protestBaseLayer) return "protests";
   if (layer === aisBaseLayer) return "ais";
+  if (layer === flightsBaseLayer) return "flights";
   if (layer === streetsLayer) return "map";
   return "map";
 }
@@ -1148,7 +1185,7 @@ async function switchBaseMode(nextMode, options = {}) {
   if (!map || !mainBaseLayers) return;
 
   let mode = normalizeBaseMode(nextMode);
-  if (mode === "ais" && !isAdmin) {
+  if ((mode === "ais" || mode === "flights") && !isAdmin) {
     mode = "map";
   }
   applyMapPanBoundsForMode(mode);
@@ -1161,6 +1198,7 @@ async function switchBaseMode(nextMode, options = {}) {
     prisonerBaseLayer,
     protestBaseLayer,
     aisBaseLayer,
+    flightsBaseLayer,
   } = mainBaseLayers;
   const targetLayer = baseLayerForMode(mode);
 
@@ -1172,6 +1210,7 @@ async function switchBaseMode(nextMode, options = {}) {
     prisonerBaseLayer,
     protestBaseLayer,
     aisBaseLayer,
+    flightsBaseLayer,
   ]
     .filter(Boolean)
     .forEach((layer) => {
@@ -1197,6 +1236,9 @@ async function switchBaseMode(nextMode, options = {}) {
     if (activeBaseMode === "ais") {
       disableAISMode();
     }
+    if (activeBaseMode === "flights") {
+      disableFlightsMode();
+    }
     if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
       map.removeLayer(satelliteLabelsLayer);
     }
@@ -1219,6 +1261,9 @@ async function switchBaseMode(nextMode, options = {}) {
     }
     if (activeBaseMode === "ais") {
       disableAISMode();
+    }
+    if (activeBaseMode === "flights") {
+      disableFlightsMode();
     }
     if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
       map.removeLayer(satelliteLabelsLayer);
@@ -1243,6 +1288,9 @@ async function switchBaseMode(nextMode, options = {}) {
     if (activeBaseMode === "ais") {
       disableAISMode();
     }
+    if (activeBaseMode === "flights") {
+      disableFlightsMode();
+    }
     if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
       map.removeLayer(satelliteLabelsLayer);
     }
@@ -1265,6 +1313,9 @@ async function switchBaseMode(nextMode, options = {}) {
     }
     if (activeBaseMode === "ais") {
       disableAISMode();
+    }
+    if (activeBaseMode === "flights") {
+      disableFlightsMode();
     }
     if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
       map.removeLayer(satelliteLabelsLayer);
@@ -1289,12 +1340,41 @@ async function switchBaseMode(nextMode, options = {}) {
     if (activeBaseMode === "prisoners") {
       disablePrisonerMode();
     }
+    if (activeBaseMode === "flights") {
+      disableFlightsMode();
+    }
     if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
       map.removeLayer(satelliteLabelsLayer);
     }
     await enableAISMode();
     if (options.syncRoute !== false) {
       syncBaseModeRoute("ais", { replace: options.replaceRoute === true });
+    }
+    return;
+  }
+
+  if (mode === "flights") {
+    if (activeBaseMode === "connectivity") {
+      disableConnectivityMode();
+    }
+    if (activeBaseMode === "repressors") {
+      disableRepressorMode();
+    }
+    if (activeBaseMode === "protests") {
+      disableProtestMode();
+    }
+    if (activeBaseMode === "prisoners") {
+      disablePrisonerMode();
+    }
+    if (activeBaseMode === "ais") {
+      disableAISMode();
+    }
+    if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
+      map.removeLayer(satelliteLabelsLayer);
+    }
+    await enableFlightsMode();
+    if (options.syncRoute !== false) {
+      syncBaseModeRoute("flights", { replace: options.replaceRoute === true });
     }
     return;
   }
@@ -1314,6 +1394,9 @@ async function switchBaseMode(nextMode, options = {}) {
   if (activeBaseMode === "ais") {
     disableAISMode();
   }
+  if (activeBaseMode === "flights") {
+    disableFlightsMode();
+  }
 
   activeBaseMode = mode === "satellite" ? "satellite" : "map";
   if (satelliteLabelsLayer && activeBaseMode === "satellite") {
@@ -1330,6 +1413,7 @@ async function switchBaseMode(nextMode, options = {}) {
   setRepressorOverlayVisible(false);
   setPrisonerOverlayVisible(false);
   setAISOverlayVisible(false);
+  setFlightsOverlayVisible(false);
   await applyFilters();
 
   if (options.syncRoute !== false) {
@@ -1382,6 +1466,11 @@ function setAISOverlayVisible(visible) {
   aisOverlay.hidden = !visible;
 }
 
+function setFlightsOverlayVisible(visible) {
+  if (!flightsOverlay) return;
+  flightsOverlay.hidden = !visible;
+}
+
 function setActiveConnectivityWindow(hours) {
   const numeric = Number(hours);
   if (![2, 6, 24].includes(numeric)) return;
@@ -1389,6 +1478,18 @@ function setActiveConnectivityWindow(hours) {
   connectivityWindowButtons.forEach((button) => {
     const buttonHours = Number(button?.dataset?.connectivityWindowHours);
     const isActive = buttonHours === connectivityWindowHours;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+  });
+}
+
+function setActiveFlightsWindow(hours) {
+  const numeric = Number(hours);
+  if (![2, 6, 24].includes(numeric)) return;
+  flightsWindowHours = numeric;
+  flightsWindowButtons.forEach((button) => {
+    const buttonHours = Number(button?.dataset?.flightsWindowHours);
+    const isActive = buttonHours === flightsWindowHours;
     button.classList.toggle("is-active", isActive);
     button.setAttribute("aria-pressed", isActive ? "true" : "false");
   });
@@ -2312,7 +2413,8 @@ window.handleNewReport = function (payload) {
     activeBaseMode === "protests" ||
     activeBaseMode === "repressors" ||
     activeBaseMode === "prisoners" ||
-    activeBaseMode === "ais"
+    activeBaseMode === "ais" ||
+    activeBaseMode === "flights"
   ) {
     if (Array.isArray(allPosts) && payload.status === "approved") {
       allPosts.unshift(payload);
@@ -2325,6 +2427,9 @@ window.handleNewReport = function (payload) {
     if (activeBaseMode === "prisoners") {
       refreshPrisonerLayer();
       refreshPrisonerStats();
+    }
+    if (activeBaseMode === "flights") {
+      refreshFlightsLayer();
     }
     refreshAlerts();
     return;
@@ -2997,6 +3102,7 @@ async function enableConnectivityMode() {
   setRepressorOverlayVisible(false);
   setPrisonerOverlayVisible(false);
   setAISOverlayVisible(false);
+  setFlightsOverlayVisible(false);
   ensureContextPanelVisible({ mobileState: "mid" });
   await refreshConnectivityLayer();
   startConnectivityPolling();
@@ -3525,6 +3631,7 @@ async function enableRepressorMode() {
   setRepressorOverlayVisible(true);
   setPrisonerOverlayVisible(false);
   setAISOverlayVisible(false);
+  setFlightsOverlayVisible(false);
   ensureContextPanelVisible({ mobileState: "mid" });
   renderRepressorStats(repressorStatsPayload, "Cargando gráfico de represores...");
   refreshRepressorStats();
@@ -3544,6 +3651,7 @@ function disableRepressorMode() {
   setRepressorOverlayVisible(false);
   setPrisonerOverlayVisible(false);
   setAISOverlayVisible(false);
+  setFlightsOverlayVisible(false);
   setReportLegendVisible(true);
   setReportDetailVisible(true);
   setMapHintVisible(true);
@@ -3995,6 +4103,7 @@ async function enablePrisonerMode() {
   setRepressorOverlayVisible(false);
   setPrisonerOverlayVisible(true);
   setAISOverlayVisible(false);
+  setFlightsOverlayVisible(false);
   ensureContextPanelVisible({ mobileState: "mid" });
   wirePrisonerFilters();
   renderPrisonerStats(prisonerStatsPayload, "Cargando gráfico de prisioneros...");
@@ -4014,6 +4123,7 @@ function disablePrisonerMode() {
   renderPrisonerStats(null, "Selecciona la capa de prisioneros para cargar el gráfico.");
   setPrisonerOverlayVisible(false);
   setAISOverlayVisible(false);
+  setFlightsOverlayVisible(false);
   setReportLegendVisible(true);
   setReportDetailVisible(true);
   setMapHintVisible(true);
@@ -4214,6 +4324,7 @@ async function enableAISMode() {
   setRepressorOverlayVisible(false);
   setPrisonerOverlayVisible(false);
   setAISOverlayVisible(true);
+  setFlightsOverlayVisible(false);
   ensureContextPanelVisible({ mobileState: "mid" });
   renderAISSummary(aisLastPayload, "Cargando capa AIS...");
   await refreshAISLayer();
@@ -4227,6 +4338,413 @@ function disableAISMode() {
   clearAISLayer();
   aisLastPayload = null;
   setAISOverlayVisible(false);
+  setFlightsOverlayVisible(false);
+  setReportLegendVisible(true);
+  setReportDetailVisible(true);
+  setMapHintVisible(true);
+}
+
+function clearFlightsLayer() {
+  if (flightsLayerGroup && map) {
+    map.removeLayer(flightsLayerGroup);
+  }
+  flightsLayerGroup = null;
+}
+
+function clearFlightsTrack() {
+  if (flightsTrackLayer && map) {
+    map.removeLayer(flightsTrackLayer);
+  }
+  flightsTrackLayer = null;
+}
+
+function stopFlightsPolling() {
+  if (!flightsRefreshTimer) return;
+  clearInterval(flightsRefreshTimer);
+  flightsRefreshTimer = null;
+}
+
+function startFlightsPolling() {
+  stopFlightsPolling();
+  const intervalMs = Math.max(30, Number(flightsRefreshSeconds) || 300) * 1000;
+  flightsRefreshTimer = setInterval(() => {
+    refreshFlightsLayer();
+  }, intervalMs);
+}
+
+function buildFlightsMarkerIcon() {
+  const color = FLIGHTS_MARKER_COLOR;
+  return L.divIcon({
+    className: "flights-marker-wrap",
+    html: `<span class="flights-marker-dot" style="background:${color};"></span>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+    popupAnchor: [0, -10],
+  });
+}
+
+function flightsPopupHtml(item) {
+  const callSign = escapeHtml(item?.call_sign || "Vuelo");
+  const model = escapeHtml(item?.model || "Modelo N/D");
+  const origin = escapeHtml(item?.origin_airport_name || "Origen N/D");
+  const destination = escapeHtml(item?.destination_airport_name || "Destino Cuba");
+  return `
+    <div class="flights-popup">
+      <div class="flights-popup-title">${callSign}</div>
+      <div class="flights-popup-meta">${model}</div>
+      <div class="flights-popup-meta">${origin} -> ${destination}</div>
+    </div>
+  `;
+}
+
+function renderFlightsAirportsList(payload) {
+  if (!flightsAirportsList) return;
+  const rows = Array.isArray(payload?.summary?.by_destination_airport)
+    ? payload.summary.by_destination_airport
+    : [];
+  if (!rows.length) {
+    flightsAirportsList.innerHTML = `<div class="flights-airports-empty">Sin datos de aeropuertos en esta ventana.</div>`;
+    return;
+  }
+  flightsAirportsList.innerHTML = rows
+    .slice(0, 20)
+    .map((row) => {
+      const airport = escapeHtml(row?.airport || "Aeropuerto Cuba");
+      const count = Math.max(0, Number(row?.count) || 0).toLocaleString("es-ES");
+      return `<div class="flights-airports-row"><span>${airport}</span><strong>${count}</strong></div>`;
+    })
+    .join("");
+}
+
+function renderFlightsSummary(payload, errorText = "") {
+  if (!flightsSummary || !flightsMeta) return;
+  if (errorText) {
+    flightsSummary.textContent = errorText;
+    flightsMeta.textContent = "No se pudo actualizar la capa.";
+    return;
+  }
+
+  const summary = payload?.summary || {};
+  const totalFlights = Math.max(0, Number(summary?.total_flights) || 0);
+  const destinationAirports = Math.max(0, Number(summary?.destination_airports) || 0);
+  const stale = Boolean(payload?.stale);
+  const staleLabel = stale ? "desactualizado" : "vigente";
+  const run = payload?.latest_run || {};
+  const status = String(run?.status || "N/D").trim();
+  const safeMode = Boolean(run?.safe_mode);
+  const safeModeLabel = safeMode ? "modo seguro activo" : "modo normal";
+  const generatedAt = formatUtcLabel(payload?.snapshot?.generated_at_utc || "");
+
+  flightsSummary.textContent = `Vuelos en mapa: ${totalFlights.toLocaleString(
+    "es-ES"
+  )} · Aeropuertos destino: ${destinationAirports.toLocaleString("es-ES")} · Snapshot ${staleLabel}.`;
+  flightsMeta.textContent = `Run: ${status} · ${safeModeLabel} · Actualizado: ${
+    generatedAt || "N/D"
+  }.`;
+}
+
+function drawFlightTrack(trackPayload) {
+  if (!map) return;
+  clearFlightsTrack();
+
+  const points = Array.isArray(trackPayload?.track?.points) ? trackPayload.track.points : [];
+  const latlngs = points
+    .map((point) => [Number(point?.latitude), Number(point?.longitude)])
+    .filter((pair) => Number.isFinite(pair[0]) && Number.isFinite(pair[1]));
+
+  if (!latlngs.length) return;
+
+  flightsTrackLayer = L.layerGroup();
+
+  if (latlngs.length >= 2) {
+    const trackLine = L.polyline(latlngs, {
+      color: "#f97316",
+      weight: 3,
+      opacity: 0.9,
+    });
+    trackLine.addTo(flightsTrackLayer);
+  }
+
+  const latest = latlngs[latlngs.length - 1];
+  L.circleMarker(latest, {
+    radius: 5,
+    color: "#ffffff",
+    weight: 2,
+    fillColor: "#f59e0b",
+    fillOpacity: 0.95,
+  }).addTo(flightsTrackLayer);
+
+  flightsTrackLayer.addTo(map);
+}
+
+function renderFlightDetailLoading(item) {
+  if (!reportDetailPanel) return;
+  const callSign = escapeHtml(item?.call_sign || "Vuelo");
+  reportDetailPanel.innerHTML = `
+    <div class="report-detail-content">
+      <h3 class="report-detail-title">${callSign}</h3>
+      <div class="report-detail-meta">Cargando detalle de avión y track...</div>
+    </div>
+  `;
+  triggerReportDetailReveal();
+  if (mapSideScroll) mapSideScroll.scrollTop = 0;
+}
+
+function renderFlightDetail(item, detailPayload, trackPayload) {
+  if (!reportDetailPanel) return;
+
+  const aircraft = detailPayload?.aircraft || {};
+  const summary30d = detailPayload?.summary_30d || {};
+  const history = Array.isArray(detailPayload?.history) ? detailPayload.history : [];
+  const origins = Array.isArray(summary30d?.origins) ? summary30d.origins : [];
+  const destinations = Array.isArray(summary30d?.destinations) ? summary30d.destinations : [];
+  const callSign = escapeHtml(aircraft?.call_sign || item?.call_sign || "Vuelo");
+  const model = escapeHtml(aircraft?.model || item?.model || "Modelo N/D");
+  const registration = escapeHtml(aircraft?.registration || item?.registration || "N/D");
+  const operator = escapeHtml(aircraft?.operator_name || "N/D");
+  const tripsToCuba = Math.max(0, Number(summary30d?.trips_to_cuba) || 0).toLocaleString("es-ES");
+  const photoUrl = safeUrl(aircraft?.photo_url || item?.photo_url || "");
+  const photoSource = String(aircraft?.photo_source || "none");
+  const photoSourceLabel =
+    photoSource === "manual" ? "Foto manual (Cloudinary)" : photoSource === "api" ? "Foto API" : "Sin foto";
+  const cloudinaryEnabled = Boolean(detailPayload?.cloudinary_enabled);
+  const aircraftId = Number(aircraft?.id || item?.aircraft_id);
+  const latestTrackPointCount = Math.max(0, Number(trackPayload?.track?.point_count) || 0);
+
+  const topOrigins = origins
+    .slice(0, 4)
+    .map((row) => `${escapeHtml(row?.origin || "N/D")} (${Math.max(0, Number(row?.count) || 0)})`)
+    .join(" · ");
+  const topDestinations = destinations
+    .slice(0, 4)
+    .map((row) => `${escapeHtml(row?.destination || "N/D")} (${Math.max(0, Number(row?.count) || 0)})`)
+    .join(" · ");
+
+  const historyRows = history
+    .slice(0, 8)
+    .map((row) => {
+      const origin = escapeHtml(row?.origin_airport_name || "Origen N/D");
+      const destination = escapeHtml(row?.destination_airport_name || "Destino N/D");
+      const when = escapeHtml(formatUtcAndCuba(row?.last_seen_at_utc || ""));
+      const status = escapeHtml(row?.status || "N/D");
+      return `<div class=\"flights-history-row\"><strong>${origin} -> ${destination}</strong><span>${when} · ${status}</span></div>`;
+    })
+    .join("");
+
+  const uploadSection =
+    cloudinaryEnabled && Number.isFinite(aircraftId)
+      ? `
+        <form class=\"flights-photo-form\" data-flight-photo-form data-aircraft-id=\"${aircraftId}\">
+          <label class=\"flights-photo-label\">Asignar foto manual</label>
+          <input type=\"file\" name=\"photo\" accept=\"image/*\" required />
+          <button type=\"submit\" class=\"flights-photo-btn\">Subir a Cloudinary</button>
+          <div class=\"flights-photo-feedback\" data-flight-photo-feedback></div>
+        </form>
+      `
+      : "";
+
+  reportDetailPanel.innerHTML = `
+    <div class=\"report-detail-content\">
+      <h3 class=\"report-detail-title\">${callSign}</h3>
+      <div class=\"report-detail-meta\">Modelo: ${model} · Matricula: ${registration}</div>
+      <div class=\"report-detail-meta\">Operador: ${operator} · Viajes a Cuba (30d): ${tripsToCuba}</div>
+      <div class=\"report-detail-meta\">Track disponible: ${latestTrackPointCount.toLocaleString("es-ES")} puntos</div>
+      <div class=\"report-detail-meta\">Foto: ${escapeHtml(photoSourceLabel)}</div>
+      ${
+        photoUrl
+          ? `<img class=\"flights-detail-photo\" src=\"${photoUrl}\" alt=\"Foto de aeronave\" loading=\"lazy\" />`
+          : `<div class=\"report-detail-meta\">No hay foto disponible para esta aeronave.</div>`
+      }
+      ${uploadSection}
+      <div class=\"report-detail-meta\">Orígenes frecuentes: ${topOrigins || "N/D"}</div>
+      <div class=\"report-detail-meta\">Destinos en Cuba: ${topDestinations || "N/D"}</div>
+      <div class=\"flights-history-list\">
+        ${
+          historyRows ||
+          '<div class=\"report-detail-meta\">Sin historial de viajes hacia Cuba en los últimos 30 días.</div>'
+        }
+      </div>
+    </div>
+  `;
+  triggerReportDetailReveal();
+  if (mapSideScroll) mapSideScroll.scrollTop = 0;
+
+  const form = reportDetailPanel.querySelector("[data-flight-photo-form]");
+  if (!form) return;
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const input = form.querySelector("input[name='photo']");
+    const feedback = form.querySelector("[data-flight-photo-feedback]");
+    const submitBtn = form.querySelector("button[type='submit']");
+    const file = input?.files?.[0];
+    if (!file) {
+      if (feedback) feedback.textContent = "Selecciona una imagen primero.";
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("photo", file);
+    if (submitBtn) submitBtn.disabled = true;
+    if (feedback) feedback.textContent = "Subiendo foto...";
+
+    try {
+      const response = await fetch(`/api/v1/flights/aircraft/${aircraftId}/photo`, {
+        method: "POST",
+        body: formData,
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.error || "No se pudo subir la foto.");
+      }
+      if (feedback) feedback.textContent = "Foto actualizada.";
+      await showFlightDetail(item);
+    } catch (error) {
+      if (feedback) feedback.textContent = error?.message || "No se pudo subir la foto.";
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  });
+}
+
+function renderFlightsLayer(payload) {
+  if (!map) return;
+  clearFlightsLayer();
+  clearFlightsTrack();
+  flightsLayerGroup = L.layerGroup();
+
+  const points = Array.isArray(payload?.points) ? payload.points : [];
+  points.forEach((item) => {
+    const lat = Number(item?.latitude);
+    const lng = Number(item?.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const marker = L.marker([lat, lng], {
+      icon: buildFlightsMarkerIcon(),
+      title: item?.call_sign || item?.registration || "Vuelo",
+    });
+    marker.bindPopup(flightsPopupHtml(item), MAP_POPUP_OPTIONS);
+    marker.on("click", () => {
+      ensureContextPanelVisible({ mobileState: "full" });
+      showFlightDetail(item);
+    });
+    marker.addTo(flightsLayerGroup);
+  });
+
+  flightsLayerGroup.addTo(map);
+}
+
+async function fetchFlightsLayerData() {
+  const params = new URLSearchParams();
+  params.set("window_hours", String(flightsWindowHours));
+  const url = `/api/v1/flights/cuba-layer?${params.toString()}`;
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error("No se pudo cargar la capa de vuelos.");
+  }
+  return await response.json();
+}
+
+async function fetchFlightDetail(aircraftId) {
+  const safeId = Number(aircraftId);
+  if (!Number.isFinite(safeId)) {
+    throw new Error("Avión inválido.");
+  }
+  const response = await fetch(`/api/v1/flights/aircraft/${safeId}/detail`, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error("No se pudo cargar detalle del avión.");
+  }
+  return await response.json();
+}
+
+async function fetchFlightTrack(eventId) {
+  const safeId = Number(eventId);
+  if (!Number.isFinite(safeId)) {
+    throw new Error("Evento de vuelo inválido.");
+  }
+  const response = await fetch(`/api/v1/flights/events/${safeId}/track`, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error("No se pudo cargar track del vuelo.");
+  }
+  return await response.json();
+}
+
+async function showFlightDetail(item) {
+  const aircraftId = Number(item?.aircraft_id);
+  const eventId = Number(item?.event_id);
+  if (!Number.isFinite(aircraftId) || !Number.isFinite(eventId)) {
+    return;
+  }
+  const requestSeq = ++flightsDetailRequestSeq;
+  renderFlightDetailLoading(item);
+  try {
+    const [detailPayload, trackPayload] = await Promise.all([
+      fetchFlightDetail(aircraftId),
+      fetchFlightTrack(eventId),
+    ]);
+    if (requestSeq !== flightsDetailRequestSeq || activeBaseMode !== "flights") return;
+    drawFlightTrack(trackPayload);
+    renderFlightDetail(item, detailPayload, trackPayload);
+  } catch (error) {
+    if (requestSeq !== flightsDetailRequestSeq || activeBaseMode !== "flights") return;
+    reportDetailPanel.innerHTML = `
+      <div class=\"report-detail-content\">
+        <h3 class=\"report-detail-title\">Detalle no disponible</h3>
+        <div class=\"report-detail-meta\">${escapeHtml(error?.message || "No se pudo cargar el detalle.")}</div>
+      </div>
+    `;
+  }
+}
+
+async function refreshFlightsLayer() {
+  if (activeBaseMode !== "flights") return;
+  try {
+    const payload = await fetchFlightsLayerData();
+    flightsLastPayload = payload;
+    renderFlightsLayer(payload);
+    renderFlightsSummary(payload);
+    renderFlightsAirportsList(payload);
+  } catch (_error) {
+    if (!flightsLastPayload) {
+      clearFlightsLayer();
+      clearFlightsTrack();
+    }
+    renderFlightsSummary(flightsLastPayload, "No fue posible actualizar la capa de vuelos.");
+    renderFlightsAirportsList(flightsLastPayload);
+  }
+}
+
+async function enableFlightsMode() {
+  if (!isAdmin) return;
+  activeBaseMode = "flights";
+  flightsDetailRequestSeq += 1;
+  clearMarkers();
+  closeActivePopup();
+  selectedReportId = null;
+  renderReportDetail(null);
+  setMapHintVisible(false);
+  setReportLegendVisible(false);
+  setReportDetailVisible(true);
+  setConnectivityLegendVisible(false);
+  setProtestOverlayVisible(false);
+  setRepressorOverlayVisible(false);
+  setPrisonerOverlayVisible(false);
+  setAISOverlayVisible(false);
+  setFlightsOverlayVisible(true);
+  ensureContextPanelVisible({ mobileState: "mid" });
+  renderFlightsSummary(flightsLastPayload, "Cargando capa de vuelos...");
+  renderFlightsAirportsList(flightsLastPayload);
+  await refreshFlightsLayer();
+  startFlightsPolling();
+}
+
+function disableFlightsMode() {
+  if (activeBaseMode !== "flights") return;
+  activeBaseMode = "map";
+  flightsDetailRequestSeq += 1;
+  stopFlightsPolling();
+  clearFlightsLayer();
+  clearFlightsTrack();
+  flightsLastPayload = null;
+  setFlightsOverlayVisible(false);
   setReportLegendVisible(true);
   setReportDetailVisible(true);
   setMapHintVisible(true);
@@ -4699,6 +5217,7 @@ async function enableProtestMode() {
   setRepressorOverlayVisible(false);
   setPrisonerOverlayVisible(false);
   setAISOverlayVisible(false);
+  setFlightsOverlayVisible(false);
   ensureContextPanelVisible({ mobileState: "mid" });
   await refreshProtestLayer();
   startProtestPolling();
@@ -4718,6 +5237,7 @@ function disableProtestMode() {
   setRepressorOverlayVisible(false);
   setPrisonerOverlayVisible(false);
   setAISOverlayVisible(false);
+  setFlightsOverlayVisible(false);
   setReportLegendVisible(true);
   setReportDetailVisible(true);
   setMapHintVisible(true);
@@ -4729,7 +5249,9 @@ async function applyFilters() {
     activeBaseMode === "connectivity" ||
     activeBaseMode === "protests" ||
     activeBaseMode === "repressors" ||
-    activeBaseMode === "prisoners"
+    activeBaseMode === "prisoners" ||
+    activeBaseMode === "ais" ||
+    activeBaseMode === "flights"
   ) {
     clearMarkers();
     updateLegendCounts(allPosts);
@@ -5317,12 +5839,16 @@ async function initMap() {
   connectivityRefreshSeconds = Number(mapEl.dataset.connectivityRefreshSeconds || 300);
   protestRefreshSeconds = Number(mapEl.dataset.protestRefreshSeconds || 300);
   aisRefreshSeconds = Number(mapEl.dataset.aisRefreshSeconds || 1800);
+  flightsRefreshSeconds = Number(mapEl.dataset.flightsRefreshSeconds || 300);
   const preferredProvider = (mapEl.dataset.mapProvider || MAP_PROVIDER_LEAFLET).toLowerCase();
   mapLayerRouteTemplate = String(mapEl.dataset.layerRouteTemplate || "/map=__layer__").trim();
   const requestedBaseModeRaw = normalizeBaseMode(
     mapEl.dataset.initialBaseMode || parseBaseModeFromPath(window.location.pathname)
   );
-  const requestedBaseMode = !isAdmin && requestedBaseModeRaw === "ais" ? "map" : requestedBaseModeRaw;
+  const requestedBaseMode =
+    !isAdmin && (requestedBaseModeRaw === "ais" || requestedBaseModeRaw === "flights")
+      ? "map"
+      : requestedBaseModeRaw;
   mapHintElement = document.getElementById("mapHint");
   reportLegendSection = document.getElementById("reportLegendSection");
   connectivityLegendOverlay = document.getElementById("connectivityLegendOverlay");
@@ -5391,8 +5917,14 @@ async function initMap() {
   aisOverlay = document.getElementById("aisOverlay");
   aisSummary = document.getElementById("aisSummary");
   aisPortList = document.getElementById("aisPortList");
+  flightsOverlay = document.getElementById("flightsOverlay");
+  flightsSummary = document.getElementById("flightsSummary");
+  flightsMeta = document.getElementById("flightsMeta");
+  flightsAirportsList = document.getElementById("flightsAirportsList");
+  flightsWindowButtons = Array.from(document.querySelectorAll("[data-flights-window-hours]"));
   reportDetailPanel = document.getElementById("reportDetailPanel");
   setActiveConnectivityWindow(connectivityWindowHours);
+  setActiveFlightsWindow(flightsWindowHours);
   renderReportDetail(null);
   renderConnectivityRegionChart(null);
   renderConnectivityRadarPanels(null);
@@ -5406,6 +5938,7 @@ async function initMap() {
   setRepressorOverlayVisible(false);
   setPrisonerOverlayVisible(false);
   setAISOverlayVisible(false);
+  setFlightsOverlayVisible(false);
 
   const nowUtc = new Date();
   const currentDayUtc = `${nowUtc.getUTCFullYear()}-${String(nowUtc.getUTCMonth() + 1).padStart(
@@ -5425,6 +5958,19 @@ async function initMap() {
       connectivityLastRenderKey = null;
       if (activeBaseMode === "connectivity") {
         await refreshConnectivityLayer();
+      }
+    });
+  });
+
+  flightsWindowButtons.forEach((button) => {
+    button.addEventListener("click", async () => {
+      const hours = Number(button.dataset.flightsWindowHours);
+      if (![2, 6, 24].includes(hours)) return;
+      const changed = hours !== flightsWindowHours;
+      setActiveFlightsWindow(hours);
+      if (!changed) return;
+      if (activeBaseMode === "flights") {
+        await refreshFlightsLayer();
       }
     });
   });
@@ -5512,6 +6058,7 @@ async function initMap() {
   const prisonerBaseLayer = layerSet.prisonerBaseLayer;
   const protestBaseLayer = layerSet.protestBaseLayer;
   const aisBaseLayer = layerSet.aisBaseLayer;
+  const flightsBaseLayer = layerSet.flightsBaseLayer;
   mainBaseLayers = {
     streetsLayer,
     satelliteLayer,
@@ -5521,6 +6068,7 @@ async function initMap() {
     prisonerBaseLayer,
     protestBaseLayer,
     aisBaseLayer,
+    flightsBaseLayer,
   };
 
   streetsLayer.addTo(map);
@@ -5534,6 +6082,7 @@ async function initMap() {
   };
   if (isAdmin) {
     baseLayerOptions["Buques Cuba (beta)"] = aisBaseLayer;
+    baseLayerOptions["Vuelos Cuba (beta)"] = flightsBaseLayer;
   }
   const layersControl = L.control.layers(baseLayerOptions, {}, { collapsed: true }).addTo(map);
   decorateMapLayersControl(layersControl);
@@ -5558,6 +6107,7 @@ async function initMap() {
   setRepressorOverlayVisible(false);
   setPrisonerOverlayVisible(false);
   setAISOverlayVisible(false);
+  setFlightsOverlayVisible(false);
 
   map.on("baselayerchange", (event) => {
     const nextMode = modeForBaseLayer(event.layer);
@@ -5637,7 +6187,8 @@ async function initMap() {
       activeBaseMode === "protests" ||
       activeBaseMode === "repressors" ||
       activeBaseMode === "prisoners" ||
-      activeBaseMode === "ais"
+      activeBaseMode === "ais" ||
+      activeBaseMode === "flights"
     ) {
       closeActivePopup();
       return;

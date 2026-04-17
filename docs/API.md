@@ -230,6 +230,46 @@ Rate limit: `120/min`.
 }
 ```
 
+### `GET /api/v1/flights/cuba-layer` (solo admin)
+
+Devuelve snapshot preprocesado de vuelos hacia Cuba para la ventana solicitada (`24h`, `6h`, `2h`).
+
+Rate limit: `120/min`.
+
+**Parámetros query:**
+
+| Parámetro      | Tipo | Default | Descripción |
+|----------------|------|---------|-------------|
+| `window_hours` | int  | `24`    | Ventana permitida: `24`, `6`, `2` |
+
+### `GET /api/v1/flights/aircraft/<id>/detail` (solo admin)
+
+Devuelve detalle de aeronave para barra lateral, foto efectiva (manual > API), resumen de 30 días e historial de viajes a Cuba.
+
+### `GET /api/v1/flights/events/<id>/track` (solo admin)
+
+Devuelve track del vuelo seleccionado (posiciones registradas) para dibujar polyline bajo demanda.
+
+### `POST /api/v1/flights/aircraft/<id>/photo` (solo admin, multipart)
+
+Sube foto manual a Cloudinary y la prioriza sobre foto API.
+
+Campo multipart esperado: `photo` (1 archivo imagen).
+
+**Respuesta:** `200`
+
+```json
+{
+  "ok": true,
+  "aircraft_id": 14,
+  "photo_url": "https://res.cloudinary.com/.../image/upload/...jpg",
+  "photo_source": "manual",
+  "photo_manual_url": "https://res.cloudinary.com/.../image/upload/...jpg",
+  "photo_api_url": null,
+  "photo_updated_at_utc": "2026-04-17T18:40:00Z"
+}
+```
+
 ### `POST /api/v1/repressors/<id>/residence-reports`
 
 Crea reporte ciudadano de posible vivienda y genera un post de mapa categoría `residencia-represor`.

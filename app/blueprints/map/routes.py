@@ -128,6 +128,10 @@ _MAP_LAYER_ALIASES = {
     "buques-cuba": "ais",
     "ships": "ais",
     "vessels": "ais",
+    "flights": "flights",
+    "vuelos": "flights",
+    "vuelos-cuba": "flights",
+    "flights-cuba": "flights",
 }
 _REPRESSOR_TYPE_PALETTES = {
     "batablanca": {
@@ -485,10 +489,10 @@ def _serialize_residence_report(report: RepressorResidenceReport):
     }
 
 
-def _normalize_map_layer(value: str | None, *, allow_ais: bool = False) -> str:
+def _normalize_map_layer(value: str | None, *, allow_admin_layers: bool = False) -> str:
     raw = (value or "").strip().lower()
     normalized = _MAP_LAYER_ALIASES.get(raw, "map")
-    if normalized == "ais" and not allow_ais:
+    if normalized in {"ais", "flights"} and not allow_admin_layers:
         return "map"
     return normalized
 
@@ -499,8 +503,12 @@ def dashboard(layer_slug: str | None = None):
     categories = Category.query.order_by(Category.id.asc()).all()
     posts = Post.query.filter_by(status="approved").all()
     map_provider_main = get_map_provider_main()
-    allow_ais = current_user.is_authenticated and current_user.has_role("administrador")
-    initial_base_mode = _normalize_map_layer(layer_slug, allow_ais=allow_ais)
+    allow_admin_layers = current_user.is_authenticated and current_user.has_role(
+        "administrador"
+    )
+    initial_base_mode = _normalize_map_layer(
+        layer_slug, allow_admin_layers=allow_admin_layers
+    )
     return render_template(
         "map/dashboard.html",
         categories=categories,
@@ -520,6 +528,9 @@ def dashboard(layer_slug: str | None = None):
         ),
         ais_refresh_seconds=current_app.config.get(
             "AISSTREAM_FRONTEND_REFRESH_SECONDS", 1800
+        ),
+        flights_refresh_seconds=current_app.config.get(
+            "FLIGHTS_FRONTEND_REFRESH_SECONDS", 300
         ),
         map_provider_main=map_provider_main,
         google_maps_api_key=_google_maps_api_key(),

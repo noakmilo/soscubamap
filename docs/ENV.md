@@ -135,6 +135,43 @@ Layer administrativo (beta) para visualizar buques con destino a puertos de Cuba
 | `AISSTREAM_MAX_DIRECTION_DELTA_DEG`        | Diferencia angular máxima COG→puerto para aceptar destino genérico.       | `70` |
 | `AISSTREAM_MAX_DIRECTION_DISTANCE_NM`      | Distancia máxima al puerto (millas náuticas) para destino genérico.       | `1200` |
 
+## Vuelos hacia Cuba (FlightRadar API Explorer)
+
+Layer administrativo para visualizar vuelos con destino a aeropuertos cubanos con snapshots `24h/6h/2h`.
+
+| Variable | Descripción | Default |
+|----------|-------------|---------|
+| `FLIGHTS_ENABLED` | `1` habilita ingesta/capa de vuelos; `0` la desactiva. | `0` |
+| `FLIGHTS_API_KEY` | API key de FlightRadar Explorer. | (vacío) |
+| `FLIGHTS_API_BASE_URL` | Base URL del API Explorer. | `https://fr24api.flightradar24.com/api` |
+| `FLIGHTS_API_AUTH_HEADER` | Header de autenticación. | `x-apikey` |
+| `FLIGHTS_API_AUTH_PREFIX` | Prefijo del header (ej. `Bearer `). | (vacío) |
+| `FLIGHTS_API_TIMEOUT_SECONDS` | Timeout HTTP por request. | `20` |
+| `FLIGHTS_API_RESPONSE_LIMIT` | Límite por página/request (plan: `20`). | `20` |
+| `FLIGHTS_API_REQUEST_RATE_LIMIT` | Máximo de requests por segundo (plan: `10`). | `10` |
+| `FLIGHTS_INGESTION_INTERVAL_SECONDS` | Intervalo de ingesta periódica por Celery Beat. | `900` |
+| `FLIGHTS_FRONTEND_REFRESH_SECONDS` | Refresco frontend de la capa admin. | `300` |
+| `FLIGHTS_STALE_AFTER_SECONDS` | Umbral de stale del snapshot. | `1800` |
+| `FLIGHTS_REQUEST_CAP_PER_RUN` | Cap de requests por corrida en modo normal. | `120` |
+| `FLIGHTS_SAFE_REQUEST_CAP_PER_RUN` | Cap de requests por corrida al entrar en modo seguro. | `40` |
+| `FLIGHTS_MONTHLY_CREDIT_BUDGET` | Presupuesto mensual estimado de créditos. | `60000` |
+| `FLIGHTS_GUARDRAIL_PERCENT` | Umbral de guardia de cuota (modo seguro). | `85` |
+| `FLIGHTS_ESTIMATED_CREDIT_PER_REQUEST` | Crédito estimado por request para budgeting interno. | `1` |
+| `FLIGHTS_BACKFILL_DAYS` | Backfill inicial en días. | `7` |
+| `FLIGHTS_BACKFILL_CHUNK_HOURS` | Tamaño de chunk para backfill histórico. | `24` |
+| `FLIGHTS_BACKFILL_ON_EMPTY_DB` | `1` activa backfill inicial cuando BD está vacía. | `1` |
+| `FLIGHTS_SAFE_MODE_SKIP_BACKFILL` | `1` evita backfill en modo seguro (ahorro de cuota). | `1` |
+| `FLIGHTS_AIRPORTS_SYNC_INTERVAL_SECONDS` | Frecuencia de sync del catálogo de aeropuertos cubanos. | `86400` |
+| `FLIGHTS_AIRPORTS_MAX_PAGES` | Máximo de páginas de aeropuertos por corrida. | `10` |
+| `FLIGHTS_EVENTS_MAX_PAGES` | Máximo de páginas de eventos/live por corrida (normal). | `5` |
+| `FLIGHTS_SAFE_EVENTS_MAX_PAGES` | Máximo de páginas de eventos/live por corrida (safe mode). | `2` |
+| `FLIGHTS_LAYER_MAX_POINTS` | Máximo de puntos retornados para la capa por ventana. | `2000` |
+| `FLIGHTS_TRACK_POINT_LIMIT` | Máximo de puntos por track al seleccionar vuelo. | `2000` |
+| `FLIGHTS_API_AIRPORTS_LIGHT_PATH` | Path endpoint “Airports light”. | `/airports/light` |
+| `FLIGHTS_API_LIVE_POSITIONS_LIGHT_PATH` | Path endpoint “Live flight positions light”. | `/live/flight-positions/light` |
+| `FLIGHTS_API_HISTORIC_EVENTS_LIGHT_PATH` | Path endpoint “Historic flight events light”. | `/historic/flight-events/light` |
+| `FLIGHTS_API_TRACKS_PATH` | Path endpoint de tracks por vuelo seleccionado. | `/flights/tracks` |
+
 ## Protestas (RSS / NLP)
 
 Layer de eventos de protesta inferidos automáticamente desde fuentes RSS.
@@ -190,6 +227,8 @@ Notas de rango de ingesta:
 | `CELERY_CONNECTIVITY_QUEUE`        | Cola usada por el polling de conectividad.                           | `ingestion` |
 | `CELERY_AIS_INGESTION_ENABLED`     | `1` habilita la ingesta periódica AIS (si `AISSTREAM_ENABLED=1`).    | `1` |
 | `CELERY_AIS_QUEUE`                 | Cola usada por la ingesta AIS.                                        | `ingestion` |
+| `CELERY_FLIGHTS_INGESTION_ENABLED` | `1` habilita la ingesta periódica de vuelos (si `FLIGHTS_ENABLED=1`). | `1` |
+| `CELERY_FLIGHTS_QUEUE`             | Cola usada por la ingesta de vuelos.                                  | `ingestion` |
 | `CELERY_REPRESSOR_INGESTION_ENABLED` | `1` habilita la ingesta periódica de represores.                   | `1` |
 | `CELERY_REPRESSOR_QUEUE`           | Cola usada por la ingesta de represores.                             | `ingestion` |
 

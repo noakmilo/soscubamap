@@ -188,6 +188,7 @@ Prueba manual de task (opcional):
 cd /home/soscuba/soscubamap
 source .venv/bin/activate
 celery -A app.celery_app.celery call app.tasks.protests.ingest_protests_feeds
+celery -A app.celery_app.celery call app.tasks.flights.ingest_flights_cuba
 ```
 
 ### Actualizar (script incluido)
@@ -239,6 +240,7 @@ flask --app run.py db history
 | `python -m scripts.fetch_protests` | Ingesta manual de feeds RSS de protestas |
 | `python -m scripts.fetch_connectivity --single-call` | Ingesta manual de conectividad (Cloudflare Radar) |
 | `python -m scripts.fetch_aisstream` | Ingesta manual AISStream (buques rumbo a puertos de Cuba) |
+| `python -m scripts.fetch_flights --force-backfill` | Ingesta manual FlightRadar (vuelos hacia Cuba) con opción de backfill |
 
 ## Self-hosted maps
 
