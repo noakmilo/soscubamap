@@ -141,7 +141,7 @@ class Config:
     FLIGHTS_LAYER_MAX_POINTS = int(os.getenv("FLIGHTS_LAYER_MAX_POINTS", "2000"))
     FLIGHTS_TRACK_POINT_LIMIT = int(os.getenv("FLIGHTS_TRACK_POINT_LIMIT", "2000"))
     FLIGHTS_API_AIRPORTS_LIGHT_PATH = os.getenv(
-        "FLIGHTS_API_AIRPORTS_LIGHT_PATH", "/airports/light"
+        "FLIGHTS_API_AIRPORTS_LIGHT_PATH", "/static/airports/light"
     )
     FLIGHTS_API_LIVE_POSITIONS_LIGHT_PATH = os.getenv(
         "FLIGHTS_API_LIVE_POSITIONS_LIGHT_PATH", "/live/flight-positions/light"

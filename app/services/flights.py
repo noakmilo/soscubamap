@@ -421,7 +421,10 @@ def get_flights_safe_mode_events_max_pages() -> int:
 
 
 def get_flights_airports_light_path() -> str:
-    return str(_config_value("FLIGHTS_API_AIRPORTS_LIGHT_PATH", "/airports/light") or "/airports/light").strip()
+    return str(
+        _config_value("FLIGHTS_API_AIRPORTS_LIGHT_PATH", "/static/airports/light")
+        or "/static/airports/light"
+    ).strip()
 
 
 def get_flights_live_positions_light_path() -> str:

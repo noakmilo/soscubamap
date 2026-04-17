@@ -168,7 +168,7 @@ Layer administrativo para visualizar vuelos con destino a aeropuertos cubanos co
 | `FLIGHTS_SAFE_EVENTS_MAX_PAGES` | Máximo de páginas de eventos/live por corrida (safe mode). | `2` |
 | `FLIGHTS_LAYER_MAX_POINTS` | Máximo de puntos retornados para la capa por ventana. | `2000` |
 | `FLIGHTS_TRACK_POINT_LIMIT` | Máximo de puntos por track al seleccionar vuelo. | `2000` |
-| `FLIGHTS_API_AIRPORTS_LIGHT_PATH` | Path endpoint “Airports light”. | `/airports/light` |
+| `FLIGHTS_API_AIRPORTS_LIGHT_PATH` | Path endpoint “Airports light”. | `/static/airports/light` |
 | `FLIGHTS_API_LIVE_POSITIONS_LIGHT_PATH` | Path endpoint “Live flight positions light”. | `/live/flight-positions/light` |
 | `FLIGHTS_API_HISTORIC_EVENTS_LIGHT_PATH` | Path endpoint “Historic flight events light”. | `/historic/flight-events/light` |
 | `FLIGHTS_API_TRACKS_PATH` | Path endpoint de tracks por vuelo seleccionado. | `/flights/tracks` |
