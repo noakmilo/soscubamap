@@ -477,6 +477,24 @@ function disableMapNativeDragDrop(leafletMap) {
   leafletMap.on("popupopen", applyNoDragToNodes);
 }
 
+function setupSidePanelScrollIsolation(leafletMap) {
+  if (!leafletMap || typeof L === "undefined") return;
+
+  const targets = [mapSidePanel, mapSideScroll].filter(Boolean);
+  if (!targets.length) return;
+
+  const stopPropagation = (event) => {
+    if (!event) return;
+    L.DomEvent.stopPropagation(event);
+  };
+
+  targets.forEach((target) => {
+    L.DomEvent.disableScrollPropagation(target);
+    target.addEventListener("wheel", stopPropagation, { passive: false });
+    target.addEventListener("touchmove", stopPropagation, { passive: true });
+  });
+}
+
 function decorateMapLayersControl(layersControl) {
   const controlContainer = layersControl?.getContainer?.();
   if (!controlContainer) return;
@@ -5484,6 +5502,7 @@ async function initMap() {
     maxZoom: 19,
   });
   disableMapNativeDragDrop(map);
+  setupSidePanelScrollIsolation(map);
   const layerSet = buildMainBaseLayers(preferredProvider);
   const streetsLayer = layerSet.streetsLayer;
   const satelliteLayer = layerSet.satelliteLayer;

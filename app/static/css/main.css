@@ -230,7 +230,9 @@ body.map-dashboard-page .map-canvas {
   box-shadow: var(--intel-glow);
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
-  overflow: visible;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   transition:
     transform var(--panel-motion-duration) var(--panel-motion-ease),
     opacity var(--panel-fade-duration) ease,
@@ -291,10 +293,15 @@ body.map-dashboard-page .map-canvas {
 }
 
 .map-side-scroll {
-  overflow: visible;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 12px;
   display: grid;
   gap: 12px;
+  min-height: 0;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   opacity: 1;
   transform: translateX(0);
