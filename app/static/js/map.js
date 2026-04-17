@@ -150,6 +150,12 @@ const CARIBBEAN_BOUNDS = {
   west: -90.0,
   east: -58.0,
 };
+const CONNECTIVITY_PAN_BOUNDS = {
+  north: 28.3,
+  south: 10.8,
+  west: -90.0,
+  east: -58.0,
+};
 const MOBILE_VIEWPORT_QUERY = "(max-width: 900px)";
 const ALERT_PANEL_HIDDEN_COOKIE = "soscuba_alert_panel_hidden";
 const ALERT_PANEL_HIDDEN_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
@@ -375,8 +381,21 @@ function caribbeanLatLngBounds() {
   );
 }
 
-function applyMapPanBoundsForMode() {
+function connectivityLatLngBounds() {
+  return L.latLngBounds(
+    [CONNECTIVITY_PAN_BOUNDS.south, CONNECTIVITY_PAN_BOUNDS.west],
+    [CONNECTIVITY_PAN_BOUNDS.north, CONNECTIVITY_PAN_BOUNDS.east]
+  );
+}
+
+function applyMapPanBoundsForMode(mode = "map") {
   if (!map) return;
+  if (mode === "connectivity") {
+    map.setMaxBounds(connectivityLatLngBounds());
+    map.options.maxBoundsViscosity = 0.55;
+    return;
+  }
+
   map.setMaxBounds(caribbeanLatLngBounds());
   map.options.maxBoundsViscosity = 1.0;
 }
