@@ -240,7 +240,8 @@ flask --app run.py db history
 | `python -m scripts.fetch_protests` | Ingesta manual de feeds RSS de protestas |
 | `python -m scripts.fetch_connectivity --single-call` | Ingesta manual de conectividad (Cloudflare Radar) |
 | `python -m scripts.fetch_aisstream` | Ingesta manual AISStream (buques rumbo a puertos de Cuba) |
-| `python -m scripts.fetch_flights --force-backfill` | Ingesta manual FlightRadar (vuelos hacia Cuba) con opción de backfill |
+| `python -m scripts.fetch_flights` | Ingesta manual FlightRadar (vuelos hacia Cuba, modo recomendado) |
+| `python -m scripts.fetch_flights --force-backfill` | Fuerza backfill histórico (solo si `FLIGHTS_BACKFILL_HISTORIC_ENABLED=1`) |
 
 ## Self-hosted maps
 

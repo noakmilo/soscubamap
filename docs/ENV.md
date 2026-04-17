@@ -158,20 +158,25 @@ Layer administrativo para visualizar vuelos con destino a aeropuertos cubanos co
 | `FLIGHTS_MONTHLY_CREDIT_BUDGET` | Presupuesto mensual estimado de créditos. | `60000` |
 | `FLIGHTS_GUARDRAIL_PERCENT` | Umbral de guardia de cuota (modo seguro). | `85` |
 | `FLIGHTS_ESTIMATED_CREDIT_PER_REQUEST` | Crédito estimado por request para budgeting interno. | `1` |
-| `FLIGHTS_BACKFILL_DAYS` | Backfill inicial en días. | `7` |
+| `FLIGHTS_BACKFILL_DAYS` | Backfill inicial en días (si está habilitado). | `7` |
 | `FLIGHTS_BACKFILL_CHUNK_HOURS` | Tamaño de chunk para backfill histórico. | `24` |
-| `FLIGHTS_BACKFILL_ON_EMPTY_DB` | `1` activa backfill inicial cuando BD está vacía. | `1` |
+| `FLIGHTS_BACKFILL_ON_EMPTY_DB` | `1` activa backfill inicial cuando BD está vacía. | `0` |
+| `FLIGHTS_BACKFILL_HISTORIC_ENABLED` | `1` intenta backfill vía endpoint histórico (solo si tu plan/queries lo soportan). | `0` |
 | `FLIGHTS_SAFE_MODE_SKIP_BACKFILL` | `1` evita backfill en modo seguro (ahorro de cuota). | `1` |
+| `FLIGHTS_AIRPORTS_SYNC_ENABLED` | `1` habilita sync de catálogo de aeropuertos en API. | `0` |
 | `FLIGHTS_AIRPORTS_SYNC_INTERVAL_SECONDS` | Frecuencia de sync del catálogo de aeropuertos cubanos. | `86400` |
 | `FLIGHTS_AIRPORTS_MAX_PAGES` | Máximo de páginas de aeropuertos por corrida. | `10` |
 | `FLIGHTS_EVENTS_MAX_PAGES` | Máximo de páginas de eventos/live por corrida (normal). | `5` |
 | `FLIGHTS_SAFE_EVENTS_MAX_PAGES` | Máximo de páginas de eventos/live por corrida (safe mode). | `2` |
 | `FLIGHTS_LAYER_MAX_POINTS` | Máximo de puntos retornados para la capa por ventana. | `2000` |
 | `FLIGHTS_TRACK_POINT_LIMIT` | Máximo de puntos por track al seleccionar vuelo. | `2000` |
-| `FLIGHTS_API_AIRPORTS_LIGHT_PATH` | Path endpoint “Airports light”. | `/static/airports/light` |
+| `FLIGHTS_API_AIRPORTS_LIGHT_PATH` | Path endpoint “Airports light” (acepta `{code}` para lookup por aeropuerto). | `/static/airports/{code}/light` |
 | `FLIGHTS_API_LIVE_POSITIONS_LIGHT_PATH` | Path endpoint “Live flight positions light”. | `/live/flight-positions/light` |
 | `FLIGHTS_API_HISTORIC_EVENTS_LIGHT_PATH` | Path endpoint “Historic flight events light”. | `/historic/flight-events/light` |
 | `FLIGHTS_API_TRACKS_PATH` | Path endpoint de tracks por vuelo seleccionado. | `/flights/tracks` |
+| `FLIGHTS_LIVE_FILTER_BOUNDS` | Bounding box para query `live` (formato `minLat,minLon,maxLat,maxLon`). | `19.4,-85.2,24.2,-73.9` |
+| `FLIGHTS_LIVE_FILTER_AIRPORTS` | Filtro opcional `airports` para query `live` (vacío = solo bounds). | (vacío) |
+| `FLIGHTS_CUBA_AIRPORT_CODES` | Lista CSV base de códigos (IATA/ICAO) para detección de destino Cuba. | `MUHA,HAV,MUCU,SCU,MUVR,VRA,MUCC,CCC,MUCM,CMW,MUSC,SNU,MUBY,BCA,MUGT,BWW,MUMZ,MZG,MUCL,CYO,MUBA` |
 
 ## Protestas (RSS / NLP)
 

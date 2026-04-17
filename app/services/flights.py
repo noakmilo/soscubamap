@@ -30,6 +30,11 @@ logger = logging.getLogger(__name__)
 
 WINDOW_HOURS_SUPPORTED = (24, 6, 2)
 _CLEAN_TOKEN_RE = re.compile(r"[^a-z0-9]+")
+DEFAULT_CUBA_LIVE_BOUNDS = "19.4,-85.2,24.2,-73.9"
+DEFAULT_CUBA_AIRPORT_CODES = (
+    "MUHA,HAV,MUCU,SCU,MUVR,VRA,MUCC,CCC,MUCM,CMW,"
+    "MUSC,SNU,MUBY,BCA,MUGT,BWW,MUMZ,MZG,MUCL,CYO,MUBA"
+)
 
 
 @dataclass
@@ -368,11 +373,15 @@ def get_flights_backfill_chunk_hours() -> int:
 
 
 def get_flights_backfill_on_empty_db() -> bool:
-    return _safe_bool(_config_value("FLIGHTS_BACKFILL_ON_EMPTY_DB", True), True)
+    return _safe_bool(_config_value("FLIGHTS_BACKFILL_ON_EMPTY_DB", False), False)
 
 
 def get_flights_safe_mode_skip_backfill() -> bool:
     return _safe_bool(_config_value("FLIGHTS_SAFE_MODE_SKIP_BACKFILL", True), True)
+
+
+def get_flights_backfill_historic_enabled() -> bool:
+    return _safe_bool(_config_value("FLIGHTS_BACKFILL_HISTORIC_ENABLED", False), False)
 
 
 def get_flights_snapshot_stale_after_seconds() -> int:
@@ -405,6 +414,10 @@ def get_flights_airports_sync_interval_seconds() -> int:
     return max(raw, 300)
 
 
+def get_flights_airports_sync_enabled() -> bool:
+    return _safe_bool(_config_value("FLIGHTS_AIRPORTS_SYNC_ENABLED", False), False)
+
+
 def get_flights_airports_max_pages() -> int:
     raw = _safe_int(_config_value("FLIGHTS_AIRPORTS_MAX_PAGES", 10), 10)
     return max(raw, 1)
@@ -422,8 +435,8 @@ def get_flights_safe_mode_events_max_pages() -> int:
 
 def get_flights_airports_light_path() -> str:
     return str(
-        _config_value("FLIGHTS_API_AIRPORTS_LIGHT_PATH", "/static/airports/light")
-        or "/static/airports/light"
+        _config_value("FLIGHTS_API_AIRPORTS_LIGHT_PATH", "/static/airports/{code}/light")
+        or "/static/airports/{code}/light"
     ).strip()
 
 
@@ -449,6 +462,35 @@ def get_flights_historic_events_light_path() -> str:
 
 def get_flights_tracks_path() -> str:
     return str(_config_value("FLIGHTS_API_TRACKS_PATH", "/flights/tracks") or "/flights/tracks").strip()
+
+
+def get_flights_live_filter_bounds() -> str:
+    raw = str(_config_value("FLIGHTS_LIVE_FILTER_BOUNDS", DEFAULT_CUBA_LIVE_BOUNDS) or "").strip()
+    if not raw:
+        return ""
+    parts = [chunk.strip() for chunk in raw.split(",")]
+    if len(parts) != 4:
+        return DEFAULT_CUBA_LIVE_BOUNDS
+    for chunk in parts:
+        if _safe_float(chunk) is None:
+            return DEFAULT_CUBA_LIVE_BOUNDS
+    return ",".join(parts)
+
+
+def get_flights_live_filter_airports() -> str:
+    return str(_config_value("FLIGHTS_LIVE_FILTER_AIRPORTS", "") or "").strip()
+
+
+def get_flights_cuba_airport_codes() -> set[str]:
+    raw = str(_config_value("FLIGHTS_CUBA_AIRPORT_CODES", DEFAULT_CUBA_AIRPORT_CODES) or "").strip()
+    if not raw:
+        return set()
+    codes: set[str] = set()
+    for token in raw.split(","):
+        code = _clean_text(token, upper=True, limit=8)
+        if len(code) >= 3:
+            codes.add(code)
+    return codes
 
 
 def _build_api_url(path: str) -> str:
@@ -551,7 +593,7 @@ def _safe_mode_active(monthly_used: int, monthly_budget: int) -> bool:
 
 def _known_cuba_airport_codes() -> set[str]:
     rows = FlightAirport.query.filter(FlightAirport.is_cuba.is_(True)).all()
-    codes: set[str] = set()
+    codes: set[str] = set(get_flights_cuba_airport_codes())
     for row in rows:
         if row.airport_code_icao:
             codes.add(str(row.airport_code_icao).strip().upper())
@@ -644,11 +686,22 @@ def _parse_event_row(item: dict[str, Any], known_cuba_codes: set[str], source_ki
             "id",
             "fr24_id",
             "identifier",
+            "flight_identification.id",
         ),
         limit=128,
     )
 
-    call_sign = _clean_text(_pick(item, "callsign", "call_sign", "identification.callsign"), limit=64)
+    call_sign = _clean_text(
+        _pick(
+            item,
+            "callsign",
+            "call_sign",
+            "identification.callsign",
+            "flight",
+            "flight_number",
+        ),
+        limit=64,
+    )
     model = _clean_text(
         _pick(
             item,
@@ -656,11 +709,12 @@ def _parse_event_row(item: dict[str, Any], known_cuba_codes: set[str], source_ki
             "aircraft.model",
             "aircraft_model",
             "aircraft.type",
+            "type",
         ),
         limit=120,
     )
     registration = _clean_text(
-        _pick(item, "registration", "aircraft.registration", "tail_number"),
+        _pick(item, "registration", "aircraft.registration", "tail_number", "reg"),
         limit=64,
     )
 
@@ -670,6 +724,8 @@ def _parse_event_row(item: dict[str, Any], known_cuba_codes: set[str], source_ki
             "origin.icao",
             "origin_airport_icao",
             "departure.airport.icao",
+            "origin_icao",
+            "orig_icao",
         ),
         upper=True,
         limit=8,
@@ -680,6 +736,8 @@ def _parse_event_row(item: dict[str, Any], known_cuba_codes: set[str], source_ki
             "origin.iata",
             "origin_airport_iata",
             "departure.airport.iata",
+            "origin_iata",
+            "orig_iata",
         ),
         upper=True,
         limit=8,
@@ -709,6 +767,10 @@ def _parse_event_row(item: dict[str, Any], known_cuba_codes: set[str], source_ki
             "destination.icao",
             "destination_airport_icao",
             "arrival.airport.icao",
+            "destination_icao",
+            "dest_icao",
+            "destination_icao_actual",
+            "dest_icao_actual",
         ),
         upper=True,
         limit=8,
@@ -719,6 +781,10 @@ def _parse_event_row(item: dict[str, Any], known_cuba_codes: set[str], source_ki
             "destination.iata",
             "destination_airport_iata",
             "arrival.airport.iata",
+            "destination_iata",
+            "dest_iata",
+            "destination_iata_actual",
+            "dest_iata_actual",
         ),
         upper=True,
         limit=8,
@@ -774,6 +840,8 @@ def _parse_event_row(item: dict[str, Any], known_cuba_codes: set[str], source_ki
             "departure.scheduled",
             "departure.actual",
             "times.departure",
+            "datetime_takeoff",
+            "first_seen",
         )
     )
     arrival_at_utc = _parse_datetime(
@@ -784,6 +852,7 @@ def _parse_event_row(item: dict[str, Any], known_cuba_codes: set[str], source_ki
             "arrival.scheduled",
             "arrival.actual",
             "times.arrival",
+            "datetime_landed",
         )
     )
     observed_at_utc = _parse_datetime(
@@ -794,6 +863,8 @@ def _parse_event_row(item: dict[str, Any], known_cuba_codes: set[str], source_ki
             "last_seen_at",
             "last_seen_at_utc",
             "position.timestamp",
+            "last_seen",
+            "first_seen",
         )
     )
 
@@ -817,9 +888,21 @@ def _parse_event_row(item: dict[str, Any], known_cuba_codes: set[str], source_ki
         )
     )
     altitude = _safe_float(_pick(item, "altitude", "position.altitude", "position.alt"))
-    speed = _safe_float(_pick(item, "speed", "ground_speed", "position.speed", "position.gs"))
-    heading = _safe_float(_pick(item, "heading", "course", "position.heading", "position.track"))
+    speed = _safe_float(_pick(item, "speed", "ground_speed", "position.speed", "position.gs", "gspeed"))
+    heading = _safe_float(
+        _pick(item, "heading", "course", "position.heading", "position.track", "track")
+    )
     status = _clean_text(_pick(item, "status", "state", "flight_status"), limit=64)
+    if not status:
+        flight_ended = _pick(item, "flight_ended")
+        if isinstance(flight_ended, bool):
+            status = "landed" if flight_ended else "live"
+        else:
+            ended_text = _clean_text(flight_ended, upper=True, limit=16)
+            if ended_text in {"TRUE", "1"}:
+                status = "landed"
+            elif ended_text in {"FALSE", "0"}:
+                status = "live"
 
     identity_key = _normalize_identity_key(call_sign, model, registration, external_flight_id)
     event_key = _build_event_key(
@@ -1077,6 +1160,9 @@ def _query_events_from_endpoint(
 
 
 def _sync_cuba_airports(request_ctx: RequestContext) -> tuple[int, list[str], bool]:
+    if not get_flights_airports_sync_enabled():
+        return 0, [], False
+
     stored = 0
     errors: list[str] = []
     budget_exhausted = False
@@ -1084,6 +1170,34 @@ def _sync_cuba_airports(request_ctx: RequestContext) -> tuple[int, list[str], bo
     max_pages = get_flights_airports_max_pages()
 
     airport_cache: dict[str, FlightAirport] = {}
+    path = get_flights_airports_light_path()
+
+    if "{code}" in path:
+        codes = sorted(get_flights_cuba_airport_codes())
+        for code in codes:
+            endpoint = path.replace("{code}", code)
+            try:
+                payload = _api_get(endpoint, {}, request_ctx)
+            except RequestBudgetExhausted:
+                budget_exhausted = True
+                break
+            except Exception as exc:
+                errors.append(str(exc))
+                continue
+
+            rows = _extract_items(payload, ("airport", "data.airport", "data", "item"))
+            if not rows and isinstance(payload, dict):
+                rows = [payload]
+
+            for row in rows:
+                parsed = _parse_airport_row(row)
+                if parsed is None:
+                    continue
+                parsed["is_cuba"] = True
+                _upsert_airport(parsed, airport_cache)
+                stored += 1
+
+        return stored, errors, budget_exhausted
 
     for page in range(1, max_pages + 1):
         params = {
@@ -1119,6 +1233,9 @@ def _sync_cuba_airports(request_ctx: RequestContext) -> tuple[int, list[str], bo
 
 
 def _needs_airport_sync(now_utc: datetime, safe_mode: bool) -> bool:
+    if not get_flights_airports_sync_enabled():
+        return False
+
     total = db.session.query(func.count(FlightAirport.id)).scalar() or 0
     if total <= 0:
         return True
@@ -1145,6 +1262,11 @@ def _collect_backfill_records(
 ) -> FetchBatch:
     batch = FetchBatch()
     if days <= 0:
+        return batch
+    if not get_flights_backfill_historic_enabled():
+        batch.errors.append(
+            "Backfill historico desactivado: endpoint historic/light exige flight_ids + event_types."
+        )
         return batch
 
     now_utc = _utc_now_naive()
@@ -1187,10 +1309,29 @@ def _collect_live_records(
     safe_mode: bool,
 ) -> FetchBatch:
     max_pages = get_flights_safe_mode_events_max_pages() if safe_mode else get_flights_events_max_pages()
-    params = {
-        "destination_country": "CU",
-        "light": 1,
+    params: dict[str, Any] = {"light": 1}
+    live_airports = get_flights_live_filter_airports()
+    if live_airports:
+        params["airports"] = live_airports
+
+    live_bounds = get_flights_live_filter_bounds()
+    if live_bounds:
+        params["bounds"] = live_bounds
+
+    selector_keys = {
+        "bounds",
+        "flights",
+        "callsigns",
+        "registrations",
+        "painted_as",
+        "operating_as",
+        "airports",
+        "routes",
+        "aircraft",
     }
+    if not any(key in params for key in selector_keys):
+        params["bounds"] = DEFAULT_CUBA_LIVE_BOUNDS
+
     return _query_events_from_endpoint(
         get_flights_live_positions_light_path(),
         params,
