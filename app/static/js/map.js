@@ -433,6 +433,42 @@ function enableMiddleClickPan(leafletMap) {
   });
 }
 
+function disableMapNativeDragDrop(leafletMap) {
+  const container = leafletMap?.getContainer?.();
+  if (!container) return;
+
+  const applyNoDragToNodes = () => {
+    const nodes = container.querySelectorAll(
+      "img, canvas, a, .leaflet-tile, .leaflet-layer, .leaflet-marker-icon, .leaflet-pane"
+    );
+    nodes.forEach((node) => {
+      if (node instanceof HTMLElement) {
+        node.draggable = false;
+      }
+    });
+  };
+
+  container.setAttribute("draggable", "false");
+  container.addEventListener("dragstart", (event) => {
+    event.preventDefault();
+  });
+
+  applyNoDragToNodes();
+  leafletMap.on("layeradd", applyNoDragToNodes);
+  leafletMap.on("popupopen", applyNoDragToNodes);
+}
+
+function decorateMapLayersControl(layersControl) {
+  const controlContainer = layersControl?.getContainer?.();
+  if (!controlContainer) return;
+
+  controlContainer.classList.add("map-layer-control");
+  const toggle = controlContainer.querySelector(".leaflet-control-layers-toggle");
+  if (!toggle) return;
+  toggle.setAttribute("aria-label", "Capas");
+  toggle.setAttribute("title", "Capas");
+}
+
 function escapeHtml(value) {
   return String(value || "")
     .replaceAll("&", "&amp;")
@@ -5423,7 +5459,7 @@ async function initMap() {
     minZoom: 4,
     maxZoom: 19,
   });
-  enableMiddleClickPan(map);
+  disableMapNativeDragDrop(map);
   const layerSet = buildMainBaseLayers(preferredProvider);
   const streetsLayer = layerSet.streetsLayer;
   const satelliteLayer = layerSet.satelliteLayer;
@@ -5456,13 +5492,8 @@ async function initMap() {
   if (isAdmin) {
     baseLayerOptions["Buques Cuba (beta)"] = aisBaseLayer;
   }
-  L.control
-    .layers(
-      baseLayerOptions,
-      {},
-      { collapsed: true }
-    )
-    .addTo(map);
+  const layersControl = L.control.layers(baseLayerOptions, {}, { collapsed: true }).addTo(map);
+  decorateMapLayersControl(layersControl);
 
   // Initialize marker cluster groups by category
   Object.keys(CATEGORY_ICONS).forEach((slug) => {

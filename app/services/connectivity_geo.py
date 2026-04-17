@@ -4,7 +4,7 @@ import os
 import unicodedata
 
 from app.services.cuba_locations import PROVINCES
-from app.services.location_names import normalize_location_key
+from app.services.location_names import canonicalize_province_name, normalize_location_key
 
 DEFAULT_PROVINCE_KEYS = [
     "province",
@@ -33,6 +33,13 @@ PROVINCE_CANONICAL = {}
 for province_name in PROVINCES:
     PROVINCE_CANONICAL[_normalize(province_name)] = province_name
     PROVINCE_CANONICAL[normalize_location_key(province_name)] = province_name
+
+_LEGACY_HAVANA_CITY_KEYS = {
+    "ciudaddelahabana",
+    "ciudadhabana",
+}
+_LEGACY_HAVANA_PROVINCE_KEY = "lahabana"
+_ARTEMISA_KEY = normalize_location_key("Artemisa")
 
 _CACHE = {
     "signature": None,
@@ -71,6 +78,32 @@ def _configured_keys():
     return keys or DEFAULT_PROVINCE_KEYS
 
 
+def _province_key(value):
+    return normalize_location_key(value) or _normalize(value).replace(" ", "")
+
+
+def _legacy_geojson_aliases(raw_names):
+    keys = {_province_key(name) for name in (raw_names or []) if name}
+    aliases = {}
+
+    has_legacy_city_havana = any(key in keys for key in _LEGACY_HAVANA_CITY_KEYS)
+    if has_legacy_city_havana:
+        for key in _LEGACY_HAVANA_CITY_KEYS:
+            aliases[key] = "La Habana"
+
+    # Compatibilidad para GeoJSON legado: cuando existe "Ciudad de La Habana"
+    # y no existe "Artemisa", el polígono legado "La Habana" corresponde al
+    # territorio de Artemisa en el esquema actual.
+    if (
+        has_legacy_city_havana
+        and _LEGACY_HAVANA_PROVINCE_KEY in keys
+        and _ARTEMISA_KEY not in keys
+    ):
+        aliases[_LEGACY_HAVANA_PROVINCE_KEY] = "Artemisa"
+
+    return aliases
+
+
 def _resolve_path(path):
     raw = (path or "").strip()
     if not raw:
@@ -105,7 +138,8 @@ def _load_geojson_from_disk(path, keys):
         data = json.load(fh)
 
     features = data.get("features") or []
-    normalized_features = []
+    feature_rows = []
+    raw_names = []
 
     for feature in features:
         if not isinstance(feature, dict):
@@ -120,8 +154,18 @@ def _load_geojson_from_disk(path, keys):
         if not raw_name:
             continue
 
+        feature_rows.append((geometry, raw_name))
+        raw_names.append(raw_name)
+
+    legacy_aliases = _legacy_geojson_aliases(raw_names)
+    normalized_features = []
+
+    for geometry, raw_name in feature_rows:
+        raw_key = _province_key(raw_name)
         canonical = (
-            PROVINCE_CANONICAL.get(_normalize(raw_name))
+            legacy_aliases.get(raw_key)
+            or canonicalize_province_name(raw_name)
+            or PROVINCE_CANONICAL.get(_normalize(raw_name))
             or PROVINCE_CANONICAL.get(normalize_location_key(raw_name))
             or raw_name
         )
