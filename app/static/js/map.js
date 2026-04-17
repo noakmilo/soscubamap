@@ -467,6 +467,11 @@ function decorateMapLayersControl(layersControl) {
   if (!toggle) return;
   toggle.setAttribute("aria-label", "Capas");
   toggle.setAttribute("title", "Capas");
+  toggle.classList.add("map-layer-toggle-btn");
+  toggle.innerHTML = `
+    <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+    <span class="map-layer-toggle-label"><strong>Capas</strong></span>
+  `;
 }
 
 function escapeHtml(value) {

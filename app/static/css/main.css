@@ -1055,9 +1055,9 @@ body.map-dashboard-page .map-canvas .leaflet-control-layers.map-layer-control {
   background: rgba(8, 14, 18, 0.82);
 }
 
-body.map-dashboard-page .map-canvas .leaflet-control-layers-toggle {
+body.map-dashboard-page .map-canvas .leaflet-control-layers-toggle.map-layer-toggle-btn {
   width: auto;
-  min-width: 84px;
+  min-width: 96px;
   height: 34px;
   padding: 0 12px;
   border-radius: 10px;
@@ -1067,23 +1067,44 @@ body.map-dashboard-page .map-canvas .leaflet-control-layers-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   text-indent: 0;
   text-transform: none;
   letter-spacing: 0.2px;
   line-height: 1;
+  text-decoration: none;
 }
 
-body.map-dashboard-page .map-canvas .leaflet-control-layers-toggle::before {
-  content: "Capas";
+body.map-dashboard-page .map-canvas .leaflet-control-layers-toggle.map-layer-toggle-btn i {
+  font-size: 13px;
+  color: #07130f;
+}
+
+body.map-dashboard-page .map-canvas .leaflet-control-layers-toggle.map-layer-toggle-btn .map-layer-toggle-label {
+  color: #07130f;
+}
+
+body.map-dashboard-page .map-canvas .leaflet-control-layers-toggle.map-layer-toggle-btn strong {
   font-weight: 800;
 }
 
-body.map-dashboard-page .map-canvas .leaflet-control-layers-toggle:hover {
+body.map-dashboard-page .map-canvas .leaflet-control-layers-toggle.map-layer-toggle-btn:hover {
   filter: brightness(1.04);
 }
 
 body.map-dashboard-page .map-canvas .leaflet-control-layers-expanded {
   padding: 8px;
+  background: rgba(8, 14, 18, 0.95);
+}
+
+body.map-dashboard-page .map-canvas .leaflet-control-layers.map-layer-control label,
+body.map-dashboard-page .map-canvas .leaflet-control-layers.map-layer-control label span {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+body.map-dashboard-page .map-canvas .leaflet-control-layers.map-layer-control input.leaflet-control-layers-selector {
+  accent-color: #6ee7b7;
 }
 
 .map-hint {
