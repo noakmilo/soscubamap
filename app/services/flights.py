@@ -49,6 +49,28 @@ _WORLD_AIRPORTS_BY_CODE: dict[str, dict[str, Any]] | None = None
 _WORLD_AIRPORTS_LOAD_ATTEMPTED = False
 
 
+def _build_cuba_code_aliases() -> dict[str, str]:
+    tokens = [
+        str(chunk or "").strip().upper()[:8]
+        for chunk in str(DEFAULT_CUBA_AIRPORT_CODES or "").split(",")
+    ]
+    tokens = [token for token in tokens if token]
+    aliases: dict[str, str] = {}
+    for idx in range(0, max(0, len(tokens) - 1), 2):
+        first = tokens[idx]
+        second = tokens[idx + 1]
+        if len(first) == 4 and len(second) == 3:
+            aliases[first] = second
+            aliases[second] = first
+        elif len(first) == 3 and len(second) == 4:
+            aliases[first] = second
+            aliases[second] = first
+    return aliases
+
+
+_CUBA_CODE_ALIASES = _build_cuba_code_aliases()
+
+
 @dataclass
 class RequestContext:
     request_cap: int
@@ -240,6 +262,17 @@ def _lookup_world_airport(
         if not code:
             continue
         match = index.get(code)
+        if match:
+            return match
+
+    # Fallback Cuba ICAO<->IATA aliases (e.g. MUHA <-> HAV)
+    for code in (iata, icao):
+        if not code:
+            continue
+        alias = _CUBA_CODE_ALIASES.get(code)
+        if not alias:
+            continue
+        match = index.get(alias)
         if match:
             return match
     return {}
@@ -3492,6 +3525,20 @@ def backfill_flights_airport_metadata_from_static_catalog(
                         origin_iata = inferred_iata
                         changed = True
                         origin_code_inferred += 1
+                if origin_icao and not origin_iata:
+                    alias = _clean_text(_CUBA_CODE_ALIASES.get(origin_icao), upper=True, limit=8)
+                    if alias and len(alias) == 3:
+                        event.origin_airport_iata = alias
+                        origin_iata = alias
+                        changed = True
+                        origin_code_inferred += 1
+                if origin_iata and not origin_icao:
+                    alias = _clean_text(_CUBA_CODE_ALIASES.get(origin_iata), upper=True, limit=8)
+                    if alias and len(alias) == 4:
+                        event.origin_airport_icao = alias
+                        origin_icao = alias
+                        changed = True
+                        origin_code_inferred += 1
 
                 dest_icao = _clean_text(event.destination_airport_icao, upper=True, limit=8)
                 dest_iata = _clean_text(event.destination_airport_iata, upper=True, limit=8)
@@ -3507,6 +3554,20 @@ def backfill_flights_airport_metadata_from_static_catalog(
                     if inferred_iata and not dest_iata:
                         event.destination_airport_iata = inferred_iata
                         dest_iata = inferred_iata
+                        changed = True
+                        destination_code_inferred += 1
+                if dest_icao and not dest_iata:
+                    alias = _clean_text(_CUBA_CODE_ALIASES.get(dest_icao), upper=True, limit=8)
+                    if alias and len(alias) == 3:
+                        event.destination_airport_iata = alias
+                        dest_iata = alias
+                        changed = True
+                        destination_code_inferred += 1
+                if dest_iata and not dest_icao:
+                    alias = _clean_text(_CUBA_CODE_ALIASES.get(dest_iata), upper=True, limit=8)
+                    if alias and len(alias) == 4:
+                        event.destination_airport_icao = alias
+                        dest_icao = alias
                         changed = True
                         destination_code_inferred += 1
 
@@ -3546,7 +3607,26 @@ def backfill_flights_airport_metadata_from_static_catalog(
                         changed = True
 
                 destination_airport = event.destination_airport
-                if destination_airport is None and (
+                linked_icao = (
+                    _clean_text(destination_airport.airport_code_icao, upper=True, limit=8)
+                    if destination_airport
+                    else ""
+                )
+                linked_iata = (
+                    _clean_text(destination_airport.airport_code_iata, upper=True, limit=8)
+                    if destination_airport
+                    else ""
+                )
+                codes_available = bool(dest_icao or dest_iata)
+                destination_link_mismatch = bool(
+                    destination_airport is not None
+                    and codes_available
+                    and not (
+                        (not dest_icao or linked_icao == dest_icao)
+                        and (not dest_iata or linked_iata == dest_iata)
+                    )
+                )
+                if (destination_airport is None or destination_link_mismatch) and (
                     dest_icao
                     or dest_iata
                     or _clean_text(event.destination_airport_name, limit=255)
@@ -3563,7 +3643,7 @@ def backfill_flights_airport_metadata_from_static_catalog(
                         or "Cuba"
                     )
                     resolved_country_code = _clean_text(destination_ref.get("country"), upper=True, limit=8)
-                    if not resolved_country_code and _country_is_cuba(resolved_country, resolved_country):
+                    if not resolved_country_code and _country_is_cuba(resolved_country, resolved_country_code):
                         resolved_country_code = "CU"
                     parsed = {
                         "code_key": _airport_code_key(dest_icao, dest_iata, "", resolved_name),
@@ -3579,11 +3659,13 @@ def backfill_flights_airport_metadata_from_static_catalog(
                         "longitude": _safe_float(destination_ref.get("longitude")),
                         "is_cuba": _country_is_cuba(resolved_country, resolved_country_code),
                     }
-                    destination_airport = _upsert_airport(parsed, airport_cache)
-                    if event.destination_airport_id is None:
+                    resolved_airport = _upsert_airport(parsed, airport_cache)
+                    if event.destination_airport_id != resolved_airport.id:
                         destination_linked += 1
-                    event.destination_airport = destination_airport
-                    changed = True
+                    if event.destination_airport is not resolved_airport:
+                        event.destination_airport = resolved_airport
+                        changed = True
+                    destination_airport = resolved_airport
 
                 if destination_airport is not None and destination_ref:
                     airport_changed = False
