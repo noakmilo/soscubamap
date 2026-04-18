@@ -2621,6 +2621,23 @@ body.map-dashboard-page .map-canvas .leaflet-control-layers.map-layer-control in
   color: #fff7e8;
 }
 
+.flights-routes-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #ffe4bd;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.flights-routes-toggle input[type="checkbox"] {
+  accent-color: #f59e0b;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  flex: 0 0 auto;
+}
+
 .flights-summary {
   border-top: 1px solid rgba(255, 214, 150, 0.2);
   padding-top: 8px;

@@ -107,6 +107,7 @@ let aisSummary;
 let aisPortList;
 let flightsLayerGroup;
 let flightsTrackLayer;
+let flightsRoutesLayer;
 let flightsRefreshTimer;
 let flightsRefreshSeconds = 300;
 let flightsLastPayload = null;
@@ -114,8 +115,10 @@ let flightsOverlay;
 let flightsSummary;
 let flightsMeta;
 let flightsAirportsList;
+let flightsRoutesToggle;
 let flightsWindowButtons = [];
-let flightsWindowHours = 24;
+let flightsWindowHours = 2;
+let flightsShowAllRoutes = false;
 let flightsDetailRequestSeq = 0;
 let flightsPhotoModalNode = null;
 let reportDetailPanel;
@@ -272,6 +275,7 @@ const flightsDetailCacheByEvent = new Map();
 const flightsDetailCacheByAircraft = new Map();
 const AIS_MARKER_COLOR = "#0ea5e9";
 const FLIGHTS_MARKER_COLOR = "#ef4444";
+const FLIGHTS_ROUTE_COLOR = "#f59e0b";
 const MAP_POPUP_OPTIONS = {
   maxWidth: 320,
   maxHeight: 320,
@@ -4428,6 +4432,13 @@ function clearFlightsTrack() {
   flightsTrackLayer = null;
 }
 
+function clearFlightsRoutes() {
+  if (flightsRoutesLayer && map) {
+    map.removeLayer(flightsRoutesLayer);
+  }
+  flightsRoutesLayer = null;
+}
+
 function stopFlightsPolling() {
   if (!flightsRefreshTimer) return;
   clearInterval(flightsRefreshTimer);
@@ -4619,6 +4630,43 @@ function renderFlightsSummary(payload, errorText = "") {
   flightsMeta.textContent = `Run: ${status} · ${safeModeLabel} · Actualizado: ${
     generatedAt || "N/D"
   }.`;
+}
+
+function toFlightLatLng(latitude, longitude) {
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return [lat, lng];
+}
+
+function renderFlightsRoutes(payload) {
+  if (!map) return;
+  clearFlightsRoutes();
+  if (!flightsShowAllRoutes) return;
+
+  const points = Array.isArray(payload?.points) ? payload.points : [];
+  if (!points.length) return;
+
+  const layer = L.layerGroup();
+  let routeCount = 0;
+  points.forEach((item) => {
+    const origin = toFlightLatLng(item?.origin_latitude, item?.origin_longitude);
+    const destination = toFlightLatLng(item?.destination_latitude, item?.destination_longitude);
+    if (!origin || !destination) return;
+
+    L.polyline([origin, destination], {
+      color: FLIGHTS_ROUTE_COLOR,
+      weight: 1.6,
+      opacity: 0.5,
+      dashArray: "5 6",
+      interactive: false,
+    }).addTo(layer);
+    routeCount += 1;
+  });
+
+  if (!routeCount) return;
+  flightsRoutesLayer = layer;
+  flightsRoutesLayer.addTo(map);
 }
 
 function drawFlightTrack(trackPayload) {
@@ -5082,12 +5130,14 @@ async function refreshFlightsLayer() {
     const payload = await fetchFlightsLayerData();
     flightsLastPayload = payload;
     renderFlightsLayer(payload);
+    renderFlightsRoutes(payload);
     renderFlightsSummary(payload);
     renderFlightsAirportsList(payload);
   } catch (_error) {
     if (!flightsLastPayload) {
       clearFlightsLayer();
       clearFlightsTrack();
+      clearFlightsRoutes();
     }
     renderFlightsSummary(flightsLastPayload, "No fue posible actualizar la capa de vuelos.");
     renderFlightsAirportsList(flightsLastPayload);
@@ -5126,6 +5176,7 @@ function disableFlightsMode() {
   stopFlightsPolling();
   clearFlightsLayer();
   clearFlightsTrack();
+  clearFlightsRoutes();
   flightsLastPayload = null;
   setFlightsOverlayVisible(false);
   setReportLegendVisible(true);
@@ -6304,10 +6355,12 @@ async function initMap() {
   flightsSummary = document.getElementById("flightsSummary");
   flightsMeta = document.getElementById("flightsMeta");
   flightsAirportsList = document.getElementById("flightsAirportsList");
+  flightsRoutesToggle = document.getElementById("flightsRoutesToggle");
   flightsWindowButtons = Array.from(document.querySelectorAll("[data-flights-window-hours]"));
   reportDetailPanel = document.getElementById("reportDetailPanel");
   setActiveConnectivityWindow(connectivityWindowHours);
   setActiveFlightsWindow(flightsWindowHours);
+  flightsShowAllRoutes = Boolean(flightsRoutesToggle?.checked);
   renderReportDetail(null);
   renderConnectivityRegionChart(null);
   renderConnectivityRadarPanels(null);
@@ -6355,6 +6408,21 @@ async function initMap() {
       }
     });
   });
+
+  if (flightsRoutesToggle) {
+    flightsRoutesToggle.addEventListener("change", () => {
+      flightsShowAllRoutes = Boolean(flightsRoutesToggle.checked);
+      if (activeBaseMode !== "flights") {
+        clearFlightsRoutes();
+        return;
+      }
+      if (flightsShowAllRoutes) {
+        renderFlightsRoutes(flightsLastPayload);
+        return;
+      }
+      clearFlightsRoutes();
+    });
+  }
 
   if (protestTimelineSlider) {
     protestTimelineSlider.addEventListener("change", async () => {

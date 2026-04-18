@@ -415,10 +415,14 @@
         </div>
         <div class="flights-window-switch" role="group" aria-label="Ventana de vuelos">
           <button type="button" class="flights-window-btn" data-flights-window-hours="168" aria-pressed="false">7d</button>
-          <button type="button" class="flights-window-btn is-active" data-flights-window-hours="24" aria-pressed="true">24h</button>
+          <button type="button" class="flights-window-btn" data-flights-window-hours="24" aria-pressed="false">24h</button>
           <button type="button" class="flights-window-btn" data-flights-window-hours="6" aria-pressed="false">6h</button>
-          <button type="button" class="flights-window-btn" data-flights-window-hours="2" aria-pressed="false">2h</button>
+          <button type="button" class="flights-window-btn is-active" data-flights-window-hours="2" aria-pressed="true">2h</button>
         </div>
+        <label class="flights-routes-toggle">
+          <input id="flightsRoutesToggle" type="checkbox" />
+          <span>Dibujar rutas de todos los vuelos en la ventana activa</span>
+        </label>
         <div id="flightsSummary" class="flights-summary">Cargando capa de vuelos...</div>
         <div id="flightsMeta" class="flights-meta">Sin datos de ingesta.</div>
         <div class="flights-airports-heading">Aeropuertos destino (ventana)</div>

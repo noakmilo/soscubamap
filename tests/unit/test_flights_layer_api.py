@@ -46,8 +46,11 @@ def _seed_flights_data(app):
             airport_code_icao="MUHA",
             airport_code_iata="HAV",
             name="Jose Marti",
+            city="La Habana",
             country_code="CU",
             country_name="Cuba",
+            latitude=22.9892,
+            longitude=-82.4091,
             is_cuba=True,
         )
         aircraft = FlightAircraft(
@@ -70,8 +73,12 @@ def _seed_flights_data(app):
             model="A320",
             registration="N123AB",
             origin_airport_name="Miami Intl",
+            origin_airport_icao="KMIA",
+            origin_airport_iata="MIA",
             origin_country="USA",
             destination_airport_name="Jose Marti",
+            destination_airport_icao="MUHA",
+            destination_airport_iata="HAV",
             destination_country="Cuba",
             status="en_route",
             departure_at_utc=now - timedelta(hours=2),
@@ -109,6 +116,14 @@ def _seed_flights_data(app):
                 "call_sign": "ABC123",
                 "model": "A320",
                 "destination_airport_name": "Jose Marti",
+                "origin_airport_icao": "KMIA",
+                "origin_airport_iata": "MIA",
+                "destination_airport_icao": "MUHA",
+                "destination_airport_iata": "HAV",
+                "origin_latitude": 25.7959,
+                "origin_longitude": -80.287,
+                "destination_latitude": 22.9892,
+                "destination_longitude": -82.4091,
                 "latitude": 22.9,
                 "longitude": -82.6,
                 "observed_at_utc": (now - timedelta(minutes=2)).isoformat() + "Z",
@@ -133,9 +148,9 @@ def _seed_flights_data(app):
         }
 
 
-def test_flights_layer_api_requires_admin(client):
+def test_flights_layer_api_is_public(client):
     response = client.get("/api/v1/flights/cuba-layer")
-    assert response.status_code == 403
+    assert response.status_code == 200
 
 
 def test_flights_layer_api_returns_snapshot_for_admin(app, client):
@@ -152,6 +167,20 @@ def test_flights_layer_api_returns_snapshot_for_admin(app, client):
     assert len(payload["points"]) == 1
     assert payload["summary"]["total_flights"] == 1
     assert payload["latest_run"]["status"] == "success"
+    assert payload["points"][0]["origin_latitude"] == 25.7959
+    assert payload["points"][0]["destination_latitude"] == 22.9892
+
+
+def test_flights_layer_api_defaults_to_2h_window_for_admin(app, client):
+    seeded = _seed_flights_data(app)
+    _login_admin(client, seeded["admin_id"])
+
+    response = client.get("/api/v1/flights/cuba-layer")
+    assert response.status_code == 200
+
+    payload = response.get_json()
+    assert payload is not None
+    assert payload["window_hours"] == 2
 
 
 def test_flights_layer_api_accepts_7d_window_for_admin(app, client):
@@ -165,6 +194,29 @@ def test_flights_layer_api_accepts_7d_window_for_admin(app, client):
     assert payload is not None
     assert payload["window_hours"] == 168
     assert isinstance(payload.get("points"), list)
+
+
+def test_flights_layer_api_enriches_route_coordinates_when_missing_in_snapshot(app, client):
+    seeded = _seed_flights_data(app)
+    _login_admin(client, seeded["admin_id"])
+
+    with app.app_context():
+        snapshot = FlightLayerSnapshot.query.filter_by(window_hours=24).first()
+        points = json.loads(snapshot.points_json or "[]")
+        points[0].pop("origin_latitude", None)
+        points[0].pop("origin_longitude", None)
+        points[0].pop("destination_latitude", None)
+        points[0].pop("destination_longitude", None)
+        snapshot.points_json = json.dumps(points)
+        db.session.commit()
+
+    response = client.get("/api/v1/flights/cuba-layer?window_hours=24")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload is not None
+    point = payload["points"][0]
+    assert point["destination_latitude"] == 22.9892
+    assert point["destination_longitude"] == -82.4091
 
 
 def test_flights_detail_track_and_photo_upload(app, client, monkeypatch):

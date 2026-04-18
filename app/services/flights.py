@@ -2527,6 +2527,14 @@ def _build_snapshot_payload(window_hours: int, now_utc: datetime | None = None) 
             row.destination_airport_iata,
             cache=airport_lookup_cache,
         )
+        origin_lat = _safe_float(origin_ref.get("latitude"))
+        origin_lng = _safe_float(origin_ref.get("longitude"))
+        destination_lat = _safe_float(row.destination_airport.latitude) if row.destination_airport else None
+        destination_lng = _safe_float(row.destination_airport.longitude) if row.destination_airport else None
+        if destination_lat is None:
+            destination_lat = _safe_float(destination_ref.get("latitude"))
+        if destination_lng is None:
+            destination_lng = _safe_float(destination_ref.get("longitude"))
         aircraft = row.aircraft
         destination_name = (
             (row.destination_airport.name if row.destination_airport else "")
@@ -2577,6 +2585,10 @@ def _build_snapshot_payload(window_hours: int, now_utc: datetime | None = None) 
                     or _clean_text(destination_ref.get("country"), limit=120)
                     or "Cuba"
                 ),
+                "origin_latitude": origin_lat,
+                "origin_longitude": origin_lng,
+                "destination_latitude": destination_lat,
+                "destination_longitude": destination_lng,
                 "latitude": lat,
                 "longitude": lng,
                 "altitude": _safe_float(row.latest_altitude),
@@ -2600,6 +2612,53 @@ def _build_snapshot_payload(window_hours: int, now_utc: datetime | None = None) 
     }
 
     return points, summary
+
+
+def enrich_snapshot_points_with_route_coordinates(points: Any) -> list[dict[str, Any]]:
+    rows = points if isinstance(points, list) else []
+    if not rows:
+        return []
+
+    airport_lookup_cache: dict[tuple[str, str], dict[str, Any]] = {}
+    enriched: list[dict[str, Any]] = []
+    for item in rows:
+        if not isinstance(item, dict):
+            continue
+        row = dict(item)
+
+        origin_lat = _safe_float(row.get("origin_latitude"))
+        origin_lng = _safe_float(row.get("origin_longitude"))
+        destination_lat = _safe_float(row.get("destination_latitude"))
+        destination_lng = _safe_float(row.get("destination_longitude"))
+
+        if origin_lat is None or origin_lng is None:
+            origin_ref = _find_airport_point(
+                row.get("origin_airport_icao"),
+                row.get("origin_airport_iata"),
+                cache=airport_lookup_cache,
+            )
+            if origin_lat is None:
+                origin_lat = _safe_float(origin_ref.get("latitude"))
+            if origin_lng is None:
+                origin_lng = _safe_float(origin_ref.get("longitude"))
+
+        if destination_lat is None or destination_lng is None:
+            destination_ref = _find_airport_point(
+                row.get("destination_airport_icao"),
+                row.get("destination_airport_iata"),
+                cache=airport_lookup_cache,
+            )
+            if destination_lat is None:
+                destination_lat = _safe_float(destination_ref.get("latitude"))
+            if destination_lng is None:
+                destination_lng = _safe_float(destination_ref.get("longitude"))
+
+        row["origin_latitude"] = origin_lat
+        row["origin_longitude"] = origin_lng
+        row["destination_latitude"] = destination_lat
+        row["destination_longitude"] = destination_lng
+        enriched.append(row)
+    return enriched
 
 
 def refresh_flight_layer_snapshots(

@@ -102,6 +102,7 @@ from app.services.flights import (
     build_aircraft_detail_payload,
     build_event_track_payload,
     decode_snapshot_json,
+    enrich_snapshot_points_with_route_coordinates,
     enrich_aircraft_detail_from_summary_light,
     get_flights_frontend_refresh_seconds,
     get_flights_snapshot_stale_after_seconds,
@@ -1221,14 +1222,14 @@ def _parse_connectivity_window_hours():
 def _parse_flights_window_hours():
     raw = (request.args.get("window_hours") or "").strip()
     if not raw:
-        return 24
+        return 2
     try:
         value = int(raw)
     except Exception:
-        return 24
+        return 2
     if value in (2, 6, 24, 168):
         return value
-    return 24
+    return 2
 
 
 def _parse_iso_day(raw_value):
@@ -2817,6 +2818,7 @@ def flights_cuba_layer_v1():
 
     if snapshot:
         points = decode_snapshot_json(snapshot.points_json, [])
+        points = enrich_snapshot_points_with_route_coordinates(points)
         summary = decode_snapshot_json(snapshot.summary_json, summary)
         stale_after_seconds = int(snapshot.stale_after_seconds or stale_after_seconds)
         if snapshot.generated_at_utc:
