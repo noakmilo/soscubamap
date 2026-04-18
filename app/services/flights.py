@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 WINDOW_HOURS_SUPPORTED = (168, 24, 6, 2)
 _CLEAN_TOKEN_RE = re.compile(r"[^a-z0-9]+")
+_AIRPORT_CODE_TOKEN_RE = re.compile(r"[A-Z0-9]{3,4}")
 DEFAULT_CUBA_LIVE_BOUNDS = "24.2,19.4,-85.2,-73.9"
 DEFAULT_CUBA_AIRPORT_CODES = (
     "MUHA,HAV,MUCU,SCU,MUVR,VRA,MUCC,CCC,MUCM,CMW,"
@@ -242,6 +243,25 @@ def _lookup_world_airport(
         if match:
             return match
     return {}
+
+
+def _infer_airport_codes_from_text(value: Any) -> tuple[str, str]:
+    text = _clean_text(value, upper=True, limit=255)
+    if not text:
+        return "", ""
+
+    icao = ""
+    iata = ""
+    for token in _AIRPORT_CODE_TOKEN_RE.findall(text):
+        if not any(ch.isalpha() for ch in token):
+            continue
+        if len(token) == 4 and not icao:
+            icao = token
+        elif len(token) == 3 and not iata:
+            iata = token
+        if icao and iata:
+            break
+    return icao, iata
 
 
 def _normalize_token(value: Any) -> str:
@@ -3343,6 +3363,300 @@ def _find_airport_point(
     if cache is not None:
         cache[cache_key] = reference
     return reference
+
+
+def backfill_flights_airport_metadata_from_static_catalog(
+    *,
+    limit: int | None = None,
+    dry_run: bool = False,
+    only_missing: bool = True,
+    commit_every: int = 300,
+) -> dict[str, Any]:
+    commit_every = max(50, int(commit_every or 300))
+    max_rows = int(limit) if limit is not None else None
+    if max_rows is not None and max_rows <= 0:
+        max_rows = None
+
+    static_index = _load_world_airports_index()
+    airport_cache: dict[str, FlightAirport] = {}
+    lookup_cache: dict[tuple[str, str], dict[str, Any]] = {}
+
+    airports_scanned = 0
+    airports_updated = 0
+    events_scanned = 0
+    events_updated = 0
+    origin_code_inferred = 0
+    destination_code_inferred = 0
+    destination_linked = 0
+    pending_changes = 0
+
+    def _mark_dirty(changed: bool) -> None:
+        nonlocal pending_changes
+        if changed:
+            pending_changes += 1
+
+    def _maybe_commit() -> None:
+        nonlocal pending_changes
+        if dry_run:
+            return
+        if pending_changes < commit_every:
+            return
+        db.session.commit()
+        pending_changes = 0
+
+    try:
+        airport_rows = FlightAirport.query.order_by(FlightAirport.id.asc()).all()
+        for airport in airport_rows:
+            airports_scanned += 1
+            ref = _lookup_world_airport(airport.airport_code_icao, airport.airport_code_iata)
+            if not ref:
+                continue
+
+            changed = False
+            city = _clean_text(ref.get("city"), limit=120)
+            country = _clean_text(ref.get("country"), upper=True, limit=120)
+            latitude = _safe_float(ref.get("latitude"))
+            longitude = _safe_float(ref.get("longitude"))
+
+            if city and (not only_missing or not _clean_text(airport.city, limit=120)):
+                if _clean_text(airport.city, limit=120) != city:
+                    airport.city = city
+                    changed = True
+            if country and (not only_missing or not _clean_text(airport.country_name, limit=120)):
+                if _clean_text(airport.country_name, upper=True, limit=120) != country:
+                    airport.country_name = country
+                    changed = True
+            if country and (not only_missing or not _clean_text(airport.country_code, upper=True, limit=8)):
+                if _clean_text(airport.country_code, upper=True, limit=8) != country:
+                    airport.country_code = country
+                    changed = True
+            if latitude is not None and (
+                not only_missing or _safe_float(airport.latitude) is None
+            ):
+                if _safe_float(airport.latitude) != latitude:
+                    airport.latitude = latitude
+                    changed = True
+            if longitude is not None and (
+                not only_missing or _safe_float(airport.longitude) is None
+            ):
+                if _safe_float(airport.longitude) != longitude:
+                    airport.longitude = longitude
+                    changed = True
+
+            if _country_is_cuba(airport.country_name, airport.country_code) and not airport.is_cuba:
+                airport.is_cuba = True
+                changed = True
+
+            if changed:
+                airports_updated += 1
+                _mark_dirty(True)
+                _maybe_commit()
+
+        last_id = 0
+        batch_size = 500
+        while True:
+            remaining = None
+            if max_rows is not None:
+                remaining = max_rows - events_scanned
+                if remaining <= 0:
+                    break
+
+            query = (
+                FlightEvent.query.options(selectinload(FlightEvent.destination_airport))
+                .filter(FlightEvent.id > last_id)
+                .order_by(FlightEvent.id.asc())
+                .limit(min(batch_size, remaining) if remaining is not None else batch_size)
+            )
+            batch = query.all()
+            if not batch:
+                break
+
+            for event in batch:
+                last_id = event.id
+                events_scanned += 1
+                changed = False
+
+                origin_icao = _clean_text(event.origin_airport_icao, upper=True, limit=8)
+                origin_iata = _clean_text(event.origin_airport_iata, upper=True, limit=8)
+                if not origin_icao or not origin_iata:
+                    inferred_icao, inferred_iata = _infer_airport_codes_from_text(
+                        event.origin_airport_name
+                    )
+                    if inferred_icao and not origin_icao:
+                        event.origin_airport_icao = inferred_icao
+                        origin_icao = inferred_icao
+                        changed = True
+                        origin_code_inferred += 1
+                    if inferred_iata and not origin_iata:
+                        event.origin_airport_iata = inferred_iata
+                        origin_iata = inferred_iata
+                        changed = True
+                        origin_code_inferred += 1
+
+                dest_icao = _clean_text(event.destination_airport_icao, upper=True, limit=8)
+                dest_iata = _clean_text(event.destination_airport_iata, upper=True, limit=8)
+                if not dest_icao or not dest_iata:
+                    inferred_icao, inferred_iata = _infer_airport_codes_from_text(
+                        event.destination_airport_name
+                    )
+                    if inferred_icao and not dest_icao:
+                        event.destination_airport_icao = inferred_icao
+                        dest_icao = inferred_icao
+                        changed = True
+                        destination_code_inferred += 1
+                    if inferred_iata and not dest_iata:
+                        event.destination_airport_iata = inferred_iata
+                        dest_iata = inferred_iata
+                        changed = True
+                        destination_code_inferred += 1
+
+                origin_ref = _find_airport_point(origin_icao, origin_iata, cache=lookup_cache)
+                destination_ref = _find_airport_point(dest_icao, dest_iata, cache=lookup_cache)
+
+                if _clean_text(origin_ref.get("name"), limit=255) and (
+                    not only_missing or not _clean_text(event.origin_airport_name, limit=255)
+                ):
+                    next_value = _clean_text(origin_ref.get("name"), limit=255)
+                    if _clean_text(event.origin_airport_name, limit=255) != next_value:
+                        event.origin_airport_name = next_value
+                        changed = True
+
+                if _clean_text(origin_ref.get("country"), limit=120) and (
+                    not only_missing or not _clean_text(event.origin_country, limit=120)
+                ):
+                    next_value = _clean_text(origin_ref.get("country"), limit=120)
+                    if _clean_text(event.origin_country, limit=120) != next_value:
+                        event.origin_country = next_value
+                        changed = True
+
+                if _clean_text(destination_ref.get("name"), limit=255) and (
+                    not only_missing or not _clean_text(event.destination_airport_name, limit=255)
+                ):
+                    next_value = _clean_text(destination_ref.get("name"), limit=255)
+                    if _clean_text(event.destination_airport_name, limit=255) != next_value:
+                        event.destination_airport_name = next_value
+                        changed = True
+
+                if _clean_text(destination_ref.get("country"), limit=120) and (
+                    not only_missing or not _clean_text(event.destination_country, limit=120)
+                ):
+                    next_value = _clean_text(destination_ref.get("country"), limit=120)
+                    if _clean_text(event.destination_country, limit=120) != next_value:
+                        event.destination_country = next_value
+                        changed = True
+
+                destination_airport = event.destination_airport
+                if destination_airport is None and (
+                    dest_icao
+                    or dest_iata
+                    or _clean_text(event.destination_airport_name, limit=255)
+                    or _clean_text(destination_ref.get("name"), limit=255)
+                ):
+                    resolved_name = (
+                        _clean_text(event.destination_airport_name, limit=255)
+                        or _clean_text(destination_ref.get("name"), limit=255)
+                        or "Aeropuerto Cuba"
+                    )
+                    resolved_country = (
+                        _clean_text(event.destination_country, limit=120)
+                        or _clean_text(destination_ref.get("country"), limit=120)
+                        or "Cuba"
+                    )
+                    resolved_country_code = _clean_text(destination_ref.get("country"), upper=True, limit=8)
+                    if not resolved_country_code and _country_is_cuba(resolved_country, resolved_country):
+                        resolved_country_code = "CU"
+                    parsed = {
+                        "code_key": _airport_code_key(dest_icao, dest_iata, "", resolved_name),
+                        "fr_airport_id": "",
+                        "airport_code_icao": dest_icao,
+                        "airport_code_iata": dest_iata,
+                        "name": resolved_name,
+                        "city": _clean_text(destination_ref.get("city"), limit=120),
+                        "province": "",
+                        "country_code": resolved_country_code,
+                        "country_name": resolved_country,
+                        "latitude": _safe_float(destination_ref.get("latitude")),
+                        "longitude": _safe_float(destination_ref.get("longitude")),
+                        "is_cuba": _country_is_cuba(resolved_country, resolved_country_code),
+                    }
+                    destination_airport = _upsert_airport(parsed, airport_cache)
+                    if event.destination_airport_id is None:
+                        destination_linked += 1
+                    event.destination_airport = destination_airport
+                    changed = True
+
+                if destination_airport is not None and destination_ref:
+                    airport_changed = False
+                    ref_city = _clean_text(destination_ref.get("city"), limit=120)
+                    ref_country_code = _clean_text(destination_ref.get("country"), upper=True, limit=8)
+                    ref_country_name = "Cuba" if ref_country_code == "CU" else ref_country_code
+                    ref_lat = _safe_float(destination_ref.get("latitude"))
+                    ref_lng = _safe_float(destination_ref.get("longitude"))
+
+                    if ref_city and (not only_missing or not _clean_text(destination_airport.city, limit=120)):
+                        if _clean_text(destination_airport.city, limit=120) != ref_city:
+                            destination_airport.city = ref_city
+                            airport_changed = True
+                    if ref_country_name and (
+                        not only_missing or not _clean_text(destination_airport.country_name, limit=120)
+                    ):
+                        if _clean_text(destination_airport.country_name, upper=True, limit=120) != _clean_text(
+                            ref_country_name, upper=True, limit=120
+                        ):
+                            destination_airport.country_name = ref_country_name
+                            airport_changed = True
+                    if ref_country_code and (
+                        not only_missing or not _clean_text(destination_airport.country_code, upper=True, limit=8)
+                    ):
+                        if _clean_text(destination_airport.country_code, upper=True, limit=8) != ref_country_code:
+                            destination_airport.country_code = ref_country_code
+                            airport_changed = True
+                    if ref_lat is not None and (
+                        not only_missing or _safe_float(destination_airport.latitude) is None
+                    ):
+                        if _safe_float(destination_airport.latitude) != ref_lat:
+                            destination_airport.latitude = ref_lat
+                            airport_changed = True
+                    if ref_lng is not None and (
+                        not only_missing or _safe_float(destination_airport.longitude) is None
+                    ):
+                        if _safe_float(destination_airport.longitude) != ref_lng:
+                            destination_airport.longitude = ref_lng
+                            airport_changed = True
+                    if _country_is_cuba(destination_airport.country_name, destination_airport.country_code) and not destination_airport.is_cuba:
+                        destination_airport.is_cuba = True
+                        airport_changed = True
+
+                    if airport_changed:
+                        airports_updated += 1
+                        changed = True
+
+                if changed:
+                    events_updated += 1
+                    _mark_dirty(True)
+                    _maybe_commit()
+
+        if dry_run:
+            db.session.rollback()
+        else:
+            db.session.commit()
+
+        return {
+            "status": "success",
+            "dry_run": bool(dry_run),
+            "only_missing": bool(only_missing),
+            "catalog_rows": len(static_index),
+            "airports_scanned": airports_scanned,
+            "airports_updated": airports_updated,
+            "events_scanned": events_scanned,
+            "events_updated": events_updated,
+            "origin_code_inferred": origin_code_inferred,
+            "destination_code_inferred": destination_code_inferred,
+            "destination_linked": destination_linked,
+        }
+    except Exception:
+        db.session.rollback()
+        raise
 
 
 def build_event_track_payload(event: FlightEvent) -> dict[str, Any]:
