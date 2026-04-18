@@ -395,14 +395,15 @@ body.map-dashboard-page .map-canvas {
   background: rgba(10, 17, 22, 0.7);
 }
 
-.map-side-panel.is-report-after-legend .legend {
+.map-side-panel.is-report-priority .legend {
   order: 10;
 }
 
-.map-side-panel.is-report-after-legend .report-detail-panel {
-  order: 20;
-  max-height: min(38vh, 360px);
-  overflow-y: auto;
+.map-side-panel.is-report-priority .report-detail-panel {
+  order: 0;
+  min-height: min(42vh, 420px);
+  max-height: none;
+  overflow: visible;
 }
 
 .report-detail-panel {
@@ -2659,24 +2660,23 @@ body.map-dashboard-page .map-canvas .leaflet-control-layers.map-layer-control in
 }
 
 .flights-marker-plane {
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.32), rgba(0, 0, 0, 0.62));
-  color: var(--flight-marker-color, #f59e0b);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.48), 0 6px 12px rgba(0, 0, 0, 0.5);
+  width: 34px;
+  height: 34px;
+  border: none;
+  background: transparent;
+  color: var(--flight-marker-color, #ef4444);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   transform: rotate(var(--flight-marker-heading, 0deg));
   transform-origin: center;
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.65)) drop-shadow(0 0 6px rgba(239, 68, 68, 0.35));
 }
 
 .flights-marker-plane i {
-  font-size: 11px;
+  font-size: 18px;
   line-height: 1;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
 }
 
 .flights-popup {
@@ -2757,6 +2757,41 @@ body.map-dashboard-page .map-canvas .leaflet-control-layers.map-layer-control in
 .flights-photo-feedback {
   font-size: 11px;
   color: #ffe8c8;
+}
+
+.flights-photo-replace-link {
+  border: none;
+  background: transparent;
+  color: #ffd89f;
+  padding: 0;
+  margin-top: 2px;
+  font-size: 11px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.flights-photo-replace-link:hover {
+  color: #fff0cf;
+}
+
+.flights-photo-modal-shell {
+  width: min(460px, 96vw);
+  height: auto;
+  min-height: 210px;
+}
+
+.flights-photo-modal-body {
+  display: grid;
+  gap: 10px;
+  padding: 18px 16px 16px;
+}
+
+.flights-photo-modal-body h4 {
+  margin: 0;
+  color: #fff2d5;
+  font-size: 14px;
+  letter-spacing: 0.3px;
 }
 
 .ais-overlay {
@@ -6508,8 +6543,8 @@ textarea {
       transform var(--motion-duration) var(--motion-ease);
   }
 
-  body.map-dashboard-page .map-side-panel.is-report-after-legend .report-detail-panel {
-    max-height: min(42vh, 420px);
+  body.map-dashboard-page .map-side-panel.is-report-priority .report-detail-panel {
+    min-height: min(40vh, 380px);
   }
 
   body.map-dashboard-page .map-side-panel[data-mobile-state="peek"] .map-side-scroll {

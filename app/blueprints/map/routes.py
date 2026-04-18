@@ -1808,7 +1808,7 @@ def add_repressor():
         elif len(photo_files) > 1:
             errors["photo"] = "Solo puedes subir una foto por envío."
         elif not cloudinary_enabled:
-            errors["photo"] = "Subida de imagen no disponible: falta configuración de Cloudinary."
+            errors["photo"] = "Subida de imagen no disponible: falta configuración del servicio de imágenes."
         else:
             ok, error = validate_files(photo_files)
             if not ok:
@@ -1852,10 +1852,10 @@ def add_repressor():
                 uploaded_urls = upload_files(photo_files)
                 photo_url = uploaded_urls[0] if uploaded_urls else None
             except Exception:
-                current_app.logger.exception("Error al subir foto de represor a Cloudinary")
-                errors["photo"] = "No se pudo subir la foto a Cloudinary."
+                current_app.logger.exception("Error al subir foto de represor")
+                errors["photo"] = "No se pudo subir la foto."
             if not photo_url and "photo" not in errors:
-                errors["photo"] = "No se pudo subir la foto a Cloudinary."
+                errors["photo"] = "No se pudo subir la foto."
 
         if not errors:
             try:
@@ -2136,7 +2136,7 @@ def _handle_repressor_edit_form(repressor_id: int, edit_kind: str):
         if len(photo_files) > 1:
             errors["photo"] = "Solo puedes subir una foto por envío."
         elif photo_files and not cloudinary_enabled:
-            errors["photo"] = "Subida de imagen no disponible: falta configuración de Cloudinary."
+            errors["photo"] = "Subida de imagen no disponible: falta configuración del servicio de imágenes."
         elif photo_files:
             ok, error = validate_files(photo_files)
             if not ok:
@@ -2184,9 +2184,9 @@ def _handle_repressor_edit_form(repressor_id: int, edit_kind: str):
                 uploaded_photo_url = uploaded_urls[0] if uploaded_urls else None
             except Exception:
                 current_app.logger.exception("Error al subir foto de edición de represor")
-                errors["photo"] = "No se pudo subir la foto a Cloudinary."
+                errors["photo"] = "No se pudo subir la foto."
             if not uploaded_photo_url and "photo" not in errors:
-                errors["photo"] = "No se pudo subir la foto a Cloudinary."
+                errors["photo"] = "No se pudo subir la foto."
 
         if not errors:
             try:
@@ -2960,7 +2960,7 @@ def add_prisoner():
         if len(photo_files) > 1:
             errors["photo"] = "Solo puedes subir una foto."
         elif photo_files and not cloudinary_enabled:
-            errors["photo"] = "Subida no disponible: falta configuración de Cloudinary."
+            errors["photo"] = "Subida no disponible: falta configuración del servicio de imágenes."
         elif photo_files:
             ok, error = validate_files(photo_files)
             if not ok:
@@ -2973,9 +2973,9 @@ def add_prisoner():
                 uploaded_photo_url = uploaded_urls[0] if uploaded_urls else None
             except Exception:
                 current_app.logger.exception("Error al subir foto de prisionero")
-                errors["photo"] = "No se pudo subir la foto a Cloudinary."
+                errors["photo"] = "No se pudo subir la foto."
             if not uploaded_photo_url and "photo" not in errors:
-                errors["photo"] = "No se pudo subir la foto a Cloudinary."
+                errors["photo"] = "No se pudo subir la foto."
 
         if not errors:
             try:
@@ -3076,7 +3076,7 @@ def edit_prisoner_public(prisoner_id):
         if len(photo_files) > 1:
             errors["photo"] = "Solo puedes subir una foto."
         elif photo_files and not cloudinary_enabled:
-            errors["photo"] = "Subida no disponible: falta configuración de Cloudinary."
+            errors["photo"] = "Subida no disponible: falta configuración del servicio de imágenes."
         elif photo_files:
             ok, error = validate_files(photo_files)
             if not ok:
@@ -3089,9 +3089,9 @@ def edit_prisoner_public(prisoner_id):
                 uploaded_photo_url = uploaded_urls[0] if uploaded_urls else None
             except Exception:
                 current_app.logger.exception("Error al subir foto de edición de prisionero")
-                errors["photo"] = "No se pudo subir la foto a Cloudinary."
+                errors["photo"] = "No se pudo subir la foto."
             if not uploaded_photo_url and "photo" not in errors:
-                errors["photo"] = "No se pudo subir la foto a Cloudinary."
+                errors["photo"] = "No se pudo subir la foto."
 
         final_image_url = uploaded_photo_url or form_data.get("image_url") or prisoner.image_url
         if not errors and not _has_prisoner_changes(

@@ -408,11 +408,11 @@ def protests_manual_ingestion():
             queue=queue_name,
         )
         flash(
-            f"Ingesta manual enviada a Celery (task_id={result.id}, queue={queue_name}).",
+            f"Ingesta manual enviada a la cola de tareas (task_id={result.id}, queue={queue_name}).",
             "success",
         )
     except Exception as exc:
-        flash(f"No se pudo enviar la ingesta manual a Celery: {exc}", "error")
+        flash(f"No se pudo enviar la ingesta manual a la cola de tareas: {exc}", "error")
 
     return redirect(next_url)
 
@@ -500,7 +500,7 @@ def repressors_manual_ingestion():
             queue=queue_name,
         )
         flash(
-            f"Ingesta manual de represores enviada a Celery (task_id={result.id}, queue={queue_name}).",
+            f"Ingesta manual de represores enviada a la cola de tareas (task_id={result.id}, queue={queue_name}).",
             "success",
         )
     except Exception as exc:

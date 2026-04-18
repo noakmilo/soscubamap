@@ -2883,11 +2883,12 @@ def flights_aircraft_detail_v1(aircraft_id):
     summary_cache = enrich_aircraft_detail_from_summary_light(aircraft, event=event)
     payload = build_aircraft_detail_payload(aircraft)
     payload["summary_light_cache"] = summary_cache
-    payload["cloudinary_enabled"] = bool(
+    payload["photo_upload_enabled"] = bool(
         current_app.config.get("CLOUDINARY_CLOUD_NAME")
         and current_app.config.get("CLOUDINARY_API_KEY")
         and current_app.config.get("CLOUDINARY_API_SECRET")
     )
+    payload["cloudinary_enabled"] = bool(payload["photo_upload_enabled"])
     return jsonify(payload)
 
 
@@ -2920,17 +2921,17 @@ def flights_aircraft_photo_upload_v1(aircraft_id):
     if len(files) > 1:
         return jsonify({"ok": False, "error": "Solo puedes subir una foto por envío."}), 400
 
-    cloudinary_enabled = bool(
+    upload_enabled = bool(
         current_app.config.get("CLOUDINARY_CLOUD_NAME")
         and current_app.config.get("CLOUDINARY_API_KEY")
         and current_app.config.get("CLOUDINARY_API_SECRET")
     )
-    if not cloudinary_enabled:
+    if not upload_enabled:
         return (
             jsonify(
                 {
                     "ok": False,
-                    "error": "Subida de imagen no disponible: falta configuración de Cloudinary.",
+                    "error": "Subida de imagen no disponible: falta configuración del servicio de imágenes.",
                 }
             ),
             400,
@@ -2943,11 +2944,11 @@ def flights_aircraft_photo_upload_v1(aircraft_id):
     try:
         urls = upload_files(files)
     except Exception:
-        current_app.logger.exception("Error al subir foto de avión a Cloudinary")
-        return jsonify({"ok": False, "error": "No se pudo subir la foto a Cloudinary."}), 400
+        current_app.logger.exception("Error al subir foto de avión")
+        return jsonify({"ok": False, "error": "No se pudo subir la foto."}), 400
 
     if not urls:
-        return jsonify({"ok": False, "error": "No se pudo subir la foto a Cloudinary."}), 400
+        return jsonify({"ok": False, "error": "No se pudo subir la foto."}), 400
 
     aircraft.photo_manual_url = urls[0]
     aircraft.photo_updated_at_utc = datetime.utcnow()

@@ -266,7 +266,7 @@ const repressorUnresolvedDetailCache = new Map();
 const PRISONER_COUNT_COLOR = "#22c55e";
 const prisonerTerritoryDetailCache = new Map();
 const AIS_MARKER_COLOR = "#0ea5e9";
-const FLIGHTS_MARKER_COLOR = "#f59e0b";
+const FLIGHTS_MARKER_COLOR = "#ef4444";
 const MAP_POPUP_OPTIONS = {
   maxWidth: 320,
   maxHeight: 320,
@@ -896,8 +896,9 @@ function ensureContextPanelVisible(options = {}) {
 
 function syncReportDetailPanelLayout() {
   if (!mapSidePanel) return;
-  const showDetailAfterLegend = activeBaseMode === "map" || activeBaseMode === "satellite";
-  mapSidePanel.classList.toggle("is-report-after-legend", showDetailAfterLegend);
+  const prioritizeReportDetail = activeBaseMode === "map" || activeBaseMode === "satellite";
+  mapSidePanel.classList.toggle("is-report-priority", prioritizeReportDetail);
+  mapSidePanel.classList.remove("is-report-after-legend");
 }
 
 function setupContextPanelLayout() {
@@ -4398,9 +4399,9 @@ function buildFlightsMarkerIcon(heading) {
     html: `<span class="flights-marker-plane" style="--flight-marker-color:${color};--flight-marker-heading:${normalizedHeading.toFixed(
       1
     )}deg;" aria-hidden="true"><i class="fa-solid fa-plane-up"></i></span>`,
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
-    popupAnchor: [0, -12],
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+    popupAnchor: [0, -16],
   });
 }
 
@@ -4472,8 +4473,25 @@ function drawFlightTrack(trackPayload) {
   const latlngs = points
     .map((point) => [Number(point?.latitude), Number(point?.longitude)])
     .filter((pair) => Number.isFinite(pair[0]) && Number.isFinite(pair[1]));
+  const rawRouteOrigin = trackPayload?.route?.origin || {};
+  const rawRouteDestination = trackPayload?.route?.destination || {};
+  const routeOriginCandidate = [Number(rawRouteOrigin?.latitude), Number(rawRouteOrigin?.longitude)];
+  const routeDestinationCandidate = [
+    Number(rawRouteDestination?.latitude),
+    Number(rawRouteDestination?.longitude),
+  ];
+  const hasRouteOrigin = Number.isFinite(routeOriginCandidate[0]) && Number.isFinite(routeOriginCandidate[1]);
+  const hasRouteDestination =
+    Number.isFinite(routeDestinationCandidate[0]) && Number.isFinite(routeDestinationCandidate[1]);
 
-  if (!latlngs.length) return;
+  const fallbackOrigin = latlngs[0];
+  const fallbackDestination = latlngs.length ? latlngs[latlngs.length - 1] : null;
+  const routeOrigin = hasRouteOrigin ? routeOriginCandidate : fallbackOrigin || null;
+  const routeDestination = hasRouteDestination
+    ? routeDestinationCandidate
+    : fallbackDestination || routeOrigin || null;
+
+  if (!latlngs.length && !routeOrigin && !routeDestination) return;
 
   flightsTrackLayer = L.layerGroup();
 
@@ -4486,14 +4504,48 @@ function drawFlightTrack(trackPayload) {
     trackLine.addTo(flightsTrackLayer);
   }
 
-  const latest = latlngs[latlngs.length - 1];
-  L.circleMarker(latest, {
-    radius: 5,
-    color: "#ffffff",
-    weight: 2,
-    fillColor: "#f59e0b",
-    fillOpacity: 0.95,
-  }).addTo(flightsTrackLayer);
+  if (routeOrigin && routeDestination) {
+    const samePoint =
+      Math.abs(routeOrigin[0] - routeDestination[0]) < 0.00001 &&
+      Math.abs(routeOrigin[1] - routeDestination[1]) < 0.00001;
+
+    if (!samePoint) {
+      const routeLine = L.polyline([routeOrigin, routeDestination], {
+        color: "#ef4444",
+        weight: 2,
+        opacity: 0.95,
+        dashArray: "8 6",
+      });
+      routeLine.addTo(flightsTrackLayer);
+    }
+
+    L.circleMarker(routeOrigin, {
+      radius: 4,
+      color: "#ffffff",
+      weight: 1.5,
+      fillColor: "#22d3ee",
+      fillOpacity: 0.95,
+    }).addTo(flightsTrackLayer);
+
+    L.circleMarker(routeDestination, {
+      radius: 4,
+      color: "#ffffff",
+      weight: 1.5,
+      fillColor: "#ef4444",
+      fillOpacity: 0.98,
+    }).addTo(flightsTrackLayer);
+  }
+
+  const latest = latlngs.length ? latlngs[latlngs.length - 1] : routeDestination || routeOrigin;
+  if (latest) {
+    L.circleMarker(latest, {
+      radius: 5,
+      color: "#ffffff",
+      weight: 2,
+      fillColor: "#ef4444",
+      fillOpacity: 0.95,
+    }).addTo(flightsTrackLayer);
+  }
 
   flightsTrackLayer.addTo(map);
 }
@@ -4527,10 +4579,14 @@ function renderFlightDetail(item, detailPayload, trackPayload) {
   const photoUrl = safeUrl(aircraft?.photo_url || item?.photo_url || "");
   const photoSource = String(aircraft?.photo_source || "none");
   const photoSourceLabel =
-    photoSource === "manual" ? "Foto manual (Cloudinary)" : photoSource === "api" ? "Foto API" : "Sin foto";
-  const cloudinaryEnabled = Boolean(detailPayload?.cloudinary_enabled);
+    photoSource === "manual" ? "Foto asignada manualmente" : photoSource === "api" ? "Foto de la API" : "Sin foto";
+  const photoUploadEnabled = Boolean(
+    detailPayload?.photo_upload_enabled ?? detailPayload?.cloudinary_enabled
+  );
   const aircraftId = Number(aircraft?.id || item?.aircraft_id);
   const latestTrackPointCount = Math.max(0, Number(trackPayload?.track?.point_count) || 0);
+  const canUploadPhoto = photoUploadEnabled && Number.isFinite(aircraftId);
+  const hasPhoto = Boolean(photoUrl);
 
   const topOrigins = origins
     .slice(0, 4)
@@ -4552,17 +4608,31 @@ function renderFlightDetail(item, detailPayload, trackPayload) {
     })
     .join("");
 
-  const uploadSection =
-    cloudinaryEnabled && Number.isFinite(aircraftId)
-      ? `
-        <form class=\"flights-photo-form\" data-flight-photo-form data-aircraft-id=\"${aircraftId}\">
-          <label class=\"flights-photo-label\">Asignar foto manual</label>
-          <input type=\"file\" name=\"photo\" accept=\"image/*\" required />
-          <button type=\"submit\" class=\"flights-photo-btn\">Subir a Cloudinary</button>
-          <div class=\"flights-photo-feedback\" data-flight-photo-feedback></div>
-        </form>
-      `
-      : "";
+  const uploadFormMarkup = `
+    <form class=\"flights-photo-form\" data-flight-photo-form data-aircraft-id=\"${aircraftId}\">
+      <label class=\"flights-photo-label\">Selecciona una imagen</label>
+      <input type=\"file\" name=\"photo\" accept=\"image/*\" required />
+      <button type=\"submit\" class=\"flights-photo-btn\">Guardar imagen</button>
+      <div class=\"flights-photo-feedback\" data-flight-photo-feedback></div>
+    </form>
+  `;
+  const inlineUploadSection = canUploadPhoto && !hasPhoto ? uploadFormMarkup : "";
+  const replacePrompt = canUploadPhoto && hasPhoto
+    ? `<button type=\"button\" class=\"flights-photo-replace-link\" data-flight-photo-replace-open>¿La imagen no es correcta? Reemplazar</button>`
+    : "";
+  const replaceModal = canUploadPhoto && hasPhoto
+    ? `
+      <div class=\"modal-overlay flights-photo-modal\" data-flight-photo-modal aria-hidden=\"true\">
+        <div class=\"modal flights-photo-modal-shell\" role=\"dialog\" aria-modal=\"true\" aria-label=\"Reemplazar imagen de avión\">
+          <button type=\"button\" class=\"modal-close\" data-flight-photo-modal-close>&times;</button>
+          <div class=\"flights-photo-modal-body\">
+            <h4>Reemplazar imagen</h4>
+            ${uploadFormMarkup}
+          </div>
+        </div>
+      </div>
+    `
+    : "";
 
   reportDetailPanel.innerHTML = `
     <div class=\"report-detail-content\">
@@ -4576,7 +4646,9 @@ function renderFlightDetail(item, detailPayload, trackPayload) {
           ? `<img class=\"flights-detail-photo\" src=\"${photoUrl}\" alt=\"Foto de aeronave\" loading=\"lazy\" />`
           : `<div class=\"report-detail-meta\">No hay foto disponible para esta aeronave.</div>`
       }
-      ${uploadSection}
+      ${replacePrompt}
+      ${inlineUploadSection}
+      ${replaceModal}
       <div class=\"report-detail-meta\">Orígenes frecuentes: ${topOrigins || "N/D"}</div>
       <div class=\"report-detail-meta\">Destinos en Cuba: ${topDestinations || "N/D"}</div>
       <div class=\"flights-history-list\">
@@ -4590,67 +4662,66 @@ function renderFlightDetail(item, detailPayload, trackPayload) {
   triggerReportDetailReveal();
   if (mapSideScroll) mapSideScroll.scrollTop = 0;
 
-  const form = reportDetailPanel.querySelector("[data-flight-photo-form]");
-  if (!form) return;
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const input = form.querySelector("input[name='photo']");
-    const feedback = form.querySelector("[data-flight-photo-feedback]");
-    const submitBtn = form.querySelector("button[type='submit']");
-    const file = input?.files?.[0];
-    if (!file) {
-      if (feedback) feedback.textContent = "Selecciona una imagen primero.";
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("photo", file);
-    if (submitBtn) submitBtn.disabled = true;
-    if (feedback) feedback.textContent = "Subiendo foto...";
-
-    try {
-      const response = await fetch(`/api/v1/flights/aircraft/${aircraftId}/photo`, {
-        method: "POST",
-        body: formData,
-      });
-      const payload = await response.json();
-      if (!response.ok || !payload?.ok) {
-        throw new Error(payload?.error || "No se pudo subir la foto.");
+  const modal = reportDetailPanel.querySelector("[data-flight-photo-modal]");
+  const openModalBtn = reportDetailPanel.querySelector("[data-flight-photo-replace-open]");
+  const closeModal = () => {
+    if (!modal) return;
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
+  };
+  if (openModalBtn && modal) {
+    openModalBtn.addEventListener("click", () => {
+      modal.classList.add("open");
+      modal.setAttribute("aria-hidden", "false");
+    });
+    modal.querySelectorAll("[data-flight-photo-modal-close]").forEach((button) => {
+      button.addEventListener("click", closeModal);
+    });
+    modal.addEventListener("click", (event) => {
+      if (event.target === modal) {
+        closeModal();
       }
-      if (feedback) feedback.textContent = "Foto actualizada.";
-      await showFlightDetail(item);
-    } catch (error) {
-      if (feedback) feedback.textContent = error?.message || "No se pudo subir la foto.";
-    } finally {
-      if (submitBtn) submitBtn.disabled = false;
-    }
-  });
-}
-
-function renderFlightsLayer(payload) {
-  if (!map) return;
-  clearFlightsLayer();
-  clearFlightsTrack();
-  flightsLayerGroup = L.layerGroup();
-
-  const points = Array.isArray(payload?.points) ? payload.points : [];
-  points.forEach((item) => {
-    const lat = Number(item?.latitude);
-    const lng = Number(item?.longitude);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-    const marker = L.marker([lat, lng], {
-      icon: buildFlightsMarkerIcon(item?.heading),
-      title: item?.call_sign || item?.registration || "Vuelo",
     });
-    marker.bindPopup(flightsPopupHtml(item), MAP_POPUP_OPTIONS);
-    marker.on("click", () => {
-      ensureContextPanelVisible({ mobileState: "full" });
-      showFlightDetail(item);
-    });
-    marker.addTo(flightsLayerGroup);
-  });
+  }
 
-  flightsLayerGroup.addTo(map);
+  const forms = Array.from(reportDetailPanel.querySelectorAll("[data-flight-photo-form]"));
+  if (!forms.length) return;
+  forms.forEach((form) => {
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const input = form.querySelector("input[name='photo']");
+      const feedback = form.querySelector("[data-flight-photo-feedback]");
+      const submitBtn = form.querySelector("button[type='submit']");
+      const file = input?.files?.[0];
+      if (!file) {
+        if (feedback) feedback.textContent = "Selecciona una imagen primero.";
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("photo", file);
+      if (submitBtn) submitBtn.disabled = true;
+      if (feedback) feedback.textContent = "Subiendo imagen...";
+
+      try {
+        const response = await fetch(`/api/v1/flights/aircraft/${aircraftId}/photo`, {
+          method: "POST",
+          body: formData,
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload?.ok) {
+          throw new Error(payload?.error || "No se pudo subir la foto.");
+        }
+        if (feedback) feedback.textContent = "Imagen actualizada.";
+        closeModal();
+        await showFlightDetail(item);
+      } catch (error) {
+        if (feedback) feedback.textContent = error?.message || "No se pudo subir la foto.";
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    });
+  });
 }
 
 async function fetchFlightsLayerData() {
@@ -4722,6 +4793,31 @@ async function showFlightDetail(item) {
       </div>
     `;
   }
+}
+function renderFlightsLayer(payload) {
+  if (!map) return;
+  clearFlightsLayer();
+  clearFlightsTrack();
+  flightsLayerGroup = L.layerGroup();
+
+  const points = Array.isArray(payload?.points) ? payload.points : [];
+  points.forEach((item) => {
+    const lat = Number(item?.latitude);
+    const lng = Number(item?.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const marker = L.marker([lat, lng], {
+      icon: buildFlightsMarkerIcon(item?.heading),
+      title: item?.call_sign || item?.registration || "Vuelo",
+    });
+    marker.bindPopup(flightsPopupHtml(item), MAP_POPUP_OPTIONS);
+    marker.on("click", () => {
+      ensureContextPanelVisible({ mobileState: "full" });
+      showFlightDetail(item);
+    });
+    marker.addTo(flightsLayerGroup);
+  });
+
+  flightsLayerGroup.addTo(map);
 }
 
 async function refreshFlightsLayer() {

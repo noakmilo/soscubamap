@@ -30,7 +30,7 @@
         class="{{ 'field-error' if errors.get('photo') else '' }}"
         required
       />
-      <div class="muted">Se sube directamente desde tu dispositivo a Cloudinary.</div>
+      <div class="muted">Se sube directamente desde tu dispositivo al almacenamiento de imágenes.</div>
       {% if errors.get("photo") %}
         <div class="field-error-msg">{{ errors.get("photo") }}</div>
       {% endif %}
