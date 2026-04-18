@@ -9,6 +9,7 @@ import time
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 import requests
@@ -43,6 +44,8 @@ _OPENSKY_TOKEN_CACHE: dict[str, Any] = {
     "access_token": "",
     "expires_at_epoch": 0.0,
 }
+_WORLD_AIRPORTS_BY_CODE: dict[str, dict[str, Any]] | None = None
+_WORLD_AIRPORTS_LOAD_ATTEMPTED = False
 
 
 @dataclass
@@ -168,6 +171,77 @@ def _clean_text(value: Any, *, upper: bool = False, limit: int = 255) -> str:
     if len(text) > limit:
         return text[:limit]
     return text
+
+
+def _world_airports_json_path() -> Path:
+    return Path(__file__).resolve().parents[1] / "static" / "data" / "aeropuertos.json"
+
+
+def _load_world_airports_index() -> dict[str, dict[str, Any]]:
+    global _WORLD_AIRPORTS_BY_CODE, _WORLD_AIRPORTS_LOAD_ATTEMPTED
+    if _WORLD_AIRPORTS_BY_CODE is not None:
+        return _WORLD_AIRPORTS_BY_CODE
+    if _WORLD_AIRPORTS_LOAD_ATTEMPTED:
+        return {}
+
+    _WORLD_AIRPORTS_LOAD_ATTEMPTED = True
+    path = _world_airports_json_path()
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.warning("No se pudo leer el catalogo de aeropuertos (%s): %s", path, exc)
+        _WORLD_AIRPORTS_BY_CODE = {}
+        return _WORLD_AIRPORTS_BY_CODE
+
+    index: dict[str, dict[str, Any]] = {}
+    rows = payload if isinstance(payload, list) else []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        code = _clean_text(row.get("codigo"), upper=True, limit=8)
+        if not code:
+            continue
+        city = _clean_text(row.get("ciudad"), limit=120)
+        country = _clean_text(row.get("pais"), upper=True, limit=120)
+        latitude = _safe_float(row.get("latitud"))
+        longitude = _safe_float(row.get("longitud"))
+        current = index.get(code)
+        if (
+            current
+            and current.get("latitude") is not None
+            and current.get("longitude") is not None
+        ):
+            continue
+        index[code] = {
+            "code": code,
+            "city": city,
+            "country": country,
+            "latitude": latitude,
+            "longitude": longitude,
+        }
+
+    _WORLD_AIRPORTS_BY_CODE = index
+    logger.info("Catalogo de aeropuertos estatico cargado: %s codigos", len(index))
+    return _WORLD_AIRPORTS_BY_CODE
+
+
+def _lookup_world_airport(
+    icao_code: str | None,
+    iata_code: str | None,
+) -> dict[str, Any]:
+    iata = _clean_text(iata_code, upper=True, limit=8)
+    icao = _clean_text(icao_code, upper=True, limit=8)
+    if not iata and not icao:
+        return {}
+
+    index = _load_world_airports_index()
+    for code in (iata, icao):
+        if not code:
+            continue
+        match = index.get(code)
+        if match:
+            return match
+    return {}
 
 
 def _normalize_token(value: Any) -> str:
@@ -2317,6 +2391,7 @@ def _build_snapshot_payload(window_hours: int, now_utc: datetime | None = None) 
 
     points: list[dict[str, Any]] = []
     by_destination: Counter[str] = Counter()
+    airport_lookup_cache: dict[tuple[str, str], dict[str, Any]] = {}
 
     for row in rows:
         lat = _safe_float(row.latest_latitude)
@@ -2324,10 +2399,21 @@ def _build_snapshot_payload(window_hours: int, now_utc: datetime | None = None) 
         if lat is None or lng is None:
             continue
 
+        origin_ref = _find_airport_point(
+            row.origin_airport_icao,
+            row.origin_airport_iata,
+            cache=airport_lookup_cache,
+        )
+        destination_ref = _find_airport_point(
+            row.destination_airport_icao,
+            row.destination_airport_iata,
+            cache=airport_lookup_cache,
+        )
         aircraft = row.aircraft
         destination_name = (
             (row.destination_airport.name if row.destination_airport else "")
             or row.destination_airport_name
+            or _clean_text(destination_ref.get("name"), limit=255)
             or "Aeropuerto Cuba"
         )
         by_destination[destination_name] += 1
@@ -2352,15 +2438,16 @@ def _build_snapshot_payload(window_hours: int, now_utc: datetime | None = None) 
                 "origin_airport_name": row.origin_airport_name,
                 "origin_airport_icao": row.origin_airport_icao,
                 "origin_airport_iata": row.origin_airport_iata,
-                "origin_city": "",
-                "origin_country": row.origin_country,
+                "origin_city": _clean_text(origin_ref.get("city"), limit=120),
+                "origin_country": _clean_text(row.origin_country, limit=120)
+                or _clean_text(origin_ref.get("country"), limit=120),
                 "destination_airport_name": destination_name,
                 "destination_airport_icao": row.destination_airport_icao,
                 "destination_airport_iata": row.destination_airport_iata,
                 "destination_city": (
                     _clean_text(row.destination_airport.city, limit=120)
                     if row.destination_airport
-                    else ""
+                    else _clean_text(destination_ref.get("city"), limit=120)
                 ),
                 "destination_country": (
                     _clean_text(row.destination_country, limit=120)
@@ -2369,6 +2456,7 @@ def _build_snapshot_payload(window_hours: int, now_utc: datetime | None = None) 
                         if row.destination_airport
                         else ""
                     )
+                    or _clean_text(destination_ref.get("country"), limit=120)
                     or "Cuba"
                 ),
                 "latitude": lat,
@@ -3090,12 +3178,28 @@ def build_aircraft_detail_payload(aircraft: FlightAircraft, now_utc: datetime | 
     origin_counter: Counter[str] = Counter()
     destination_counter: Counter[str] = Counter()
     history: list[dict[str, Any]] = []
+    airport_lookup_cache: dict[tuple[str, str], dict[str, Any]] = {}
 
     for event in event_rows:
-        origin_name = _clean_text(event.origin_airport_name, limit=255) or "Origen no disponible"
+        origin_ref = _find_airport_point(
+            event.origin_airport_icao,
+            event.origin_airport_iata,
+            cache=airport_lookup_cache,
+        )
+        destination_ref = _find_airport_point(
+            event.destination_airport_icao,
+            event.destination_airport_iata,
+            cache=airport_lookup_cache,
+        )
+        origin_name = (
+            _clean_text(event.origin_airport_name, limit=255)
+            or _clean_text(origin_ref.get("name"), limit=255)
+            or "Origen no disponible"
+        )
         destination_name = (
             _clean_text(event.destination_airport_name, limit=255)
             or (event.destination_airport.name if event.destination_airport else "")
+            or _clean_text(destination_ref.get("name"), limit=255)
             or "Aeropuerto Cuba"
         )
 
@@ -3109,13 +3213,14 @@ def build_aircraft_detail_payload(aircraft: FlightAircraft, now_utc: datetime | 
                 "external_flight_id": event.external_flight_id,
                 "status": event.status,
                 "origin_airport_name": origin_name,
-                "origin_city": "",
-                "origin_country": event.origin_country,
+                "origin_city": _clean_text(origin_ref.get("city"), limit=120),
+                "origin_country": _clean_text(event.origin_country, limit=120)
+                or _clean_text(origin_ref.get("country"), limit=120),
                 "destination_airport_name": destination_name,
                 "destination_city": (
                     _clean_text(event.destination_airport.city, limit=120)
                     if event.destination_airport
-                    else ""
+                    else _clean_text(destination_ref.get("city"), limit=120)
                 ),
                 "destination_country": (
                     _clean_text(event.destination_country, limit=120)
@@ -3124,6 +3229,7 @@ def build_aircraft_detail_payload(aircraft: FlightAircraft, now_utc: datetime | 
                         if event.destination_airport
                         else ""
                     )
+                    or _clean_text(destination_ref.get("country"), limit=120)
                     or "Cuba"
                 ),
                 "departure_at_utc": serialize_flight_time(event.departure_at_utc),
@@ -3178,23 +3284,65 @@ def build_aircraft_detail_payload(aircraft: FlightAircraft, now_utc: datetime | 
 def _find_airport_point(
     icao_code: str | None,
     iata_code: str | None,
-) -> tuple[float | None, float | None, str]:
+    *,
+    cache: dict[tuple[str, str], dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     icao = _clean_text(icao_code, upper=True, limit=8)
     iata = _clean_text(iata_code, upper=True, limit=8)
+    cache_key = (icao, iata)
+    if cache is not None and cache_key in cache:
+        return cache[cache_key]
+
     airport = None
+    reference: dict[str, Any] = {
+        "name": "",
+        "city": "",
+        "country": "",
+        "latitude": None,
+        "longitude": None,
+        "code": iata or icao,
+    }
 
     if icao:
         airport = FlightAirport.query.filter_by(airport_code_icao=icao).first()
     if airport is None and iata:
         airport = FlightAirport.query.filter_by(airport_code_iata=iata).first()
-    if airport is None:
-        return None, None, ""
+    if airport is not None:
+        reference.update(
+            {
+                "name": _clean_text(airport.name, limit=255),
+                "city": _clean_text(airport.city, limit=120),
+                "country": _clean_text(airport.country_name, limit=120),
+                "latitude": _safe_float(airport.latitude),
+                "longitude": _safe_float(airport.longitude),
+                "code": iata or icao,
+            }
+        )
 
-    return (
-        _safe_float(airport.latitude),
-        _safe_float(airport.longitude),
-        _clean_text(airport.name, limit=255),
-    )
+    world_match = _lookup_world_airport(icao, iata)
+    if world_match:
+        if reference.get("latitude") is None:
+            reference["latitude"] = _safe_float(world_match.get("latitude"))
+        if reference.get("longitude") is None:
+            reference["longitude"] = _safe_float(world_match.get("longitude"))
+        if not reference.get("city"):
+            reference["city"] = _clean_text(world_match.get("city"), limit=120)
+        if not reference.get("country"):
+            reference["country"] = _clean_text(world_match.get("country"), limit=120)
+        if not reference.get("name"):
+            reference["name"] = (
+                _clean_text(world_match.get("code"), upper=True, limit=8)
+                or iata
+                or icao
+                or ""
+            )
+
+    if not reference.get("name"):
+        reference["name"] = iata or icao or ""
+
+    if cache is not None:
+        cache[cache_key] = reference
+    return reference
 
 
 def build_event_track_payload(event: FlightEvent) -> dict[str, Any]:
@@ -3234,25 +3382,41 @@ def build_event_track_payload(event: FlightEvent) -> dict[str, Any]:
             }
         )
 
-    origin_lat, origin_lng, origin_name_fallback = _find_airport_point(
+    origin_ref = _find_airport_point(
         event.origin_airport_icao,
         event.origin_airport_iata,
     )
+    destination_ref = _find_airport_point(
+        event.destination_airport_icao,
+        event.destination_airport_iata,
+    )
+    origin_lat = _safe_float(origin_ref.get("latitude"))
+    origin_lng = _safe_float(origin_ref.get("longitude"))
     destination_lat = _safe_float(event.destination_airport.latitude) if event.destination_airport else None
     destination_lng = _safe_float(event.destination_airport.longitude) if event.destination_airport else None
-    destination_name_fallback = (
-        _clean_text(event.destination_airport.name, limit=255) if event.destination_airport else ""
-    )
-    if destination_lat is None or destination_lng is None:
-        destination_lat, destination_lng, destination_name_fallback = _find_airport_point(
-            event.destination_airport_icao,
-            event.destination_airport_iata,
-        )
+    if destination_lat is None:
+        destination_lat = _safe_float(destination_ref.get("latitude"))
+    if destination_lng is None:
+        destination_lng = _safe_float(destination_ref.get("longitude"))
 
-    origin_name = _clean_text(event.origin_airport_name, limit=255) or origin_name_fallback
+    origin_name = (
+        _clean_text(event.origin_airport_name, limit=255)
+        or _clean_text(origin_ref.get("name"), limit=255)
+        or "Origen N/D"
+    )
+    origin_city_name = _clean_text(origin_ref.get("city"), limit=120)
+    origin_country_name = (
+        _clean_text(event.origin_country, limit=120)
+        or _clean_text(origin_ref.get("country"), limit=120)
+    )
     destination_name = (
         _clean_text(event.destination_airport_name, limit=255)
-        or destination_name_fallback
+        or (
+            _clean_text(event.destination_airport.name, limit=255)
+            if event.destination_airport
+            else ""
+        )
+        or _clean_text(destination_ref.get("name"), limit=255)
         or "Aeropuerto Cuba"
     )
     destination_country_name = (
@@ -3262,10 +3426,13 @@ def build_event_track_payload(event: FlightEvent) -> dict[str, Any]:
             if event.destination_airport
             else ""
         )
+        or _clean_text(destination_ref.get("country"), limit=120)
         or "Cuba"
     )
     destination_city_name = (
-        _clean_text(event.destination_airport.city, limit=120) if event.destination_airport else ""
+        _clean_text(event.destination_airport.city, limit=120)
+        if event.destination_airport
+        else _clean_text(destination_ref.get("city"), limit=120)
     )
 
     return {
@@ -3277,9 +3444,9 @@ def build_event_track_payload(event: FlightEvent) -> dict[str, Any]:
             "model": event.model,
             "registration": event.registration,
             "status": event.status,
-            "origin_airport_name": event.origin_airport_name,
-            "origin_country": event.origin_country,
-            "destination_airport_name": event.destination_airport_name,
+            "origin_airport_name": origin_name,
+            "origin_country": origin_country_name,
+            "destination_airport_name": destination_name,
             "destination_country": destination_country_name,
             "last_seen_at_utc": serialize_flight_time(event.last_seen_at_utc),
         },
@@ -3292,8 +3459,8 @@ def build_event_track_payload(event: FlightEvent) -> dict[str, Any]:
                 "airport_name": origin_name,
                 "airport_icao": _clean_text(event.origin_airport_icao, upper=True, limit=8),
                 "airport_iata": _clean_text(event.origin_airport_iata, upper=True, limit=8),
-                "city": "",
-                "country": _clean_text(event.origin_country, limit=120),
+                "city": origin_city_name,
+                "country": origin_country_name,
                 "latitude": origin_lat,
                 "longitude": origin_lng,
             },

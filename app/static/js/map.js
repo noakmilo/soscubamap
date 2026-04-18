@@ -169,6 +169,8 @@ const CONNECTIVITY_PAN_BOUNDS = {
   west: -90.0,
   east: -58.0,
 };
+const DEFAULT_MAP_MIN_ZOOM = 4;
+const FLIGHTS_FREE_NAV_MIN_ZOOM = 2;
 const FLIGHTS_WINDOW_OPTIONS = [2, 6, 24, 168];
 const MOBILE_VIEWPORT_QUERY = "(max-width: 900px)";
 const ALERT_PANEL_HIDDEN_COOKIE = "soscuba_alert_panel_hidden";
@@ -423,16 +425,26 @@ function connectivityLatLngBounds() {
 function applyMapPanBoundsForMode(mode = "map") {
   if (!map) return;
   if (mode === "connectivity") {
+    map.setMinZoom(DEFAULT_MAP_MIN_ZOOM);
     map.setMaxBounds(connectivityLatLngBounds());
     map.options.maxBoundsViscosity = 0.55;
     return;
   }
   if (mode === "flights") {
+    map.setMinZoom(FLIGHTS_FREE_NAV_MIN_ZOOM);
     map.setMaxBounds(null);
     map.options.maxBoundsViscosity = 0.0;
+    if (map.dragging) map.dragging.enable();
+    if (map.touchZoom) map.touchZoom.enable();
+    if (map.scrollWheelZoom) map.scrollWheelZoom.enable();
+    if (map.doubleClickZoom) map.doubleClickZoom.enable();
+    if (map.boxZoom) map.boxZoom.enable();
+    if (map.keyboard) map.keyboard.enable();
+    if (map.tap) map.tap.enable();
     return;
   }
 
+  map.setMinZoom(DEFAULT_MAP_MIN_ZOOM);
   map.setMaxBounds(caribbeanLatLngBounds());
   map.options.maxBoundsViscosity = 1.0;
 }
@@ -6386,7 +6398,7 @@ async function initMap() {
 
   map = L.map(mapEl, {
     zoomControl: true,
-    minZoom: 4,
+    minZoom: DEFAULT_MAP_MIN_ZOOM,
     maxZoom: 19,
   });
   disableMapNativeDragDrop(map);
