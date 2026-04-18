@@ -28,6 +28,7 @@ from .ais_cuba_target_vessel import AISCubaTargetVessel
 from .flight_ingestion_run import FlightIngestionRun
 from .flight_airport import FlightAirport
 from .flight_aircraft import FlightAircraft
+from .flight_aircraft_photo_revision import FlightAircraftPhotoRevision
 from .flight_event import FlightEvent
 from .flight_position import FlightPosition
 from .flight_layer_snapshot import FlightLayerSnapshot
@@ -75,6 +76,7 @@ __all__ = [
     "FlightIngestionRun",
     "FlightAirport",
     "FlightAircraft",
+    "FlightAircraftPhotoRevision",
     "FlightEvent",
     "FlightPosition",
     "FlightLayerSnapshot",

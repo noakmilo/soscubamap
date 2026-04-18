@@ -41,6 +41,7 @@ from app.models.ais_cuba_target_vessel import AISCubaTargetVessel
 from app.models.flight_ingestion_run import FlightIngestionRun
 from app.models.flight_layer_snapshot import FlightLayerSnapshot
 from app.models.flight_aircraft import FlightAircraft
+from app.models.flight_aircraft_photo_revision import FlightAircraftPhotoRevision
 from app.models.flight_event import FlightEvent
 from app.models.protest_event import ProtestEvent
 from app.models.protest_ingestion_run import ProtestIngestionRun
@@ -147,6 +148,26 @@ def _get_chat_nick():
     nick = f"Anon-{code}"
     session["chat_nick"] = nick
     return nick
+
+
+def _get_or_create_flights_photo_anon_label() -> str:
+    if current_user.is_authenticated:
+        if not current_user.anon_code:
+            current_user.ensure_anon_code()
+            db.session.flush()
+        if current_user.anon_code:
+            return f"Anon-{current_user.anon_code}"
+        return "Anon"
+
+    label = str(session.get("flights_photo_anon") or "").strip()
+    if label.startswith("Anon-") and len(label) <= 20:
+        return label
+
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    code = "".join(secrets.choice(alphabet) for _ in range(6))
+    label = f"Anon-{code}"
+    session["flights_photo_anon"] = label
+    return label
 
 
 def _sanitize_nick(nickname: str, fallback: str) -> str:
@@ -2878,8 +2899,7 @@ def flights_aircraft_detail_v1(aircraft_id):
     payload = build_aircraft_detail_payload(aircraft)
     payload["summary_light_cache"] = summary_cache
     payload["photo_upload_enabled"] = bool(
-        _is_admin_user()
-        and current_app.config.get("CLOUDINARY_CLOUD_NAME")
+        current_app.config.get("CLOUDINARY_CLOUD_NAME")
         and current_app.config.get("CLOUDINARY_API_KEY")
         and current_app.config.get("CLOUDINARY_API_SECRET")
     )
@@ -2901,9 +2921,6 @@ def flights_event_track_v1(event_id):
 @api_bp.route("/v1/flights/aircraft/<int:aircraft_id>/photo", methods=["POST"])
 @limiter.limit("20/minute; 120/day")
 def flights_aircraft_photo_upload_v1(aircraft_id):
-    if not _is_admin_user():
-        return jsonify({"ok": False, "error": "No autorizado."}), 403
-
     aircraft = FlightAircraft.query.get_or_404(aircraft_id)
     files = [
         file
@@ -2945,8 +2962,45 @@ def flights_aircraft_photo_upload_v1(aircraft_id):
     if not urls:
         return jsonify({"ok": False, "error": "No se pudo subir la foto."}), 400
 
-    aircraft.photo_manual_url = urls[0]
+    uploader_anon_label = _get_or_create_flights_photo_anon_label()
+    uploader_user_id = current_user.id if current_user.is_authenticated else None
+    uploaded_photo_url = urls[0]
+    previous_manual_url = str(aircraft.photo_manual_url or "").strip()
+    previous_manual_updated_at = aircraft.photo_updated_at_utc
+
+    if previous_manual_url and previous_manual_url != uploaded_photo_url:
+        previous_exists = (
+            FlightAircraftPhotoRevision.query.filter_by(
+                aircraft_id=aircraft.id,
+                photo_url=previous_manual_url,
+            )
+            .limit(1)
+            .first()
+            is not None
+        )
+        if not previous_exists:
+            db.session.add(
+                FlightAircraftPhotoRevision(
+                    aircraft_id=aircraft.id,
+                    uploader_user_id=None,
+                    photo_url=previous_manual_url,
+                    photo_source="manual",
+                    uploader_anon_label="Anon",
+                    created_at=previous_manual_updated_at or datetime.utcnow(),
+                )
+            )
+
+    aircraft.photo_manual_url = uploaded_photo_url
     aircraft.photo_updated_at_utc = datetime.utcnow()
+    db.session.add(
+        FlightAircraftPhotoRevision(
+            aircraft_id=aircraft.id,
+            uploader_user_id=uploader_user_id,
+            photo_url=uploaded_photo_url,
+            photo_source="manual",
+            uploader_anon_label=uploader_anon_label,
+        )
+    )
     db.session.commit()
 
     effective_photo = aircraft.photo_manual_url or aircraft.photo_api_url or ""
@@ -2961,6 +3015,7 @@ def flights_aircraft_photo_upload_v1(aircraft_id):
             "photo_manual_url": aircraft.photo_manual_url,
             "photo_api_url": aircraft.photo_api_url,
             "photo_updated_at_utc": serialize_flight_time(aircraft.photo_updated_at_utc),
+            "uploader_anon": uploader_anon_label,
         }
     )
 

@@ -19,6 +19,7 @@ from sqlalchemy.orm import selectinload
 
 from app.extensions import db
 from app.models.flight_aircraft import FlightAircraft
+from app.models.flight_aircraft_photo_revision import FlightAircraftPhotoRevision
 from app.models.flight_airport import FlightAirport
 from app.models.flight_event import FlightEvent
 from app.models.flight_ingestion_run import FlightIngestionRun
@@ -3363,6 +3364,32 @@ def build_aircraft_detail_payload(aircraft: FlightAircraft, now_utc: datetime | 
         )
 
     photo_url, photo_source = _effective_photo_payload(aircraft)
+    photo_gallery_rows = (
+        FlightAircraftPhotoRevision.query.filter_by(aircraft_id=aircraft.id)
+        .order_by(FlightAircraftPhotoRevision.created_at.desc(), FlightAircraftPhotoRevision.id.desc())
+        .limit(30)
+        .all()
+    )
+    photo_gallery: list[dict[str, Any]] = []
+    seen_gallery_urls: set[str] = set()
+    for row in photo_gallery_rows:
+        revision_url = _clean_text(row.photo_url, limit=1000)
+        if not revision_url or revision_url in seen_gallery_urls:
+            continue
+        seen_gallery_urls.add(revision_url)
+        photo_gallery.append(
+            {
+                "id": int(row.id),
+                "photo_url": revision_url,
+                "source": _clean_text(row.photo_source, limit=32) or "manual",
+                "uploader_anon": _clean_text(row.uploader_anon_label, limit=80) or "Anon",
+                "uploaded_at_utc": serialize_flight_time(row.created_at),
+                "is_current": bool(
+                    revision_url
+                    and revision_url == _clean_text(aircraft.photo_manual_url, limit=1000)
+                ),
+            }
+        )
 
     return {
         "aircraft": {
@@ -3380,6 +3407,7 @@ def build_aircraft_detail_payload(aircraft: FlightAircraft, now_utc: datetime | 
             "photo_api_url": _clean_text(aircraft.photo_api_url, limit=1000),
             "photo_manual_url": _clean_text(aircraft.photo_manual_url, limit=1000),
         },
+        "photo_gallery": photo_gallery,
         "summary_30d": {
             "window_days": 30,
             "window_start_utc": serialize_flight_time(window_start),

@@ -2723,6 +2723,49 @@ body.map-dashboard-page .map-canvas .leaflet-control-layers.map-layer-control in
   border: 1px solid rgba(148, 163, 184, 0.35);
 }
 
+.flights-photo-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.flights-photo-gallery-item {
+  margin: 0;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(15, 23, 42, 0.1);
+}
+
+.flights-photo-gallery-item.is-current {
+  border-color: rgba(59, 130, 246, 0.72);
+}
+
+.flights-photo-gallery-item img {
+  width: 100%;
+  height: 92px;
+  object-fit: cover;
+  display: block;
+}
+
+.flights-photo-gallery-item figcaption {
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+}
+
+.flights-photo-gallery-item strong {
+  color: #e2e8f0;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.flights-photo-gallery-item span {
+  color: #94a3b8;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
 .flights-history-list {
   border: 1px solid rgba(148, 163, 184, 0.35);
   border-radius: 8px;

@@ -4764,6 +4764,26 @@ function renderFlightDetail(item, detailPayload, trackPayload) {
   const latestTrackPointCount = Math.max(0, Number(trackPayload?.track?.point_count) || 0);
   const canUploadPhoto = photoUploadEnabled && Number.isFinite(aircraftId);
   const hasPhoto = Boolean(photoUrl);
+  const photoGallery = Array.isArray(detailPayload?.photo_gallery) ? detailPayload.photo_gallery : [];
+  const galleryCards = photoGallery
+    .map((entry) => {
+      const entryUrl = safeUrl(entry?.photo_url || "");
+      if (!entryUrl) return "";
+      const uploader = escapeHtml(entry?.uploader_anon || "Anon");
+      const uploadedAt = escapeHtml(formatUtcAndCuba(entry?.uploaded_at_utc || ""));
+      const isCurrent = Boolean(entry?.is_current);
+      return `
+        <figure class=\"flights-photo-gallery-item${isCurrent ? " is-current" : ""}\">
+          <img src=\"${entryUrl}\" alt=\"Foto histórica de aeronave\" loading=\"lazy\" />
+          <figcaption>
+            <strong>${uploader}</strong>
+            <span>${uploadedAt || "Fecha N/D"}${isCurrent ? " · Actual" : ""}</span>
+          </figcaption>
+        </figure>
+      `;
+    })
+    .filter(Boolean)
+    .join("");
 
   const topOrigins = origins
     .slice(0, 4)
@@ -4844,6 +4864,14 @@ function renderFlightDetail(item, detailPayload, trackPayload) {
       ${replacePrompt}
       ${inlineUploadSection}
       ${replaceModal}
+      ${
+        galleryCards
+          ? `
+            <div class=\"report-detail-meta\">Galeria de ediciones (${photoGallery.length.toLocaleString("es-ES")})</div>
+            <div class=\"flights-photo-gallery\">${galleryCards}</div>
+          `
+          : ""
+      }
       <div class=\"report-detail-meta\">Orígenes frecuentes: ${topOrigins || "N/D"}</div>
       <div class=\"report-detail-meta\">Destinos en Cuba: ${topDestinations || "N/D"}</div>
       <div class=\"flights-history-list\">

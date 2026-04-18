@@ -36,6 +36,12 @@ class FlightAircraft(db.Model):
         back_populates="aircraft",
         cascade="all, delete-orphan",
     )
+    photo_revisions = db.relationship(
+        "FlightAircraftPhotoRevision",
+        back_populates="aircraft",
+        cascade="all, delete-orphan",
+        order_by="FlightAircraftPhotoRevision.created_at.desc(), FlightAircraftPhotoRevision.id.desc()",
+    )
 
     def __repr__(self):
         return f"<FlightAircraft {self.identity_key}>"
