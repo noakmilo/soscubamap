@@ -402,8 +402,12 @@ body.map-dashboard-page .map-canvas {
 .map-side-panel.is-report-priority .report-detail-panel {
   order: 0;
   min-height: min(42vh, 420px);
+  max-height: min(62vh, 640px);
+}
+
+.map-side-panel.is-report-priority .report-detail-panel.is-empty {
+  min-height: 0;
   max-height: none;
-  overflow: visible;
 }
 
 .report-detail-panel {
@@ -416,9 +420,23 @@ body.map-dashboard-page .map-canvas {
   min-width: 0;
   min-height: 0;
   height: auto;
-  max-height: none;
+  max-height: min(62vh, 640px);
   align-content: start;
-  overflow: visible;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.report-detail-panel::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.report-detail-panel.is-empty {
+  max-height: none;
+  overflow: hidden;
 }
 
 .report-detail-empty {
@@ -2776,15 +2794,17 @@ body.map-dashboard-page .map-canvas .leaflet-control-layers.map-layer-control in
 }
 
 .flights-photo-modal-shell {
-  width: min(460px, 96vw);
+  width: min(380px, 90vw);
   height: auto;
-  min-height: 210px;
+  min-height: 0;
+  max-height: min(72vh, 420px);
+  overflow-y: auto;
 }
 
 .flights-photo-modal-body {
   display: grid;
   gap: 10px;
-  padding: 18px 16px 16px;
+  padding: 18px 16px 14px;
 }
 
 .flights-photo-modal-body h4 {
@@ -2792,6 +2812,13 @@ body.map-dashboard-page .map-canvas .leaflet-control-layers.map-layer-control in
   color: #fff2d5;
   font-size: 14px;
   letter-spacing: 0.3px;
+}
+
+.flights-photo-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
 }
 
 .ais-overlay {
@@ -6545,6 +6572,12 @@ textarea {
 
   body.map-dashboard-page .map-side-panel.is-report-priority .report-detail-panel {
     min-height: min(40vh, 380px);
+    max-height: min(52vh, 460px);
+  }
+
+  body.map-dashboard-page .map-side-panel.is-report-priority .report-detail-panel.is-empty {
+    min-height: 0;
+    max-height: none;
   }
 
   body.map-dashboard-page .map-side-panel[data-mobile-state="peek"] .map-side-scroll {

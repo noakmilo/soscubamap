@@ -2898,7 +2898,10 @@ def flights_event_track_v1(event_id):
     if not _is_admin_user():
         return jsonify({"error": "Acceso denegado"}), 403
 
-    event = FlightEvent.query.options(selectinload(FlightEvent.aircraft)).get_or_404(event_id)
+    event = FlightEvent.query.options(
+        selectinload(FlightEvent.aircraft),
+        selectinload(FlightEvent.destination_airport),
+    ).get_or_404(event_id)
     payload = build_event_track_payload(event)
     return jsonify(payload)
 

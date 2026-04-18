@@ -2350,10 +2350,27 @@ def _build_snapshot_payload(window_hours: int, now_utc: datetime | None = None) 
                 "registration": row.registration,
                 "status": row.status,
                 "origin_airport_name": row.origin_airport_name,
+                "origin_airport_icao": row.origin_airport_icao,
+                "origin_airport_iata": row.origin_airport_iata,
+                "origin_city": "",
                 "origin_country": row.origin_country,
                 "destination_airport_name": destination_name,
                 "destination_airport_icao": row.destination_airport_icao,
                 "destination_airport_iata": row.destination_airport_iata,
+                "destination_city": (
+                    _clean_text(row.destination_airport.city, limit=120)
+                    if row.destination_airport
+                    else ""
+                ),
+                "destination_country": (
+                    _clean_text(row.destination_country, limit=120)
+                    or (
+                        _clean_text(row.destination_airport.country_name, limit=120)
+                        if row.destination_airport
+                        else ""
+                    )
+                    or "Cuba"
+                ),
                 "latitude": lat,
                 "longitude": lng,
                 "altitude": _safe_float(row.latest_altitude),
@@ -3092,8 +3109,23 @@ def build_aircraft_detail_payload(aircraft: FlightAircraft, now_utc: datetime | 
                 "external_flight_id": event.external_flight_id,
                 "status": event.status,
                 "origin_airport_name": origin_name,
+                "origin_city": "",
                 "origin_country": event.origin_country,
                 "destination_airport_name": destination_name,
+                "destination_city": (
+                    _clean_text(event.destination_airport.city, limit=120)
+                    if event.destination_airport
+                    else ""
+                ),
+                "destination_country": (
+                    _clean_text(event.destination_country, limit=120)
+                    or (
+                        _clean_text(event.destination_airport.country_name, limit=120)
+                        if event.destination_airport
+                        else ""
+                    )
+                    or "Cuba"
+                ),
                 "departure_at_utc": serialize_flight_time(event.departure_at_utc),
                 "arrival_at_utc": serialize_flight_time(event.arrival_at_utc),
                 "last_seen_at_utc": serialize_flight_time(event.last_seen_at_utc),
@@ -3223,6 +3255,18 @@ def build_event_track_payload(event: FlightEvent) -> dict[str, Any]:
         or destination_name_fallback
         or "Aeropuerto Cuba"
     )
+    destination_country_name = (
+        _clean_text(event.destination_country, limit=120)
+        or (
+            _clean_text(event.destination_airport.country_name, limit=120)
+            if event.destination_airport
+            else ""
+        )
+        or "Cuba"
+    )
+    destination_city_name = (
+        _clean_text(event.destination_airport.city, limit=120) if event.destination_airport else ""
+    )
 
     return {
         "event": {
@@ -3234,7 +3278,9 @@ def build_event_track_payload(event: FlightEvent) -> dict[str, Any]:
             "registration": event.registration,
             "status": event.status,
             "origin_airport_name": event.origin_airport_name,
+            "origin_country": event.origin_country,
             "destination_airport_name": event.destination_airport_name,
+            "destination_country": destination_country_name,
             "last_seen_at_utc": serialize_flight_time(event.last_seen_at_utc),
         },
         "track": {
@@ -3246,6 +3292,8 @@ def build_event_track_payload(event: FlightEvent) -> dict[str, Any]:
                 "airport_name": origin_name,
                 "airport_icao": _clean_text(event.origin_airport_icao, upper=True, limit=8),
                 "airport_iata": _clean_text(event.origin_airport_iata, upper=True, limit=8),
+                "city": "",
+                "country": _clean_text(event.origin_country, limit=120),
                 "latitude": origin_lat,
                 "longitude": origin_lng,
             },
@@ -3253,6 +3301,8 @@ def build_event_track_payload(event: FlightEvent) -> dict[str, Any]:
                 "airport_name": destination_name,
                 "airport_icao": _clean_text(event.destination_airport_icao, upper=True, limit=8),
                 "airport_iata": _clean_text(event.destination_airport_iata, upper=True, limit=8),
+                "city": destination_city_name,
+                "country": destination_country_name,
                 "latitude": destination_lat,
                 "longitude": destination_lng,
             },

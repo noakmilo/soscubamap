@@ -117,6 +117,7 @@ let flightsAirportsList;
 let flightsWindowButtons = [];
 let flightsWindowHours = 24;
 let flightsDetailRequestSeq = 0;
+let flightsPhotoModalNode = null;
 let reportDetailPanel;
 let activePopup;
 let alertTimer;
@@ -265,6 +266,8 @@ const REPRESSOR_UNRESOLVED_COLOR = "#dc2626";
 const repressorUnresolvedDetailCache = new Map();
 const PRISONER_COUNT_COLOR = "#22c55e";
 const prisonerTerritoryDetailCache = new Map();
+const flightsDetailCacheByEvent = new Map();
+const flightsDetailCacheByAircraft = new Map();
 const AIS_MARKER_COLOR = "#0ea5e9";
 const FLIGHTS_MARKER_COLOR = "#ef4444";
 const MAP_POPUP_OPTIONS = {
@@ -1430,6 +1433,7 @@ async function switchBaseMode(nextMode, options = {}) {
   setPrisonerOverlayVisible(false);
   setAISOverlayVisible(false);
   setFlightsOverlayVisible(false);
+  renderReportDetail(null);
   await applyFilters();
 
   if (options.syncRoute !== false) {
@@ -2302,10 +2306,39 @@ function reportDetailHtmlForPost(post) {
 
 function triggerReportDetailReveal() {
   if (!reportDetailPanel) return;
+  reportDetailPanel.classList.remove("is-empty");
   reportDetailPanel.classList.remove("is-revealing");
   // Force reflow to restart the animation when selecting another report.
   void reportDetailPanel.offsetWidth;
   reportDetailPanel.classList.add("is-revealing");
+}
+
+function detailEmptyLabelForMode(mode) {
+  const currentMode = String(mode || "").trim().toLowerCase();
+  if (currentMode === "repressors") {
+    return "Haz click en un territorio para ver fichas de represores.";
+  }
+  if (currentMode === "prisoners") {
+    return "Haz click en un territorio para ver fichas de prisioneros.";
+  }
+  if (currentMode === "ais") {
+    return "Haz click en un buque en el mapa para ver detalles.";
+  }
+  if (currentMode === "flights") {
+    return "Haz click en un avion en el mapa para ver detalles.";
+  }
+  if (currentMode === "protests") {
+    return "Haz click en un evento para ver detalles.";
+  }
+  if (currentMode === "connectivity") {
+    return "Haz click en una provincia para ver detalles de conectividad.";
+  }
+  return "Haz click en un simbolo en el mapa para ver detalles.";
+}
+
+function setReportDetailEmptyState(isEmpty) {
+  if (!reportDetailPanel) return;
+  reportDetailPanel.classList.toggle("is-empty", Boolean(isEmpty));
 }
 
 function renderReportDetail(post, options = {}) {
@@ -2313,13 +2346,15 @@ function renderReportDetail(post, options = {}) {
   reportDetailPanel.hidden = false;
   if (!post) {
     selectedReportId = null;
+    setReportDetailEmptyState(true);
     reportDetailPanel.classList.remove("is-revealing");
-    reportDetailPanel.innerHTML =
-      '<div class="report-detail-empty">Haz click en un reporte para ver sus detalles.</div>';
+    const emptyLabel = String(options.emptyLabel || detailEmptyLabelForMode(activeBaseMode)).trim();
+    reportDetailPanel.innerHTML = `<div class="report-detail-empty">${escapeHtml(emptyLabel)}</div>`;
     return;
   }
 
   selectedReportId = Number(post.id) || null;
+  setReportDetailEmptyState(false);
   try {
     reportDetailPanel.innerHTML = reportDetailHtmlForPost(post);
     triggerReportDetailReveal();
@@ -2328,6 +2363,7 @@ function renderReportDetail(post, options = {}) {
     console.error("No se pudo renderizar el detalle del reporte", error, post);
     const safeTitle = escapeHtml(post.title || "Reporte");
     const safeDescription = escapeHtml(post.description || "Sin descripcion.");
+    setReportDetailEmptyState(false);
     reportDetailPanel.classList.remove("is-revealing");
     reportDetailPanel.innerHTML = `
       <div class="report-detail-content">
@@ -3252,13 +3288,15 @@ function normalizeRepressorTerritoryRequest(item) {
 
 function renderRepressorTerritoryDetailEmpty(message = "") {
   if (!reportDetailPanel) return;
-  const text = message || "Haz click en un reporte para ver sus detalles.";
+  const text = message || "Haz click en un territorio para ver fichas de represores.";
+  setReportDetailEmptyState(true);
   reportDetailPanel.classList.remove("is-revealing");
   reportDetailPanel.innerHTML = `<div class="report-detail-empty">${escapeHtml(text)}</div>`;
 }
 
 function renderRepressorTerritoryDetailLoading(territoryLabel) {
   if (!reportDetailPanel) return;
+  setReportDetailEmptyState(false);
   reportDetailPanel.innerHTML = `
     <div class="report-detail-content">
       <h3 class="report-detail-title">${escapeHtml(territoryLabel)}</h3>
@@ -3270,6 +3308,7 @@ function renderRepressorTerritoryDetailLoading(territoryLabel) {
 
 function renderRepressorTerritoryDetail(item, payload) {
   if (!reportDetailPanel) return;
+  setReportDetailEmptyState(false);
   const territoryLabel = String(payload?.territory_label || repressorTerritoryLabel(item) || "").trim();
   const entries = Array.isArray(payload?.items) ? payload.items : [];
   const count = Math.max(0, Number(payload?.count) || entries.length);
@@ -3406,6 +3445,7 @@ async function fetchRepressorTerritoryDetail(item) {
 
 function renderRepressorConfirmedDetail(item) {
   if (!reportDetailPanel) return;
+  setReportDetailEmptyState(false);
   const repressorId = Number(item?.repressor_id);
   const repressorName = escapeHtml(item?.repressor_name || "Represor");
   const province = escapeHtml(item?.province || "N/D");
@@ -3659,7 +3699,6 @@ function disableRepressorMode() {
   activeBaseMode = "map";
   repressorDetailRequestSeq += 1;
   repressorUnresolvedDetailCache.clear();
-  renderRepressorTerritoryDetailEmpty();
   clearRepressorLayer();
   repressorLastPayload = null;
   repressorStatsPayload = null;
@@ -3741,12 +3780,14 @@ function prisonerCountPopupHtml(item) {
 function renderPrisonerTerritoryDetailEmpty(message = "") {
   if (!reportDetailPanel) return;
   const text = message || "Haz click en un territorio para ver fichas de prisioneros.";
+  setReportDetailEmptyState(true);
   reportDetailPanel.classList.remove("is-revealing");
   reportDetailPanel.innerHTML = `<div class="report-detail-empty">${escapeHtml(text)}</div>`;
 }
 
 function renderPrisonerTerritoryDetailLoading(territoryLabel) {
   if (!reportDetailPanel) return;
+  setReportDetailEmptyState(false);
   reportDetailPanel.innerHTML = `
     <div class="report-detail-content">
       <h3 class="report-detail-title">${escapeHtml(territoryLabel)}</h3>
@@ -3758,6 +3799,7 @@ function renderPrisonerTerritoryDetailLoading(territoryLabel) {
 
 function renderPrisonerTerritoryDetail(item, payload) {
   if (!reportDetailPanel) return;
+  setReportDetailEmptyState(false);
   const territoryLabel = String(payload?.territory_label || prisonerTerritoryLabel(item) || "").trim();
   const entries = Array.isArray(payload?.items) ? payload.items : [];
   const count = Math.max(0, Number(payload?.count) || entries.length);
@@ -4132,7 +4174,6 @@ function disablePrisonerMode() {
   activeBaseMode = "map";
   prisonerDetailRequestSeq += 1;
   prisonerTerritoryDetailCache.clear();
-  renderPrisonerTerritoryDetailEmpty();
   clearPrisonerLayer();
   prisonerLastPayload = null;
   prisonerStatsPayload = null;
@@ -4215,6 +4256,7 @@ function aisPopupHtml(item) {
 
 function renderAISVesselDetail(item) {
   if (!reportDetailPanel) return;
+  setReportDetailEmptyState(false);
   const vesselName = escapeHtml(item?.ship_name || "Buque sin nombre");
   const destination = escapeHtml(item?.destination_raw || "N/D");
   const portName = escapeHtml(item?.matched_port_name || "Puerto no resuelto");
@@ -4405,16 +4447,118 @@ function buildFlightsMarkerIcon(heading) {
   });
 }
 
+function resolveFlightDetailCache(item) {
+  const eventId = Number(item?.event_id);
+  if (Number.isFinite(eventId) && flightsDetailCacheByEvent.has(eventId)) {
+    return flightsDetailCacheByEvent.get(eventId);
+  }
+  const aircraftId = Number(item?.aircraft_id);
+  if (Number.isFinite(aircraftId) && flightsDetailCacheByAircraft.has(aircraftId)) {
+    return flightsDetailCacheByAircraft.get(aircraftId);
+  }
+  return null;
+}
+
+function cacheFlightDetail(item, detailPayload, trackPayload) {
+  const entry = {
+    detailPayload,
+    trackPayload,
+    cachedAt: Date.now(),
+  };
+  const eventId = Number(item?.event_id);
+  if (Number.isFinite(eventId)) {
+    flightsDetailCacheByEvent.set(eventId, entry);
+  }
+  const aircraftId = Number(item?.aircraft_id);
+  if (Number.isFinite(aircraftId)) {
+    flightsDetailCacheByAircraft.set(aircraftId, entry);
+  }
+  return entry;
+}
+
+function formatFlightAirportIndicator(name, city, country, fallbackName = "Aeropuerto N/D") {
+  const airportName = String(name || "").trim() || fallbackName;
+  const cityName = String(city || "").trim() || airportName;
+  const countryName = String(country || "").trim() || "N/D";
+  return `${airportName} (${cityName}, ${countryName})`;
+}
+
+function buildFlightPopupData(item, detailPayload = null, trackPayload = null) {
+  const merged = {
+    ...item,
+    call_sign: item?.call_sign || "",
+    model: item?.model || "",
+    origin_airport_name: item?.origin_airport_name || "",
+    origin_city: item?.origin_city || "",
+    origin_country: item?.origin_country || "",
+    destination_airport_name: item?.destination_airport_name || "",
+    destination_city: item?.destination_city || "",
+    destination_country: item?.destination_country || "",
+  };
+
+  const aircraft = detailPayload?.aircraft || {};
+  if (aircraft?.call_sign) merged.call_sign = aircraft.call_sign;
+  if (aircraft?.model) merged.model = aircraft.model;
+
+  const historyRows = Array.isArray(detailPayload?.history) ? detailPayload.history : [];
+  const eventId = Number(item?.event_id);
+  let eventRow = null;
+  if (Number.isFinite(eventId)) {
+    eventRow = historyRows.find((row) => Number(row?.event_id) === eventId) || null;
+  }
+  if (!eventRow && historyRows.length) {
+    eventRow = historyRows[0];
+  }
+  if (eventRow) {
+    merged.origin_airport_name = eventRow?.origin_airport_name || merged.origin_airport_name;
+    merged.origin_city = eventRow?.origin_city || merged.origin_city;
+    merged.origin_country = eventRow?.origin_country || merged.origin_country;
+    merged.destination_airport_name =
+      eventRow?.destination_airport_name || merged.destination_airport_name;
+    merged.destination_city = eventRow?.destination_city || merged.destination_city;
+    merged.destination_country = eventRow?.destination_country || merged.destination_country;
+  }
+
+  const trackEvent = trackPayload?.event || {};
+  merged.origin_airport_name = trackEvent?.origin_airport_name || merged.origin_airport_name;
+  merged.origin_country = trackEvent?.origin_country || merged.origin_country;
+  merged.destination_airport_name =
+    trackEvent?.destination_airport_name || merged.destination_airport_name;
+  merged.destination_country = trackEvent?.destination_country || merged.destination_country;
+  const routeOrigin = trackPayload?.route?.origin || {};
+  const routeDestination = trackPayload?.route?.destination || {};
+  merged.origin_city = routeOrigin?.city || merged.origin_city;
+  merged.destination_city = routeDestination?.city || merged.destination_city;
+
+  return merged;
+}
+
 function flightsPopupHtml(item) {
-  const callSign = escapeHtml(item?.call_sign || "Vuelo");
-  const model = escapeHtml(item?.model || "Modelo N/D");
-  const origin = escapeHtml(item?.origin_airport_name || "Origen N/D");
-  const destination = escapeHtml(item?.destination_airport_name || "Destino Cuba");
+  const popupData = buildFlightPopupData(item);
+  const callSign = escapeHtml(popupData?.call_sign || "Vuelo");
+  const model = escapeHtml(popupData?.model || "Modelo N/D");
+  const origin = escapeHtml(
+    formatFlightAirportIndicator(
+      popupData?.origin_airport_name,
+      popupData?.origin_city,
+      popupData?.origin_country,
+      "Origen N/D"
+    )
+  );
+  const destination = escapeHtml(
+    formatFlightAirportIndicator(
+      popupData?.destination_airport_name,
+      popupData?.destination_city,
+      popupData?.destination_country,
+      "Destino Cuba"
+    )
+  );
   return `
     <div class="flights-popup">
       <div class="flights-popup-title">${callSign}</div>
       <div class="flights-popup-meta">${model}</div>
-      <div class="flights-popup-meta">${origin} -> ${destination}</div>
+      <div class="flights-popup-meta"><strong>Origen:</strong> ${origin}</div>
+      <div class="flights-popup-meta"><strong>Destino:</strong> ${destination}</div>
     </div>
   `;
 }
@@ -4497,37 +4641,20 @@ function drawFlightTrack(trackPayload) {
 
   if (latlngs.length >= 2) {
     const trackLine = L.polyline(latlngs, {
-      color: "#f97316",
-      weight: 3,
-      opacity: 0.9,
+      color: "#94a3b8",
+      weight: 1.5,
+      opacity: 0.35,
+      dashArray: "4 6",
     });
     trackLine.addTo(flightsTrackLayer);
   }
 
-  if (routeOrigin && routeDestination) {
-    const samePoint =
-      Math.abs(routeOrigin[0] - routeDestination[0]) < 0.00001 &&
-      Math.abs(routeOrigin[1] - routeDestination[1]) < 0.00001;
+  const aircraftPoint = latlngs.length
+    ? latlngs[latlngs.length - 1]
+    : routeDestination || routeOrigin || null;
 
-    if (!samePoint) {
-      const routeLine = L.polyline([routeOrigin, routeDestination], {
-        color: "#ef4444",
-        weight: 2,
-        opacity: 0.95,
-        dashArray: "8 6",
-      });
-      routeLine.addTo(flightsTrackLayer);
-    }
-
+  if (routeOrigin) {
     L.circleMarker(routeOrigin, {
-      radius: 4,
-      color: "#ffffff",
-      weight: 1.5,
-      fillColor: "#22d3ee",
-      fillOpacity: 0.95,
-    }).addTo(flightsTrackLayer);
-
-    L.circleMarker(routeDestination, {
       radius: 4,
       color: "#ffffff",
       weight: 1.5,
@@ -4536,13 +4663,40 @@ function drawFlightTrack(trackPayload) {
     }).addTo(flightsTrackLayer);
   }
 
-  const latest = latlngs.length ? latlngs[latlngs.length - 1] : routeDestination || routeOrigin;
-  if (latest) {
-    L.circleMarker(latest, {
+  if (routeDestination) {
+    L.circleMarker(routeDestination, {
+      radius: 4,
+      color: "#ffffff",
+      weight: 1.5,
+      fillColor: "#3b82f6",
+      fillOpacity: 0.98,
+    }).addTo(flightsTrackLayer);
+  }
+
+  if (routeOrigin && aircraftPoint) {
+    const originToAircraft = L.polyline([routeOrigin, aircraftPoint], {
+      color: "#ef4444",
+      weight: 3,
+      opacity: 0.92,
+    });
+    originToAircraft.addTo(flightsTrackLayer);
+  }
+
+  if (aircraftPoint && routeDestination) {
+    const aircraftToDestination = L.polyline([aircraftPoint, routeDestination], {
+      color: "#3b82f6",
+      weight: 3,
+      opacity: 0.92,
+    });
+    aircraftToDestination.addTo(flightsTrackLayer);
+  }
+
+  if (aircraftPoint) {
+    L.circleMarker(aircraftPoint, {
       radius: 5,
       color: "#ffffff",
       weight: 2,
-      fillColor: "#ef4444",
+      fillColor: "#f97316",
       fillOpacity: 0.95,
     }).addTo(flightsTrackLayer);
   }
@@ -4550,8 +4704,17 @@ function drawFlightTrack(trackPayload) {
   flightsTrackLayer.addTo(map);
 }
 
+function cleanupFlightsPhotoModal() {
+  if (flightsPhotoModalNode && flightsPhotoModalNode.parentElement) {
+    flightsPhotoModalNode.remove();
+  }
+  flightsPhotoModalNode = null;
+}
+
 function renderFlightDetailLoading(item) {
   if (!reportDetailPanel) return;
+  cleanupFlightsPhotoModal();
+  setReportDetailEmptyState(false);
   const callSign = escapeHtml(item?.call_sign || "Vuelo");
   reportDetailPanel.innerHTML = `
     <div class="report-detail-content">
@@ -4565,6 +4728,8 @@ function renderFlightDetailLoading(item) {
 
 function renderFlightDetail(item, detailPayload, trackPayload) {
   if (!reportDetailPanel) return;
+  cleanupFlightsPhotoModal();
+  setReportDetailEmptyState(false);
 
   const aircraft = detailPayload?.aircraft || {};
   const summary30d = detailPayload?.summary_30d || {};
@@ -4600,8 +4765,22 @@ function renderFlightDetail(item, detailPayload, trackPayload) {
   const historyRows = history
     .slice(0, 8)
     .map((row) => {
-      const origin = escapeHtml(row?.origin_airport_name || "Origen N/D");
-      const destination = escapeHtml(row?.destination_airport_name || "Destino N/D");
+      const origin = escapeHtml(
+        formatFlightAirportIndicator(
+          row?.origin_airport_name,
+          row?.origin_city,
+          row?.origin_country,
+          "Origen N/D"
+        )
+      );
+      const destination = escapeHtml(
+        formatFlightAirportIndicator(
+          row?.destination_airport_name,
+          row?.destination_city,
+          row?.destination_country,
+          "Destino N/D"
+        )
+      );
       const when = escapeHtml(formatUtcAndCuba(row?.last_seen_at_utc || ""));
       const status = escapeHtml(row?.status || "N/D");
       return `<div class=\"flights-history-row\"><strong>${origin} -> ${destination}</strong><span>${when} · ${status}</span></div>`;
@@ -4628,6 +4807,10 @@ function renderFlightDetail(item, detailPayload, trackPayload) {
           <div class=\"flights-photo-modal-body\">
             <h4>Reemplazar imagen</h4>
             ${uploadFormMarkup}
+            <div class=\"flights-photo-modal-actions\">
+              <button type=\"button\" class=\"info-btn info-btn-outline\" data-flight-photo-modal-close>Cancelar</button>
+              <button type=\"button\" class=\"info-btn\" data-flight-photo-modal-close>Cerrar</button>
+            </div>
           </div>
         </div>
       </div>
@@ -4662,7 +4845,12 @@ function renderFlightDetail(item, detailPayload, trackPayload) {
   triggerReportDetailReveal();
   if (mapSideScroll) mapSideScroll.scrollTop = 0;
 
-  const modal = reportDetailPanel.querySelector("[data-flight-photo-modal]");
+  let modal = reportDetailPanel.querySelector("[data-flight-photo-modal]");
+  if (modal && document.body) {
+    modal.setAttribute("data-flight-photo-modal-global", "1");
+    document.body.appendChild(modal);
+    flightsPhotoModalNode = modal;
+  }
   const openModalBtn = reportDetailPanel.querySelector("[data-flight-photo-replace-open]");
   const closeModal = () => {
     if (!modal) return;
@@ -4685,6 +4873,9 @@ function renderFlightDetail(item, detailPayload, trackPayload) {
   }
 
   const forms = Array.from(reportDetailPanel.querySelectorAll("[data-flight-photo-form]"));
+  if (modal) {
+    forms.push(...Array.from(modal.querySelectorAll("[data-flight-photo-form]")));
+  }
   if (!forms.length) return;
   forms.forEach((form) => {
     form.addEventListener("submit", async (event) => {
@@ -4768,12 +4959,22 @@ async function fetchFlightTrack(eventId) {
   return await response.json();
 }
 
-async function showFlightDetail(item) {
+async function showFlightDetail(item, marker = null) {
   const aircraftId = Number(item?.aircraft_id);
   const eventId = Number(item?.event_id);
   if (!Number.isFinite(aircraftId) || !Number.isFinite(eventId)) {
     return;
   }
+
+  const cached = resolveFlightDetailCache(item);
+  if (marker && cached?.detailPayload) {
+    const cachedPopupData = buildFlightPopupData(item, cached.detailPayload, cached.trackPayload);
+    marker.setPopupContent(flightsPopupHtml(cachedPopupData));
+    if (marker.isPopupOpen()) {
+      marker.getPopup()?.update();
+    }
+  }
+
   const requestSeq = ++flightsDetailRequestSeq;
   renderFlightDetailLoading(item);
   try {
@@ -4782,10 +4983,20 @@ async function showFlightDetail(item) {
       fetchFlightTrack(eventId),
     ]);
     if (requestSeq !== flightsDetailRequestSeq || activeBaseMode !== "flights") return;
+    cacheFlightDetail(item, detailPayload, trackPayload);
+    if (marker) {
+      const popupData = buildFlightPopupData(item, detailPayload, trackPayload);
+      marker.setPopupContent(flightsPopupHtml(popupData));
+      if (marker.isPopupOpen()) {
+        marker.getPopup()?.update();
+      }
+    }
     drawFlightTrack(trackPayload);
     renderFlightDetail(item, detailPayload, trackPayload);
   } catch (error) {
     if (requestSeq !== flightsDetailRequestSeq || activeBaseMode !== "flights") return;
+    cleanupFlightsPhotoModal();
+    setReportDetailEmptyState(false);
     reportDetailPanel.innerHTML = `
       <div class=\"report-detail-content\">
         <h3 class=\"report-detail-title\">Detalle no disponible</h3>
@@ -4805,14 +5016,19 @@ function renderFlightsLayer(payload) {
     const lat = Number(item?.latitude);
     const lng = Number(item?.longitude);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const cached = resolveFlightDetailCache(item);
+    const popupData =
+      cached?.detailPayload || cached?.trackPayload
+        ? buildFlightPopupData(item, cached.detailPayload, cached.trackPayload)
+        : item;
     const marker = L.marker([lat, lng], {
       icon: buildFlightsMarkerIcon(item?.heading),
       title: item?.call_sign || item?.registration || "Vuelo",
     });
-    marker.bindPopup(flightsPopupHtml(item), MAP_POPUP_OPTIONS);
+    marker.bindPopup(flightsPopupHtml(popupData), MAP_POPUP_OPTIONS);
     marker.on("click", () => {
       ensureContextPanelVisible({ mobileState: "full" });
-      showFlightDetail(item);
+      showFlightDetail(item, marker);
     });
     marker.addTo(flightsLayerGroup);
   });
@@ -4841,6 +5057,7 @@ async function refreshFlightsLayer() {
 async function enableFlightsMode() {
   if (!isAdmin) return;
   activeBaseMode = "flights";
+  cleanupFlightsPhotoModal();
   flightsDetailRequestSeq += 1;
   clearMarkers();
   closeActivePopup();
@@ -4865,6 +5082,7 @@ async function enableFlightsMode() {
 function disableFlightsMode() {
   if (activeBaseMode !== "flights") return;
   activeBaseMode = "map";
+  cleanupFlightsPhotoModal();
   flightsDetailRequestSeq += 1;
   stopFlightsPolling();
   clearFlightsLayer();
@@ -6055,9 +6273,7 @@ async function initMap() {
   renderConnectivityRegionChart(null);
   renderConnectivityRadarPanels(null);
   renderProtestDetail(null);
-  renderRepressorTerritoryDetailEmpty();
   renderRepressorStats(null, "Selecciona la capa de represores para cargar el gráfico.");
-  renderPrisonerTerritoryDetailEmpty();
   renderPrisonerStats(null, "Selecciona la capa de prisioneros para cargar el gráfico.");
   setReportDetailVisible(true);
   setProtestOverlayVisible(false);
