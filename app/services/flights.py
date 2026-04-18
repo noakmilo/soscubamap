@@ -198,6 +198,66 @@ def _walk_for_list(value: Any, max_depth: int = 3, depth: int = 0) -> list[Any] 
     return None
 
 
+def _extract_dict_map_items(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, dict):
+        return []
+
+    # Direct record dict.
+    if _pick(
+        value,
+        "fr24_id",
+        "id",
+        "flight_id",
+        "callsign",
+        "lat",
+        "latitude",
+        "lon",
+        "longitude",
+    ) is not None:
+        return [value]
+
+    records: list[dict[str, Any]] = []
+    for child in value.values():
+        if not isinstance(child, dict):
+            continue
+        marker = _pick(
+            child,
+            "fr24_id",
+            "id",
+            "flight_id",
+            "callsign",
+            "lat",
+            "latitude",
+            "lon",
+            "longitude",
+        )
+        if marker is None:
+            continue
+        records.append(child)
+    return records
+
+
+def _walk_for_dict_map(value: Any, max_depth: int = 4, depth: int = 0) -> list[dict[str, Any]] | None:
+    if depth > max_depth:
+        return None
+
+    mapped = _extract_dict_map_items(value)
+    if mapped:
+        return mapped
+
+    if isinstance(value, dict):
+        for child in value.values():
+            found = _walk_for_dict_map(child, max_depth=max_depth, depth=depth + 1)
+            if found:
+                return found
+    elif isinstance(value, list):
+        for child in value:
+            found = _walk_for_dict_map(child, max_depth=max_depth, depth=depth + 1)
+            if found:
+                return found
+    return None
+
+
 def _extract_items(payload: Any, preferred_paths: tuple[str, ...]) -> list[dict[str, Any]]:
     if isinstance(payload, list):
         return [item for item in payload if isinstance(item, dict)]
@@ -209,11 +269,18 @@ def _extract_items(payload: Any, preferred_paths: tuple[str, ...]) -> list[dict[
         candidate = _get_nested(payload, path)
         if isinstance(candidate, list):
             return [item for item in candidate if isinstance(item, dict)]
+        mapped = _extract_dict_map_items(candidate)
+        if mapped:
+            return mapped
 
     fallback = _walk_for_list(payload)
-    if not isinstance(fallback, list):
-        return []
-    return [item for item in fallback if isinstance(item, dict)]
+    if isinstance(fallback, list):
+        return [item for item in fallback if isinstance(item, dict)]
+
+    mapped_fallback = _walk_for_dict_map(payload)
+    if mapped_fallback:
+        return mapped_fallback
+    return []
 
 
 def _country_is_cuba(country_name: Any, country_code: Any) -> bool:
@@ -457,6 +524,16 @@ def get_flights_historic_events_light_path() -> str:
             "/historic/flight-events/light",
         )
         or "/historic/flight-events/light"
+    ).strip()
+
+
+def get_flights_historic_positions_light_path() -> str:
+    return str(
+        _config_value(
+            "FLIGHTS_API_HISTORIC_POSITIONS_LIGHT_PATH",
+            "/historic/flight-positions/light",
+        )
+        or "/historic/flight-positions/light"
     ).strip()
 
 
@@ -901,7 +978,7 @@ def _parse_event_row(
             "position.lon",
         )
     )
-    altitude = _safe_float(_pick(item, "altitude", "position.altitude", "position.alt"))
+    altitude = _safe_float(_pick(item, "altitude", "position.altitude", "position.alt", "alt"))
     speed = _safe_float(_pick(item, "speed", "ground_speed", "position.speed", "position.gs", "gspeed"))
     heading = _safe_float(
         _pick(item, "heading", "course", "position.heading", "position.track", "track")
@@ -1285,7 +1362,7 @@ def _collect_backfill_records(
         return batch
     if not get_flights_backfill_historic_enabled():
         batch.errors.append(
-            "Backfill historico desactivado: endpoint historic/light exige flight_ids + event_types."
+            "Backfill historico desactivado: configura FLIGHTS_BACKFILL_HISTORIC_ENABLED=1."
         )
         return batch
 
@@ -1295,30 +1372,112 @@ def _collect_backfill_records(
     chunk_hours = get_flights_backfill_chunk_hours()
     max_pages = get_flights_events_max_pages()
 
+    def _tokenize_airports(raw_airports: str) -> list[tuple[str, str]]:
+        tokens: list[tuple[str, str]] = []
+        for raw in str(raw_airports or "").split(","):
+            part = raw.strip()
+            if not part:
+                continue
+            direction = ""
+            code = part
+            if ":" in part:
+                direction, code = part.split(":", 1)
+            direction = _clean_text(direction, upper=True, limit=16)
+            code = _clean_text(code, upper=True, limit=16)
+            if not code:
+                continue
+            tokens.append((direction, code))
+        return tokens
+
+    def _force_destination_for_airports(raw_airports: str) -> bool:
+        for direction, code in _tokenize_airports(raw_airports):
+            if direction and direction != "INBOUND":
+                continue
+            if code in {"CU", "CUB"} or code in known_cuba_codes:
+                return True
+        return False
+
+    def _expand_country_airports(raw_airports: str) -> str:
+        tokens = _tokenize_airports(raw_airports)
+        has_country_selector = any(code in {"CU", "CUB"} for _direction, code in tokens)
+        if not has_country_selector:
+            return ""
+        codes = sorted(code for code in known_cuba_codes if 3 <= len(code) <= 4)
+        if not codes:
+            return ""
+        selected = codes[:15]
+        return ",".join(f"inbound:{code}" for code in selected)
+
+    backfill_airports = get_flights_live_filter_airports() or "inbound:CU"
+    backfill_bounds = get_flights_live_filter_bounds()
+
+    attempts: list[tuple[dict[str, Any], bool]] = []
+    seen_attempts: set[tuple[tuple[tuple[str, str], ...], bool]] = set()
+
+    def _add_attempt(params: dict[str, Any], force_destination_cuba: bool) -> None:
+        normalized = tuple(sorted((str(key), str(value)) for key, value in params.items()))
+        signature = (normalized, bool(force_destination_cuba))
+        if signature in seen_attempts:
+            return
+        seen_attempts.add(signature)
+        attempts.append((dict(params), bool(force_destination_cuba)))
+
+    if backfill_airports:
+        params = {"light": 1, "airports": backfill_airports}
+        if backfill_bounds:
+            params["bounds"] = backfill_bounds
+        _add_attempt(params, _force_destination_for_airports(backfill_airports))
+
+        expanded_airports = _expand_country_airports(backfill_airports)
+        if expanded_airports and expanded_airports != backfill_airports:
+            expanded_params = {"light": 1, "airports": expanded_airports}
+            if backfill_bounds:
+                expanded_params["bounds"] = backfill_bounds
+            _add_attempt(expanded_params, True)
+
+    if not attempts:
+        fallback_params: dict[str, Any] = {"light": 1}
+        fallback_params["bounds"] = backfill_bounds or DEFAULT_CUBA_LIVE_BOUNDS
+        _add_attempt(fallback_params, False)
+
+    snapshot_step = timedelta(hours=max(1, chunk_hours))
     while cursor < now_utc:
-        chunk_end = min(cursor + timedelta(hours=chunk_hours), now_utc)
-        params = {
-            "destination_country": "CU",
-            "from": serialize_flight_time(cursor),
-            "to": serialize_flight_time(chunk_end),
-            "light": 1,
-        }
-        chunk = _query_events_from_endpoint(
-            get_flights_historic_events_light_path(),
-            params,
-            ("events", "data.events", "data.items", "items", "results", "data"),
-            known_cuba_codes,
-            "historic",
-            request_ctx,
-            max_pages=max_pages,
-        )
-        batch.records.extend(chunk.records)
-        batch.seen += chunk.seen
-        batch.errors.extend(chunk.errors)
-        if chunk.budget_exhausted:
-            batch.budget_exhausted = True
+        timestamp = int(cursor.replace(tzinfo=timezone.utc).timestamp())
+
+        for base_params, force_destination_cuba in attempts:
+            params = dict(base_params)
+            params["timestamp"] = timestamp
+
+            chunk = _query_events_from_endpoint(
+                get_flights_historic_positions_light_path(),
+                params,
+                (
+                    "positions",
+                    "flights",
+                    "data.positions",
+                    "data.flights",
+                    "data.items",
+                    "items",
+                    "data",
+                ),
+                known_cuba_codes,
+                "historic",
+                request_ctx,
+                max_pages=max_pages,
+                force_destination_cuba=force_destination_cuba,
+            )
+            batch.records.extend(chunk.records)
+            batch.seen += chunk.seen
+            batch.errors.extend(chunk.errors)
+            if chunk.budget_exhausted:
+                batch.budget_exhausted = True
+                break
+            if chunk.seen > 0 or chunk.records:
+                break
+
+        if batch.budget_exhausted:
             break
-        cursor = chunk_end
+        cursor = min(cursor + snapshot_step, now_utc)
 
     return batch
 

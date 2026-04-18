@@ -1,8 +1,11 @@
+from datetime import datetime
+
 from app.services.flights import (
     DEFAULT_CUBA_LIVE_BOUNDS,
     RequestContext,
     _collect_backfill_records,
     _collect_live_records,
+    _extract_items,
     _parse_event_row,
 )
 
@@ -127,6 +130,62 @@ def test_collect_backfill_records_warns_when_historic_disabled(monkeypatch):
     assert "Backfill historico desactivado" in batch.errors[0]
 
 
+def test_collect_backfill_records_uses_historic_positions(monkeypatch):
+    calls: list[dict[str, object]] = []
+
+    def fake_query(
+        path,
+        base_params,
+        preferred_paths,
+        known_cuba_codes,
+        source_kind,
+        request_ctx,
+        max_pages,
+        force_destination_cuba=False,
+    ):
+        calls.append(
+            {
+                "path": path,
+                "base_params": dict(base_params),
+                "source_kind": source_kind,
+                "force_destination_cuba": bool(force_destination_cuba),
+                "max_pages": max_pages,
+            }
+        )
+        return type(
+            "Batch",
+            (),
+            {"records": [{"event_key": "x1"}], "seen": 2, "errors": [], "budget_exhausted": False},
+        )()
+
+    monkeypatch.setattr("app.services.flights.get_flights_backfill_historic_enabled", lambda: True)
+    monkeypatch.setattr("app.services.flights.get_flights_backfill_chunk_hours", lambda: 24)
+    monkeypatch.setattr("app.services.flights.get_flights_events_max_pages", lambda: 5)
+    monkeypatch.setattr("app.services.flights.get_flights_live_filter_airports", lambda: "inbound:CU")
+    monkeypatch.setattr("app.services.flights.get_flights_live_filter_bounds", lambda: "")
+    monkeypatch.setattr(
+        "app.services.flights.get_flights_historic_positions_light_path",
+        lambda: "/historic/flight-positions/light",
+    )
+    monkeypatch.setattr(
+        "app.services.flights._utc_now_naive",
+        lambda: datetime(2026, 4, 18, 12, 0, 0),
+    )
+    monkeypatch.setattr("app.services.flights._query_events_from_endpoint", fake_query)
+
+    request_ctx = RequestContext(request_cap=30, rate_limit_per_second=10)
+    batch = _collect_backfill_records(request_ctx, known_cuba_codes={"MUHA"}, days=1)
+
+    assert calls
+    assert calls[0]["path"] == "/historic/flight-positions/light"
+    assert calls[0]["source_kind"] == "historic"
+    assert calls[0]["max_pages"] == 5
+    assert calls[0]["force_destination_cuba"] is True
+    assert calls[0]["base_params"]["airports"] == "inbound:CU"
+    assert isinstance(calls[0]["base_params"]["timestamp"], int)
+    assert batch.seen == 2
+
+
 def test_parse_event_row_supports_summary_style_fields():
     row = {
         "fr24_id": "fr123",
@@ -148,3 +207,16 @@ def test_parse_event_row_supports_summary_style_fields():
     assert parsed["registration"] == "N100AA"
     assert parsed["destination_airport_icao"] == "MUHA"
     assert parsed["status"] == "live"
+
+
+def test_extract_items_accepts_dict_map_payload():
+    payload = {
+        "data": {
+            "abc123": {"fr24_id": "abc123", "callsign": "AAL100", "lat": 22.0, "lon": -82.0},
+            "def456": {"fr24_id": "def456", "callsign": "DLH1", "lat": 23.0, "lon": -81.0},
+        }
+    }
+
+    rows = _extract_items(payload, ("positions", "flights", "data"))
+    assert len(rows) == 2
+    assert {row.get("fr24_id") for row in rows} == {"abc123", "def456"}

@@ -153,6 +153,9 @@ class Config:
     FLIGHTS_API_HISTORIC_EVENTS_LIGHT_PATH = os.getenv(
         "FLIGHTS_API_HISTORIC_EVENTS_LIGHT_PATH", "/historic/flight-events/light"
     )
+    FLIGHTS_API_HISTORIC_POSITIONS_LIGHT_PATH = os.getenv(
+        "FLIGHTS_API_HISTORIC_POSITIONS_LIGHT_PATH", "/historic/flight-positions/light"
+    )
     FLIGHTS_API_TRACKS_PATH = os.getenv("FLIGHTS_API_TRACKS_PATH", "/flights/tracks")
     FLIGHTS_LIVE_FILTER_BOUNDS = os.getenv("FLIGHTS_LIVE_FILTER_BOUNDS", "")
     FLIGHTS_LIVE_FILTER_AIRPORTS = os.getenv("FLIGHTS_LIVE_FILTER_AIRPORTS", "inbound:CU")
