@@ -560,6 +560,16 @@ def get_flights_historic_positions_light_path() -> str:
     ).strip()
 
 
+def get_flights_summary_light_path() -> str:
+    return str(
+        _config_value(
+            "FLIGHTS_API_FLIGHT_SUMMARY_LIGHT_PATH",
+            "/flight-summary/light",
+        )
+        or "/flight-summary/light"
+    ).strip()
+
+
 def get_flights_tracks_path() -> str:
     return str(_config_value("FLIGHTS_API_TRACKS_PATH", "/flights/tracks") or "/flights/tracks").strip()
 
@@ -591,6 +601,20 @@ def get_flights_cuba_airport_codes() -> set[str]:
         if len(code) >= 3:
             codes.add(code)
     return codes
+
+
+def get_flights_summary_on_demand_enabled() -> bool:
+    return _safe_bool(_config_value("FLIGHTS_SUMMARY_ON_DEMAND_ENABLED", True), True)
+
+
+def get_flights_summary_on_demand_hours() -> int:
+    raw = _safe_int(_config_value("FLIGHTS_SUMMARY_ON_DEMAND_HOURS", 48), 48)
+    return max(raw, 1)
+
+
+def get_flights_summary_on_demand_limit() -> int:
+    raw = _safe_int(_config_value("FLIGHTS_SUMMARY_ON_DEMAND_LIMIT", 20), 20)
+    return max(1, min(raw, 200))
 
 
 def _build_api_url(path: str) -> str:
@@ -1985,6 +2009,398 @@ def decode_snapshot_json(raw: str | None, default: Any):
         return json.loads(raw)
     except Exception:
         return default
+
+
+def _needs_summary_enrichment(aircraft: FlightAircraft, event: FlightEvent | None) -> bool:
+    aircraft_missing = not (
+        _clean_text(aircraft.model, limit=120)
+        and _clean_text(aircraft.registration, limit=64)
+        and _clean_text(aircraft.operator_name, limit=255)
+    )
+    if event is None:
+        return aircraft_missing
+
+    origin_missing = not (
+        _clean_text(event.origin_airport_icao, upper=True, limit=8)
+        or _clean_text(event.origin_airport_iata, upper=True, limit=8)
+        or _clean_text(event.origin_airport_name, limit=255)
+    )
+    destination_code_missing = not (
+        _clean_text(event.destination_airport_icao, upper=True, limit=8)
+        or _clean_text(event.destination_airport_iata, upper=True, limit=8)
+    )
+    destination_name = _clean_text(event.destination_airport_name, limit=255)
+    destination_missing = destination_code_missing or (not destination_name or destination_name == "Aeropuerto Cuba")
+    timing_missing = event.departure_at_utc is None and event.arrival_at_utc is None
+
+    return aircraft_missing or origin_missing or destination_missing or timing_missing
+
+
+def _summary_selector_attempts(
+    aircraft: FlightAircraft,
+    event: FlightEvent | None,
+) -> list[dict[str, Any]]:
+    now_utc = _utc_now_naive()
+    center = (
+        (event.last_seen_at_utc if event else None)
+        or (event.departure_at_utc if event else None)
+        or (event.arrival_at_utc if event else None)
+        or aircraft.last_seen_at_utc
+        or now_utc
+    )
+    lookback_hours = get_flights_summary_on_demand_hours()
+    range_from = center - timedelta(hours=lookback_hours)
+    range_to = center + timedelta(hours=6)
+
+    base: dict[str, Any] = {
+        "flight_datetime_from": serialize_flight_time(range_from),
+        "flight_datetime_to": serialize_flight_time(range_to),
+        "limit": get_flights_summary_on_demand_limit(),
+        "sort": "desc",
+    }
+
+    call_sign = _clean_text(
+        (event.call_sign if event else "") or aircraft.call_sign,
+        upper=True,
+        limit=64,
+    )
+    registration = _clean_text(
+        (event.registration if event else "") or aircraft.registration,
+        upper=True,
+        limit=64,
+    )
+
+    attempts: list[dict[str, Any]] = []
+    seen: set[tuple[tuple[str, str], ...]] = set()
+
+    def _push(extra: dict[str, Any]) -> None:
+        params = dict(base)
+        params.update(extra)
+        signature = tuple(sorted((str(k), str(v)) for k, v in params.items()))
+        if signature in seen:
+            return
+        seen.add(signature)
+        attempts.append(params)
+
+    if call_sign:
+        _push({"callsigns": call_sign})
+        _push({"flights": call_sign})
+    if registration:
+        _push({"registrations": registration})
+    if call_sign and registration:
+        _push({"callsigns": call_sign, "registrations": registration})
+
+    return attempts
+
+
+def _fetch_summary_rows_on_demand(
+    aircraft: FlightAircraft,
+    event: FlightEvent | None,
+) -> tuple[list[dict[str, Any]], list[str], bool, int]:
+    warnings: list[str] = []
+    attempts = _summary_selector_attempts(aircraft, event)
+    if not attempts:
+        return [], warnings, False, 0
+
+    request_ctx = RequestContext(
+        request_cap=max(1, len(attempts)),
+        rate_limit_per_second=get_flights_request_rate_limit(),
+    )
+    for params in attempts:
+        try:
+            payload = _api_get(get_flights_summary_light_path(), params, request_ctx)
+        except FlightsApiRateLimited as exc:
+            warnings.append(str(exc))
+            return [], warnings, True, int(request_ctx.request_count)
+        except Exception as exc:
+            warnings.append(str(exc))
+            continue
+
+        rows = _extract_items(payload, ("data", "items", "results"))
+        if rows:
+            return rows, warnings, False, int(request_ctx.request_count)
+
+    return [], warnings, False, int(request_ctx.request_count)
+
+
+def _score_summary_row(
+    row: dict[str, Any],
+    aircraft: FlightAircraft,
+    event: FlightEvent | None,
+    known_cuba_codes: set[str],
+) -> float:
+    score = 0.0
+
+    row_id = _normalize_token(_pick(row, "fr24_id", "id", "flight_id"))
+    event_id = _normalize_token(event.external_flight_id if event else "")
+    if row_id and event_id and row_id == event_id:
+        score += 200.0
+
+    row_callsign = _clean_text(_pick(row, "callsign", "flight"), upper=True, limit=64)
+    target_callsign = _clean_text(
+        (event.call_sign if event else "") or aircraft.call_sign,
+        upper=True,
+        limit=64,
+    )
+    if row_callsign and target_callsign and row_callsign == target_callsign:
+        score += 80.0
+
+    row_reg = _clean_text(_pick(row, "reg", "registration"), upper=True, limit=64)
+    target_reg = _clean_text(
+        (event.registration if event else "") or aircraft.registration,
+        upper=True,
+        limit=64,
+    )
+    if row_reg and target_reg and row_reg == target_reg:
+        score += 60.0
+
+    dest_icao = _clean_text(
+        _pick(
+            row,
+            "destination_icao_actual",
+            "dest_icao_actual",
+            "destination_icao",
+            "dest_icao",
+        ),
+        upper=True,
+        limit=8,
+    )
+    if dest_icao and dest_icao in known_cuba_codes:
+        score += 40.0
+
+    reference_time = (
+        (event.last_seen_at_utc if event else None)
+        or (event.departure_at_utc if event else None)
+        or aircraft.last_seen_at_utc
+    )
+    row_time = _parse_datetime(_pick(row, "last_seen", "datetime_landed", "datetime_takeoff"))
+    if reference_time and row_time:
+        delta_hours = abs((reference_time - row_time).total_seconds()) / 3600.0
+        score += max(0.0, 30.0 - min(delta_hours, 30.0))
+
+    return score
+
+
+def _best_summary_row(
+    rows: list[dict[str, Any]],
+    aircraft: FlightAircraft,
+    event: FlightEvent | None,
+    known_cuba_codes: set[str],
+) -> dict[str, Any] | None:
+    if not rows:
+        return None
+    ranked = sorted(
+        rows,
+        key=lambda row: _score_summary_row(row, aircraft, event, known_cuba_codes),
+        reverse=True,
+    )
+    best = ranked[0]
+    if _score_summary_row(best, aircraft, event, known_cuba_codes) <= 0:
+        return None
+    return best
+
+
+def _apply_summary_row_cache(
+    row: dict[str, Any],
+    aircraft: FlightAircraft,
+    event: FlightEvent | None,
+    known_cuba_codes: set[str],
+) -> bool:
+    changed = False
+
+    call_sign = _clean_text(_pick(row, "callsign", "flight"), limit=64)
+    model = _clean_text(_pick(row, "type", "model"), limit=120)
+    registration = _clean_text(_pick(row, "reg", "registration"), limit=64)
+    operator_name = _clean_text(_pick(row, "operated_as", "painted_as"), limit=255)
+    hex_code = _clean_text(_pick(row, "hex"), upper=True, limit=32)
+    first_seen = _parse_datetime(_pick(row, "first_seen"))
+    last_seen = _parse_datetime(_pick(row, "last_seen"))
+
+    if call_sign and not _clean_text(aircraft.call_sign, limit=64):
+        aircraft.call_sign = call_sign
+        changed = True
+    if model and not _clean_text(aircraft.model, limit=120):
+        aircraft.model = model
+        changed = True
+    if registration and not _clean_text(aircraft.registration, limit=64):
+        aircraft.registration = registration
+        changed = True
+    if operator_name and not _clean_text(aircraft.operator_name, limit=255):
+        aircraft.operator_name = operator_name
+        changed = True
+    if hex_code and not _clean_text(aircraft.hex_code, upper=True, limit=32):
+        aircraft.hex_code = hex_code
+        changed = True
+    if first_seen and (aircraft.first_seen_at_utc is None or first_seen < aircraft.first_seen_at_utc):
+        aircraft.first_seen_at_utc = first_seen
+        changed = True
+    if last_seen and (aircraft.last_seen_at_utc is None or last_seen > aircraft.last_seen_at_utc):
+        aircraft.last_seen_at_utc = last_seen
+        changed = True
+
+    if event is None:
+        return changed
+
+    fr24_id = _clean_text(_pick(row, "fr24_id", "id", "flight_id"), limit=128)
+    if fr24_id and not _clean_text(event.external_flight_id, limit=128):
+        event.external_flight_id = fr24_id
+        changed = True
+
+    if call_sign and not _clean_text(event.call_sign, limit=64):
+        event.call_sign = call_sign
+        changed = True
+    if model and not _clean_text(event.model, limit=120):
+        event.model = model
+        changed = True
+    if registration and not _clean_text(event.registration, limit=64):
+        event.registration = registration
+        changed = True
+
+    origin_icao = _clean_text(_pick(row, "origin_icao", "orig_icao"), upper=True, limit=8)
+    origin_iata = _clean_text(_pick(row, "origin_iata", "orig_iata"), upper=True, limit=8)
+    if origin_icao and not _clean_text(event.origin_airport_icao, upper=True, limit=8):
+        event.origin_airport_icao = origin_icao
+        changed = True
+    if origin_iata and not _clean_text(event.origin_airport_iata, upper=True, limit=8):
+        event.origin_airport_iata = origin_iata
+        changed = True
+    if (
+        not _clean_text(event.origin_airport_name, limit=255)
+        and (origin_icao or origin_iata)
+    ):
+        event.origin_airport_name = origin_icao or origin_iata
+        changed = True
+
+    dest_icao = _clean_text(
+        _pick(
+            row,
+            "destination_icao_actual",
+            "dest_icao_actual",
+            "destination_icao",
+            "dest_icao",
+        ),
+        upper=True,
+        limit=8,
+    )
+    dest_iata = _clean_text(
+        _pick(
+            row,
+            "destination_iata_actual",
+            "dest_iata_actual",
+            "destination_iata",
+            "dest_iata",
+        ),
+        upper=True,
+        limit=8,
+    )
+    if dest_icao and not _clean_text(event.destination_airport_icao, upper=True, limit=8):
+        event.destination_airport_icao = dest_icao
+        changed = True
+    if dest_iata and not _clean_text(event.destination_airport_iata, upper=True, limit=8):
+        event.destination_airport_iata = dest_iata
+        changed = True
+    current_dest_name = _clean_text(event.destination_airport_name, limit=255)
+    if (not current_dest_name or current_dest_name == "Aeropuerto Cuba") and (dest_icao or dest_iata):
+        event.destination_airport_name = dest_icao or dest_iata
+        changed = True
+
+    if (dest_icao and dest_icao in known_cuba_codes) or (dest_iata and dest_iata in known_cuba_codes):
+        if _clean_text(event.destination_country, limit=120) != "Cuba":
+            event.destination_country = "Cuba"
+            changed = True
+
+    departure_at = _parse_datetime(_pick(row, "datetime_takeoff"))
+    arrival_at = _parse_datetime(_pick(row, "datetime_landed"))
+    if departure_at and event.departure_at_utc is None:
+        event.departure_at_utc = departure_at
+        changed = True
+    if arrival_at and event.arrival_at_utc is None:
+        event.arrival_at_utc = arrival_at
+        changed = True
+
+    if first_seen and (event.first_seen_at_utc is None or first_seen < event.first_seen_at_utc):
+        event.first_seen_at_utc = first_seen
+        changed = True
+    if last_seen and (event.last_seen_at_utc is None or last_seen > event.last_seen_at_utc):
+        event.last_seen_at_utc = last_seen
+        changed = True
+
+    flight_ended = _pick(row, "flight_ended")
+    if not _clean_text(event.status, limit=64):
+        if isinstance(flight_ended, bool):
+            event.status = "landed" if flight_ended else "live"
+            changed = True
+        else:
+            ended_text = _clean_text(flight_ended, upper=True, limit=16)
+            if ended_text in {"TRUE", "1"}:
+                event.status = "landed"
+                changed = True
+            elif ended_text in {"FALSE", "0"}:
+                event.status = "live"
+                changed = True
+
+    if changed:
+        event.last_source_kind = _clean_text(event.last_source_kind, limit=64) or "summary_light_on_demand"
+
+    return changed
+
+
+def enrich_aircraft_detail_from_summary_light(
+    aircraft: FlightAircraft,
+    event: FlightEvent | None = None,
+) -> dict[str, Any]:
+    meta: dict[str, Any] = {
+        "status": "skipped",
+        "enabled": bool(get_flights_summary_on_demand_enabled()),
+        "event_id": int(event.id) if event else None,
+        "requests": 0,
+        "warnings": [],
+        "updated": False,
+    }
+
+    if not get_flights_summary_on_demand_enabled():
+        meta["reason"] = "summary_on_demand_disabled"
+        return meta
+    if not get_flights_api_key():
+        meta["reason"] = "missing_flights_api_key"
+        return meta
+    if not _needs_summary_enrichment(aircraft, event):
+        meta["status"] = "cached"
+        meta["reason"] = "already_enriched"
+        return meta
+
+    known_cuba_codes = _known_cuba_airport_codes()
+    rows, warnings, rate_limited, request_count = _fetch_summary_rows_on_demand(aircraft, event)
+    meta["warnings"] = warnings
+    meta["requests"] = int(request_count)
+    if rate_limited:
+        meta["status"] = "rate_limited"
+        return meta
+    if not rows:
+        meta["status"] = "no_match"
+        return meta
+
+    best_row = _best_summary_row(rows, aircraft, event, known_cuba_codes)
+    if best_row is None:
+        meta["status"] = "no_match"
+        return meta
+
+    changed = _apply_summary_row_cache(best_row, aircraft, event, known_cuba_codes)
+    meta["updated"] = bool(changed)
+    if not changed:
+        meta["status"] = "cached"
+        return meta
+
+    try:
+        db.session.commit()
+        meta["status"] = "enriched"
+        return meta
+    except Exception as exc:
+        db.session.rollback()
+        logger.exception("Error guardando enriquecimiento on-demand de Flight summary light")
+        meta["status"] = "error"
+        meta["warnings"] = list(meta.get("warnings") or []) + [str(exc)]
+        return meta
 
 
 def _effective_photo_payload(aircraft: FlightAircraft | None) -> tuple[str, str]:

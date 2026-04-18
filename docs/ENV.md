@@ -177,9 +177,13 @@ Layer administrativo para visualizar vuelos con destino a aeropuertos cubanos co
 | `FLIGHTS_API_LIVE_POSITIONS_LIGHT_PATH` | Path endpoint “Live flight positions light”. | `/live/flight-positions/light` |
 | `FLIGHTS_API_HISTORIC_EVENTS_LIGHT_PATH` | Path endpoint “Historic flight events light”. | `/historic/flight-events/light` |
 | `FLIGHTS_API_HISTORIC_POSITIONS_LIGHT_PATH` | Path endpoint “Historic flight positions light” (usado para backfill por timestamp). | `/historic/flight-positions/light` |
+| `FLIGHTS_API_FLIGHT_SUMMARY_LIGHT_PATH` | Path endpoint “Flight summary light” (enriquecimiento bajo demanda al abrir detalle). | `/flight-summary/light` |
 | `FLIGHTS_API_TRACKS_PATH` | Path endpoint de tracks por vuelo seleccionado. | `/flights/tracks` |
 | `FLIGHTS_LIVE_FILTER_BOUNDS` | Bounding box opcional para query `live` (formato `minLat,minLon,maxLat,maxLon`). | (vacío) |
 | `FLIGHTS_LIVE_FILTER_AIRPORTS` | Filtro `airports` para query `live`; recomendado para Cuba: `inbound:CU`. | `inbound:CU` |
+| `FLIGHTS_SUMMARY_ON_DEMAND_ENABLED` | `1` habilita enriquecimiento por `Flight summary light` al abrir detalle del avión. | `1` |
+| `FLIGHTS_SUMMARY_ON_DEMAND_HOURS` | Rango de búsqueda alrededor del evento clicado para query de summary. | `48` |
+| `FLIGHTS_SUMMARY_ON_DEMAND_LIMIT` | Límite de resultados solicitados en query summary on-demand. | `20` |
 | `FLIGHTS_CUBA_AIRPORT_CODES` | Lista CSV base de códigos (IATA/ICAO) para detección de destino Cuba. | `MUHA,HAV,MUCU,SCU,MUVR,VRA,MUCC,CCC,MUCM,CMW,MUSC,SNU,MUBY,BCA,MUGT,BWW,MUMZ,MZG,MUCL,CYO,MUBA` |
 
 ## Protestas (RSS / NLP)

@@ -204,3 +204,28 @@ def test_flights_detail_track_and_photo_upload(app, client, monkeypatch):
     assert upload_payload["ok"] is True
     assert upload_payload["photo_source"] == "manual"
     assert upload_payload["photo_url"] == "https://cdn.example.com/plane-photo.jpg"
+
+
+def test_flights_detail_uses_event_id_for_summary_enrichment(app, client, monkeypatch):
+    seeded = _seed_flights_data(app)
+    _login_admin(client, seeded["admin_id"])
+
+    captured = {"aircraft_id": None, "event_id": None}
+
+    def fake_enrich(aircraft, event=None):
+        captured["aircraft_id"] = aircraft.id
+        captured["event_id"] = event.id if event is not None else None
+        return {"status": "cached", "event_id": captured["event_id"], "requests": 0, "warnings": []}
+
+    monkeypatch.setattr("app.blueprints.api.routes.enrich_aircraft_detail_from_summary_light", fake_enrich)
+
+    response = client.get(
+        f"/api/v1/flights/aircraft/{seeded['aircraft_id']}/detail?event_id={seeded['event_id']}"
+    )
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload is not None
+    assert payload["summary_light_cache"]["status"] == "cached"
+    assert payload["summary_light_cache"]["event_id"] == seeded["event_id"]
+    assert captured["aircraft_id"] == seeded["aircraft_id"]
+    assert captured["event_id"] == seeded["event_id"]

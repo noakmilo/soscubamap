@@ -101,6 +101,7 @@ from app.services.flights import (
     build_aircraft_detail_payload,
     build_event_track_payload,
     decode_snapshot_json,
+    enrich_aircraft_detail_from_summary_light,
     get_flights_frontend_refresh_seconds,
     get_flights_snapshot_stale_after_seconds,
     get_monthly_credit_usage,
@@ -2869,7 +2870,19 @@ def flights_aircraft_detail_v1(aircraft_id):
         return jsonify({"error": "Acceso denegado"}), 403
 
     aircraft = FlightAircraft.query.get_or_404(aircraft_id)
+    event = None
+    raw_event_id = (request.args.get("event_id") or "").strip()
+    if raw_event_id:
+        try:
+            event_id = int(raw_event_id)
+        except Exception:
+            event_id = 0
+        if event_id > 0:
+            event = FlightEvent.query.filter_by(id=event_id, aircraft_id=aircraft.id).first()
+
+    summary_cache = enrich_aircraft_detail_from_summary_light(aircraft, event=event)
     payload = build_aircraft_detail_payload(aircraft)
+    payload["summary_light_cache"] = summary_cache
     payload["cloudinary_enabled"] = bool(
         current_app.config.get("CLOUDINARY_CLOUD_NAME")
         and current_app.config.get("CLOUDINARY_API_KEY")

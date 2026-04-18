@@ -894,6 +894,12 @@ function ensureContextPanelVisible(options = {}) {
   setDesktopPanelCollapsed(false);
 }
 
+function syncReportDetailPanelLayout() {
+  if (!mapSidePanel) return;
+  const showDetailAfterLegend = activeBaseMode === "map" || activeBaseMode === "satellite";
+  mapSidePanel.classList.toggle("is-report-after-legend", showDetailAfterLegend);
+}
+
 function setupContextPanelLayout() {
   mapAppShell = document.getElementById("mapAppShell");
   mapSidePanel = document.getElementById("mapSidePanel");
@@ -907,6 +913,7 @@ function setupContextPanelLayout() {
   if (content) {
     content.classList.add("map-dashboard-content");
   }
+  syncReportDetailPanelLayout();
 
   const syncViewportLayout = () => {
     syncMapShellHeight();
@@ -1244,6 +1251,7 @@ async function switchBaseMode(nextMode, options = {}) {
       map.removeLayer(satelliteLabelsLayer);
     }
     await enableConnectivityMode();
+    syncReportDetailPanelLayout();
     if (options.syncRoute !== false) {
       syncBaseModeRoute("connectivity", { replace: options.replaceRoute === true });
     }
@@ -1270,6 +1278,7 @@ async function switchBaseMode(nextMode, options = {}) {
       map.removeLayer(satelliteLabelsLayer);
     }
     await enableRepressorMode();
+    syncReportDetailPanelLayout();
     if (options.syncRoute !== false) {
       syncBaseModeRoute("repressors", { replace: options.replaceRoute === true });
     }
@@ -1296,6 +1305,7 @@ async function switchBaseMode(nextMode, options = {}) {
       map.removeLayer(satelliteLabelsLayer);
     }
     await enableProtestMode();
+    syncReportDetailPanelLayout();
     if (options.syncRoute !== false) {
       syncBaseModeRoute("protests", { replace: options.replaceRoute === true });
     }
@@ -1322,6 +1332,7 @@ async function switchBaseMode(nextMode, options = {}) {
       map.removeLayer(satelliteLabelsLayer);
     }
     await enablePrisonerMode();
+    syncReportDetailPanelLayout();
     if (options.syncRoute !== false) {
       syncBaseModeRoute("prisoners", { replace: options.replaceRoute === true });
     }
@@ -1348,6 +1359,7 @@ async function switchBaseMode(nextMode, options = {}) {
       map.removeLayer(satelliteLabelsLayer);
     }
     await enableAISMode();
+    syncReportDetailPanelLayout();
     if (options.syncRoute !== false) {
       syncBaseModeRoute("ais", { replace: options.replaceRoute === true });
     }
@@ -1374,6 +1386,7 @@ async function switchBaseMode(nextMode, options = {}) {
       map.removeLayer(satelliteLabelsLayer);
     }
     await enableFlightsMode();
+    syncReportDetailPanelLayout();
     if (options.syncRoute !== false) {
       syncBaseModeRoute("flights", { replace: options.replaceRoute === true });
     }
@@ -1400,6 +1413,7 @@ async function switchBaseMode(nextMode, options = {}) {
   }
 
   activeBaseMode = mode === "satellite" ? "satellite" : "map";
+  syncReportDetailPanelLayout();
   if (satelliteLabelsLayer && activeBaseMode === "satellite") {
     if (!map.hasLayer(satelliteLabelsLayer)) satelliteLabelsLayer.addTo(map);
   } else if (satelliteLabelsLayer && map.hasLayer(satelliteLabelsLayer)) {
@@ -4373,14 +4387,20 @@ function startFlightsPolling() {
   }, intervalMs);
 }
 
-function buildFlightsMarkerIcon() {
+function buildFlightsMarkerIcon(heading) {
   const color = FLIGHTS_MARKER_COLOR;
+  const numericHeading = Number(heading);
+  const normalizedHeading = Number.isFinite(numericHeading)
+    ? ((numericHeading % 360) + 360) % 360
+    : 0;
   return L.divIcon({
     className: "flights-marker-wrap",
-    html: `<span class="flights-marker-dot" style="background:${color};"></span>`,
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
-    popupAnchor: [0, -10],
+    html: `<span class="flights-marker-plane" style="--flight-marker-color:${color};--flight-marker-heading:${normalizedHeading.toFixed(
+      1
+    )}deg;" aria-hidden="true"><i class="fa-solid fa-plane-up"></i></span>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+    popupAnchor: [0, -12],
   });
 }
 
@@ -4619,7 +4639,7 @@ function renderFlightsLayer(payload) {
     const lng = Number(item?.longitude);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
     const marker = L.marker([lat, lng], {
-      icon: buildFlightsMarkerIcon(),
+      icon: buildFlightsMarkerIcon(item?.heading),
       title: item?.call_sign || item?.registration || "Vuelo",
     });
     marker.bindPopup(flightsPopupHtml(item), MAP_POPUP_OPTIONS);
@@ -4644,12 +4664,21 @@ async function fetchFlightsLayerData() {
   return await response.json();
 }
 
-async function fetchFlightDetail(aircraftId) {
+async function fetchFlightDetail(aircraftId, eventId) {
   const safeId = Number(aircraftId);
   if (!Number.isFinite(safeId)) {
     throw new Error("Avión inválido.");
   }
-  const response = await fetch(`/api/v1/flights/aircraft/${safeId}/detail`, { cache: "no-store" });
+  const params = new URLSearchParams();
+  const safeEventId = Number(eventId);
+  if (Number.isFinite(safeEventId)) {
+    params.set("event_id", String(safeEventId));
+  }
+  const queryString = params.toString();
+  const response = await fetch(
+    `/api/v1/flights/aircraft/${safeId}/detail${queryString ? `?${queryString}` : ""}`,
+    { cache: "no-store" }
+  );
   if (!response.ok) {
     throw new Error("No se pudo cargar detalle del avión.");
   }
@@ -4678,7 +4707,7 @@ async function showFlightDetail(item) {
   renderFlightDetailLoading(item);
   try {
     const [detailPayload, trackPayload] = await Promise.all([
-      fetchFlightDetail(aircraftId),
+      fetchFlightDetail(aircraftId, eventId),
       fetchFlightTrack(eventId),
     ]);
     if (requestSeq !== flightsDetailRequestSeq || activeBaseMode !== "flights") return;
