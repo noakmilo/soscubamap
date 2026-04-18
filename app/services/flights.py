@@ -465,7 +465,7 @@ def get_flights_tracks_path() -> str:
 
 
 def get_flights_live_filter_bounds() -> str:
-    raw = str(_config_value("FLIGHTS_LIVE_FILTER_BOUNDS", DEFAULT_CUBA_LIVE_BOUNDS) or "").strip()
+    raw = str(_config_value("FLIGHTS_LIVE_FILTER_BOUNDS", "") or "").strip()
     if not raw:
         return ""
     parts = [chunk.strip() for chunk in raw.split(",")]
@@ -678,7 +678,13 @@ def _parse_airport_row(item: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
-def _parse_event_row(item: dict[str, Any], known_cuba_codes: set[str], source_kind: str) -> dict[str, Any] | None:
+def _parse_event_row(
+    item: dict[str, Any],
+    known_cuba_codes: set[str],
+    source_kind: str,
+    *,
+    force_destination_cuba: bool = False,
+) -> dict[str, Any] | None:
     external_flight_id = _clean_text(
         _pick(
             item,
@@ -828,6 +834,14 @@ def _parse_event_row(item: dict[str, Any], known_cuba_codes: set[str], source_ki
             destination_is_cuba = True
         if dest_iata and dest_iata in known_cuba_codes:
             destination_is_cuba = True
+    if not destination_is_cuba and force_destination_cuba:
+        destination_is_cuba = True
+        if not dest_country:
+            dest_country = "Cuba"
+        if not dest_country_code:
+            dest_country_code = "CU"
+        if not dest_name:
+            dest_name = "Aeropuerto Cuba"
 
     if not destination_is_cuba:
         return None
@@ -1124,6 +1138,7 @@ def _query_events_from_endpoint(
     source_kind: str,
     request_ctx: RequestContext,
     max_pages: int,
+    force_destination_cuba: bool = False,
 ) -> FetchBatch:
     batch = FetchBatch()
     limit = get_flights_response_limit()
@@ -1148,7 +1163,12 @@ def _query_events_from_endpoint(
 
         for row in rows:
             batch.seen += 1
-            parsed = _parse_event_row(row, known_cuba_codes, source_kind)
+            parsed = _parse_event_row(
+                row,
+                known_cuba_codes,
+                source_kind,
+                force_destination_cuba=force_destination_cuba,
+            )
             if parsed is None:
                 continue
             batch.records.append(parsed)
@@ -1332,6 +1352,24 @@ def _collect_live_records(
     if not any(key in params for key in selector_keys):
         params["bounds"] = DEFAULT_CUBA_LIVE_BOUNDS
 
+    force_destination_cuba = False
+    if live_airports:
+        for token in str(live_airports).split(","):
+            part = token.strip()
+            if not part:
+                continue
+            direction = ""
+            code = part
+            if ":" in part:
+                direction, code = part.split(":", 1)
+                direction = _clean_text(direction, upper=True, limit=16)
+            code = _clean_text(code, upper=True, limit=16)
+            if direction and direction != "INBOUND":
+                continue
+            if code in {"CU", "CUB"} or code in known_cuba_codes:
+                force_destination_cuba = True
+                break
+
     return _query_events_from_endpoint(
         get_flights_live_positions_light_path(),
         params,
@@ -1340,6 +1378,7 @@ def _collect_live_records(
         "live",
         request_ctx,
         max_pages=max_pages,
+        force_destination_cuba=force_destination_cuba,
     )
 
 

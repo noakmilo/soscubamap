@@ -174,8 +174,8 @@ Layer administrativo para visualizar vuelos con destino a aeropuertos cubanos co
 | `FLIGHTS_API_LIVE_POSITIONS_LIGHT_PATH` | Path endpoint “Live flight positions light”. | `/live/flight-positions/light` |
 | `FLIGHTS_API_HISTORIC_EVENTS_LIGHT_PATH` | Path endpoint “Historic flight events light”. | `/historic/flight-events/light` |
 | `FLIGHTS_API_TRACKS_PATH` | Path endpoint de tracks por vuelo seleccionado. | `/flights/tracks` |
-| `FLIGHTS_LIVE_FILTER_BOUNDS` | Bounding box para query `live` (formato `minLat,minLon,maxLat,maxLon`). | `19.4,-85.2,24.2,-73.9` |
-| `FLIGHTS_LIVE_FILTER_AIRPORTS` | Filtro opcional `airports` para query `live` (vacío = solo bounds). | (vacío) |
+| `FLIGHTS_LIVE_FILTER_BOUNDS` | Bounding box opcional para query `live` (formato `minLat,minLon,maxLat,maxLon`). | (vacío) |
+| `FLIGHTS_LIVE_FILTER_AIRPORTS` | Filtro `airports` para query `live`; recomendado para Cuba: `inbound:CU`. | `inbound:CU` |
 | `FLIGHTS_CUBA_AIRPORT_CODES` | Lista CSV base de códigos (IATA/ICAO) para detección de destino Cuba. | `MUHA,HAV,MUCU,SCU,MUVR,VRA,MUCC,CCC,MUCM,CMW,MUSC,SNU,MUBY,BCA,MUGT,BWW,MUMZ,MZG,MUCL,CYO,MUBA` |
 
 ## Protestas (RSS / NLP)

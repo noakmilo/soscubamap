@@ -18,11 +18,13 @@ def test_collect_live_records_adds_bounds_selector_when_missing(monkeypatch):
         source_kind,
         request_ctx,
         max_pages,
+        force_destination_cuba=False,
     ):
         captured["path"] = path
         captured["base_params"] = dict(base_params)
         captured["source_kind"] = source_kind
         captured["max_pages"] = max_pages
+        captured["force_destination_cuba"] = bool(force_destination_cuba)
         return type("Batch", (), {"records": [], "seen": 0, "errors": [], "budget_exhausted": False})()
 
     monkeypatch.setattr("app.services.flights.get_flights_live_filter_airports", lambda: "")
@@ -36,7 +38,38 @@ def test_collect_live_records_adds_bounds_selector_when_missing(monkeypatch):
 
     assert captured["source_kind"] == "live"
     assert captured["max_pages"] == 5
+    assert captured["force_destination_cuba"] is False
     assert captured["base_params"] == {"light": 1, "bounds": DEFAULT_CUBA_LIVE_BOUNDS}
+
+
+def test_collect_live_records_forces_destination_for_inbound_cuba_filter(monkeypatch):
+    captured: dict[str, object] = {}
+
+    def fake_query(
+        path,
+        base_params,
+        preferred_paths,
+        known_cuba_codes,
+        source_kind,
+        request_ctx,
+        max_pages,
+        force_destination_cuba=False,
+    ):
+        captured["base_params"] = dict(base_params)
+        captured["force_destination_cuba"] = bool(force_destination_cuba)
+        return type("Batch", (), {"records": [], "seen": 0, "errors": [], "budget_exhausted": False})()
+
+    monkeypatch.setattr("app.services.flights.get_flights_live_filter_airports", lambda: "inbound:CU")
+    monkeypatch.setattr("app.services.flights.get_flights_live_filter_bounds", lambda: "")
+    monkeypatch.setattr("app.services.flights.get_flights_events_max_pages", lambda: 5)
+    monkeypatch.setattr("app.services.flights.get_flights_safe_mode_events_max_pages", lambda: 2)
+    monkeypatch.setattr("app.services.flights._query_events_from_endpoint", fake_query)
+
+    request_ctx = RequestContext(request_cap=10, rate_limit_per_second=10)
+    _collect_live_records(request_ctx, known_cuba_codes={"MUHA"}, safe_mode=False)
+
+    assert captured["force_destination_cuba"] is True
+    assert captured["base_params"] == {"light": 1, "airports": "inbound:CU"}
 
 
 def test_collect_backfill_records_warns_when_historic_disabled(monkeypatch):
