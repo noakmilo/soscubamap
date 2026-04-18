@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 WINDOW_HOURS_SUPPORTED = (24, 6, 2)
 _CLEAN_TOKEN_RE = re.compile(r"[^a-z0-9]+")
-DEFAULT_CUBA_LIVE_BOUNDS = "19.4,-85.2,24.2,-73.9"
+DEFAULT_CUBA_LIVE_BOUNDS = "24.2,19.4,-85.2,-73.9"
 DEFAULT_CUBA_AIRPORT_CODES = (
     "MUHA,HAV,MUCU,SCU,MUVR,VRA,MUCC,CCC,MUCM,CMW,"
     "MUSC,SNU,MUBY,BCA,MUGT,BWW,MUMZ,MZG,MUCL,CYO,MUBA"
@@ -1329,57 +1329,98 @@ def _collect_live_records(
     safe_mode: bool,
 ) -> FetchBatch:
     max_pages = get_flights_safe_mode_events_max_pages() if safe_mode else get_flights_events_max_pages()
-    params: dict[str, Any] = {"light": 1}
     live_airports = get_flights_live_filter_airports()
-    if live_airports:
-        params["airports"] = live_airports
-
     live_bounds = get_flights_live_filter_bounds()
-    if live_bounds:
-        params["bounds"] = live_bounds
 
-    selector_keys = {
-        "bounds",
-        "flights",
-        "callsigns",
-        "registrations",
-        "painted_as",
-        "operating_as",
-        "airports",
-        "routes",
-        "aircraft",
-    }
-    if not any(key in params for key in selector_keys):
-        params["bounds"] = DEFAULT_CUBA_LIVE_BOUNDS
-
-    force_destination_cuba = False
-    if live_airports:
-        for token in str(live_airports).split(","):
-            part = token.strip()
+    def _tokenize_airports(raw_airports: str) -> list[tuple[str, str]]:
+        tokens: list[tuple[str, str]] = []
+        for raw in str(raw_airports or "").split(","):
+            part = raw.strip()
             if not part:
                 continue
             direction = ""
             code = part
             if ":" in part:
                 direction, code = part.split(":", 1)
-                direction = _clean_text(direction, upper=True, limit=16)
+            direction = _clean_text(direction, upper=True, limit=16)
             code = _clean_text(code, upper=True, limit=16)
+            if not code:
+                continue
+            tokens.append((direction, code))
+        return tokens
+
+    def _force_destination_for_airports(raw_airports: str) -> bool:
+        for direction, code in _tokenize_airports(raw_airports):
             if direction and direction != "INBOUND":
                 continue
             if code in {"CU", "CUB"} or code in known_cuba_codes:
-                force_destination_cuba = True
-                break
+                return True
+        return False
 
-    return _query_events_from_endpoint(
-        get_flights_live_positions_light_path(),
-        params,
-        ("positions", "flights", "data.positions", "data.flights", "data.items", "items", "data"),
-        known_cuba_codes,
-        "live",
-        request_ctx,
-        max_pages=max_pages,
-        force_destination_cuba=force_destination_cuba,
-    )
+    def _expand_country_airports(raw_airports: str) -> str:
+        tokens = _tokenize_airports(raw_airports)
+        has_country_selector = any(code in {"CU", "CUB"} for _direction, code in tokens)
+        if not has_country_selector:
+            return ""
+
+        codes = sorted(code for code in known_cuba_codes if 3 <= len(code) <= 4)
+        if not codes:
+            return ""
+        # Keep the selector short to avoid provider-side size limits.
+        selected = codes[:15]
+        return ",".join(f"inbound:{code}" for code in selected)
+
+    attempts: list[tuple[dict[str, Any], bool]] = []
+    seen_attempts: set[tuple[tuple[tuple[str, str], ...], bool]] = set()
+
+    def _add_attempt(params: dict[str, Any], force_destination_cuba: bool) -> None:
+        normalized = tuple(sorted((str(key), str(value)) for key, value in params.items()))
+        signature = (normalized, bool(force_destination_cuba))
+        if signature in seen_attempts:
+            return
+        seen_attempts.add(signature)
+        attempts.append((dict(params), bool(force_destination_cuba)))
+
+    if live_airports:
+        params = {"light": 1, "airports": live_airports}
+        if live_bounds:
+            params["bounds"] = live_bounds
+        _add_attempt(params, _force_destination_for_airports(live_airports))
+
+        expanded_airports = _expand_country_airports(live_airports)
+        if expanded_airports and expanded_airports != live_airports:
+            expanded_params = {"light": 1, "airports": expanded_airports}
+            if live_bounds:
+                expanded_params["bounds"] = live_bounds
+            _add_attempt(expanded_params, True)
+
+    if not attempts:
+        fallback_params: dict[str, Any] = {"light": 1}
+        fallback_params["bounds"] = live_bounds or DEFAULT_CUBA_LIVE_BOUNDS
+        _add_attempt(fallback_params, False)
+
+    combined = FetchBatch()
+    for params, force_destination_cuba in attempts:
+        chunk = _query_events_from_endpoint(
+            get_flights_live_positions_light_path(),
+            params,
+            ("positions", "flights", "data.positions", "data.flights", "data.items", "items", "data"),
+            known_cuba_codes,
+            "live",
+            request_ctx,
+            max_pages=max_pages,
+            force_destination_cuba=force_destination_cuba,
+        )
+        combined.records.extend(chunk.records)
+        combined.seen += int(chunk.seen)
+        combined.errors.extend(chunk.errors)
+        if chunk.budget_exhausted:
+            combined.budget_exhausted = True
+            break
+        if chunk.seen > 0 or chunk.records:
+            break
+
+    return combined
 
 
 def _persist_records(
