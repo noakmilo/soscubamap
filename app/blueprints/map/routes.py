@@ -492,7 +492,7 @@ def _serialize_residence_report(report: RepressorResidenceReport):
 def _normalize_map_layer(value: str | None, *, allow_admin_layers: bool = False) -> str:
     raw = (value or "").strip().lower()
     normalized = _MAP_LAYER_ALIASES.get(raw, "map")
-    if normalized in {"ais", "flights"} and not allow_admin_layers:
+    if normalized == "ais" and not allow_admin_layers:
         return "map"
     return normalized
 

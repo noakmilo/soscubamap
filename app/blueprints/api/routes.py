@@ -2768,9 +2768,6 @@ def ais_cuba_targets_v1():
 @api_bp.route("/v1/flights/cuba-layer")
 @limiter.limit("120/minute")
 def flights_cuba_layer_v1():
-    if not _is_admin_user():
-        return jsonify({"error": "Acceso denegado"}), 403
-
     window_hours = _parse_flights_window_hours()
     now = datetime.utcnow()
     snapshot = (
@@ -2866,9 +2863,6 @@ def flights_cuba_layer_v1():
 @api_bp.route("/v1/flights/aircraft/<int:aircraft_id>/detail")
 @limiter.limit("120/minute")
 def flights_aircraft_detail_v1(aircraft_id):
-    if not _is_admin_user():
-        return jsonify({"error": "Acceso denegado"}), 403
-
     aircraft = FlightAircraft.query.get_or_404(aircraft_id)
     event = None
     raw_event_id = (request.args.get("event_id") or "").strip()
@@ -2884,7 +2878,8 @@ def flights_aircraft_detail_v1(aircraft_id):
     payload = build_aircraft_detail_payload(aircraft)
     payload["summary_light_cache"] = summary_cache
     payload["photo_upload_enabled"] = bool(
-        current_app.config.get("CLOUDINARY_CLOUD_NAME")
+        _is_admin_user()
+        and current_app.config.get("CLOUDINARY_CLOUD_NAME")
         and current_app.config.get("CLOUDINARY_API_KEY")
         and current_app.config.get("CLOUDINARY_API_SECRET")
     )
@@ -2895,9 +2890,6 @@ def flights_aircraft_detail_v1(aircraft_id):
 @api_bp.route("/v1/flights/events/<int:event_id>/track")
 @limiter.limit("120/minute")
 def flights_event_track_v1(event_id):
-    if not _is_admin_user():
-        return jsonify({"error": "Acceso denegado"}), 403
-
     event = FlightEvent.query.options(
         selectinload(FlightEvent.aircraft),
         selectinload(FlightEvent.destination_airport),

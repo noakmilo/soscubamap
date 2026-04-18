@@ -1209,7 +1209,7 @@ async function switchBaseMode(nextMode, options = {}) {
   if (!map || !mainBaseLayers) return;
 
   let mode = normalizeBaseMode(nextMode);
-  if ((mode === "ais" || mode === "flights") && !isAdmin) {
+  if (mode === "ais" && !isAdmin) {
     mode = "map";
   }
   applyMapPanBoundsForMode(mode);
@@ -5067,7 +5067,6 @@ async function refreshFlightsLayer() {
 }
 
 async function enableFlightsMode() {
-  if (!isAdmin) return;
   activeBaseMode = "flights";
   cleanupFlightsPhotoModal();
   flightsDetailRequestSeq += 1;
@@ -6202,7 +6201,7 @@ async function initMap() {
     mapEl.dataset.initialBaseMode || parseBaseModeFromPath(window.location.pathname)
   );
   const requestedBaseMode =
-    !isAdmin && (requestedBaseModeRaw === "ais" || requestedBaseModeRaw === "flights")
+    !isAdmin && requestedBaseModeRaw === "ais"
       ? "map"
       : requestedBaseModeRaw;
   mapHintElement = document.getElementById("mapHint");
@@ -6436,8 +6435,8 @@ async function initMap() {
   };
   if (isAdmin) {
     baseLayerOptions["Buques Cuba (beta)"] = aisBaseLayer;
-    baseLayerOptions["Vuelos Cuba (beta)"] = flightsBaseLayer;
   }
+  baseLayerOptions["Vuelos Cuba (beta)"] = flightsBaseLayer;
   const layersControl = L.control.layers(baseLayerOptions, {}, { collapsed: true }).addTo(map);
   decorateMapLayersControl(layersControl);
 
