@@ -1204,7 +1204,7 @@ def _parse_flights_window_hours():
         value = int(raw)
     except Exception:
         return 24
-    if value in (2, 6, 24):
+    if value in (2, 6, 24, 168):
         return value
     return 24
 

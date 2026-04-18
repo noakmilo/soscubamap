@@ -154,6 +154,19 @@ def test_flights_layer_api_returns_snapshot_for_admin(app, client):
     assert payload["latest_run"]["status"] == "success"
 
 
+def test_flights_layer_api_accepts_7d_window_for_admin(app, client):
+    seeded = _seed_flights_data(app)
+    _login_admin(client, seeded["admin_id"])
+
+    response = client.get("/api/v1/flights/cuba-layer?window_hours=168")
+    assert response.status_code == 200
+
+    payload = response.get_json()
+    assert payload is not None
+    assert payload["window_hours"] == 168
+    assert isinstance(payload.get("points"), list)
+
+
 def test_flights_detail_track_and_photo_upload(app, client, monkeypatch):
     seeded = _seed_flights_data(app)
     _login_admin(client, seeded["admin_id"])

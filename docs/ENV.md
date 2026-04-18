@@ -150,6 +150,8 @@ Layer administrativo para visualizar vuelos con destino a aeropuertos cubanos co
 | `FLIGHTS_API_TIMEOUT_SECONDS` | Timeout HTTP por request. | `20` |
 | `FLIGHTS_API_RESPONSE_LIMIT` | Límite por página/request (plan: `20`). | `20` |
 | `FLIGHTS_API_REQUEST_RATE_LIMIT` | Máximo de requests por segundo (plan: `10`). | `10` |
+| `FLIGHTS_API_MAX_RETRIES` | Reintentos automáticos por request en `429`. | `2` |
+| `FLIGHTS_API_RETRY_BACKOFF_SECONDS` | Backoff base en segundos para reintentos (`429`). | `1.5` |
 | `FLIGHTS_INGESTION_INTERVAL_SECONDS` | Intervalo de ingesta periódica por Celery Beat. | `900` |
 | `FLIGHTS_FRONTEND_REFRESH_SECONDS` | Refresco frontend de la capa admin. | `300` |
 | `FLIGHTS_STALE_AFTER_SECONDS` | Umbral de stale del snapshot. | `1800` |
@@ -158,8 +160,9 @@ Layer administrativo para visualizar vuelos con destino a aeropuertos cubanos co
 | `FLIGHTS_MONTHLY_CREDIT_BUDGET` | Presupuesto mensual estimado de créditos. | `60000` |
 | `FLIGHTS_GUARDRAIL_PERCENT` | Umbral de guardia de cuota (modo seguro). | `85` |
 | `FLIGHTS_ESTIMATED_CREDIT_PER_REQUEST` | Crédito estimado por request para budgeting interno. | `1` |
-| `FLIGHTS_BACKFILL_DAYS` | Backfill inicial en días (si está habilitado). | `7` |
+| `FLIGHTS_BACKFILL_DAYS` | Backfill inicial en días (forzado o bootstrap inicial). | `7` |
 | `FLIGHTS_BACKFILL_CHUNK_HOURS` | Tamaño de chunk para backfill histórico. | `24` |
+| `FLIGHTS_POLLING_HISTORIC_HOURS` | Ventana histórica (horas) aplicada en cada polling periódico de Celery. | `24` |
 | `FLIGHTS_BACKFILL_ON_EMPTY_DB` | `1` activa backfill inicial cuando BD está vacía. | `0` |
 | `FLIGHTS_BACKFILL_HISTORIC_ENABLED` | `1` intenta backfill vía endpoint histórico (solo si tu plan/queries lo soportan). | `0` |
 | `FLIGHTS_SAFE_MODE_SKIP_BACKFILL` | `1` evita backfill en modo seguro (ahorro de cuota). | `1` |

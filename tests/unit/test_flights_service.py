@@ -121,7 +121,7 @@ def test_collect_live_records_expands_country_filter_when_empty(monkeypatch):
 def test_collect_backfill_records_warns_when_historic_disabled(monkeypatch):
     monkeypatch.setattr("app.services.flights.get_flights_backfill_historic_enabled", lambda: False)
     request_ctx = RequestContext(request_cap=10, rate_limit_per_second=10)
-    batch = _collect_backfill_records(request_ctx, known_cuba_codes=set(), days=7)
+    batch = _collect_backfill_records(request_ctx, known_cuba_codes=set(), hours=24)
 
     assert batch.seen == 0
     assert batch.records == []
@@ -174,7 +174,7 @@ def test_collect_backfill_records_uses_historic_positions(monkeypatch):
     monkeypatch.setattr("app.services.flights._query_events_from_endpoint", fake_query)
 
     request_ctx = RequestContext(request_cap=30, rate_limit_per_second=10)
-    batch = _collect_backfill_records(request_ctx, known_cuba_codes={"MUHA"}, days=1)
+    batch = _collect_backfill_records(request_ctx, known_cuba_codes={"MUHA"}, hours=24)
 
     assert calls
     assert calls[0]["path"] == "/historic/flight-positions/light"

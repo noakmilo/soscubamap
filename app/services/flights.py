@@ -28,7 +28,7 @@ from app.models.flight_position import FlightPosition
 logger = logging.getLogger(__name__)
 
 
-WINDOW_HOURS_SUPPORTED = (24, 6, 2)
+WINDOW_HOURS_SUPPORTED = (168, 24, 6, 2)
 _CLEAN_TOKEN_RE = re.compile(r"[^a-z0-9]+")
 DEFAULT_CUBA_LIVE_BOUNDS = "24.2,19.4,-85.2,-73.9"
 DEFAULT_CUBA_AIRPORT_CODES = (
@@ -53,9 +53,14 @@ class FetchBatch:
     seen: int = 0
     errors: list[str] = field(default_factory=list)
     budget_exhausted: bool = False
+    rate_limited: bool = False
 
 
 class RequestBudgetExhausted(RuntimeError):
+    pass
+
+
+class FlightsApiRateLimited(RuntimeError):
     pass
 
 
@@ -404,6 +409,19 @@ def get_flights_request_rate_limit() -> int:
     return max(raw, 1)
 
 
+def get_flights_api_max_retries() -> int:
+    raw = _safe_int(_config_value("FLIGHTS_API_MAX_RETRIES", 2), 2)
+    return max(raw, 0)
+
+
+def get_flights_api_retry_backoff_seconds() -> float:
+    raw = _safe_float(_config_value("FLIGHTS_API_RETRY_BACKOFF_SECONDS", 1.5), 1.5)
+    value = float(raw or 1.5)
+    if value <= 0:
+        return 1.5
+    return value
+
+
 def get_flights_request_cap_per_run() -> int:
     raw = _safe_int(_config_value("FLIGHTS_REQUEST_CAP_PER_RUN", 120), 120)
     return max(raw, 1)
@@ -437,6 +455,11 @@ def get_flights_backfill_days() -> int:
 def get_flights_backfill_chunk_hours() -> int:
     raw = _safe_int(_config_value("FLIGHTS_BACKFILL_CHUNK_HOURS", 24), 24)
     return max(raw, 1)
+
+
+def get_flights_polling_historic_hours() -> int:
+    raw = _safe_int(_config_value("FLIGHTS_POLLING_HISTORIC_HOURS", 24), 24)
+    return max(raw, 0)
 
 
 def get_flights_backfill_on_empty_db() -> bool:
@@ -588,10 +611,6 @@ def _apply_rate_limit(request_ctx: RequestContext) -> None:
 
 
 def _api_get(path: str, params: dict[str, Any], request_ctx: RequestContext) -> Any:
-    if request_ctx.request_count >= request_ctx.request_cap:
-        request_ctx.budget_exhausted = True
-        raise RequestBudgetExhausted("FLIGHTS request cap reached for this run")
-
     api_key = get_flights_api_key()
     if not api_key:
         raise RuntimeError("FLIGHTS_API_KEY no configurada")
@@ -599,8 +618,6 @@ def _api_get(path: str, params: dict[str, Any], request_ctx: RequestContext) -> 
     url = _build_api_url(path)
     if not url:
         raise RuntimeError("FLIGHTS_API_BASE_URL no configurada")
-
-    _apply_rate_limit(request_ctx)
 
     headers = {
         "Accept": "application/json",
@@ -617,25 +634,52 @@ def _api_get(path: str, params: dict[str, Any], request_ctx: RequestContext) -> 
             prefix = f"{prefix} "
         headers[header_name] = f"{prefix}{api_key}" if prefix else api_key
 
-    response = requests.get(
-        url,
-        params=params,
-        headers=headers,
-        timeout=get_flights_api_timeout_seconds(),
-    )
-    request_ctx.request_count += 1
-    request_ctx.estimated_credits += get_flights_credit_per_request()
+    max_retries = get_flights_api_max_retries()
+    base_backoff_seconds = get_flights_api_retry_backoff_seconds()
+    attempt = 0
 
-    if not response.ok:
+    while True:
+        if request_ctx.request_count >= request_ctx.request_cap:
+            request_ctx.budget_exhausted = True
+            raise RequestBudgetExhausted("FLIGHTS request cap reached for this run")
+
+        _apply_rate_limit(request_ctx)
+        response = requests.get(
+            url,
+            params=params,
+            headers=headers,
+            timeout=get_flights_api_timeout_seconds(),
+        )
+        request_ctx.request_count += 1
+        request_ctx.estimated_credits += get_flights_credit_per_request()
+
+        if response.ok:
+            try:
+                return response.json()
+            except Exception as exc:
+                raise RuntimeError(f"Respuesta no JSON desde flights API: {exc}") from exc
+
         snippet = (response.text or "").strip()
         if len(snippet) > 240:
             snippet = snippet[:237] + "..."
-        raise RuntimeError(f"HTTP {response.status_code} from flights API: {snippet or 'sin detalle'}")
 
-    try:
-        return response.json()
-    except Exception as exc:
-        raise RuntimeError(f"Respuesta no JSON desde flights API: {exc}") from exc
+        if response.status_code == 429:
+            retry_after_raw = (response.headers or {}).get("Retry-After")
+            retry_after_seconds = _safe_float(retry_after_raw, None)
+            if attempt < max_retries:
+                delay = (
+                    float(retry_after_seconds)
+                    if retry_after_seconds is not None and retry_after_seconds >= 0
+                    else float(base_backoff_seconds) * (2 ** attempt)
+                )
+                time.sleep(max(0.5, delay))
+                attempt += 1
+                continue
+            raise FlightsApiRateLimited(
+                f"HTTP 429 from flights API: {snippet or 'Rate limit exceeded'}"
+            )
+
+        raise RuntimeError(f"HTTP {response.status_code} from flights API: {snippet or 'sin detalle'}")
 
 
 def _month_range(now_utc: datetime) -> tuple[datetime, datetime]:
@@ -1230,6 +1274,10 @@ def _query_events_from_endpoint(
         except RequestBudgetExhausted:
             batch.budget_exhausted = True
             break
+        except FlightsApiRateLimited as exc:
+            batch.rate_limited = True
+            batch.errors.append(str(exc))
+            break
         except Exception as exc:
             batch.errors.append(str(exc))
             break
@@ -1355,10 +1403,10 @@ def _needs_airport_sync(now_utc: datetime, safe_mode: bool) -> bool:
 def _collect_backfill_records(
     request_ctx: RequestContext,
     known_cuba_codes: set[str],
-    days: int,
+    hours: int,
 ) -> FetchBatch:
     batch = FetchBatch()
-    if days <= 0:
+    if hours <= 0:
         return batch
     if not get_flights_backfill_historic_enabled():
         batch.errors.append(
@@ -1367,7 +1415,7 @@ def _collect_backfill_records(
         return batch
 
     now_utc = _utc_now_naive()
-    start_utc = now_utc - timedelta(days=days)
+    start_utc = now_utc - timedelta(hours=hours)
     cursor = start_utc
     chunk_hours = get_flights_backfill_chunk_hours()
     max_pages = get_flights_events_max_pages()
@@ -1469,13 +1517,16 @@ def _collect_backfill_records(
             batch.records.extend(chunk.records)
             batch.seen += chunk.seen
             batch.errors.extend(chunk.errors)
+            if getattr(chunk, "rate_limited", False):
+                batch.rate_limited = True
+                break
             if chunk.budget_exhausted:
                 batch.budget_exhausted = True
                 break
             if chunk.seen > 0 or chunk.records:
                 break
 
-        if batch.budget_exhausted:
+        if batch.budget_exhausted or batch.rate_limited:
             break
         cursor = min(cursor + snapshot_step, now_utc)
 
@@ -1573,6 +1624,9 @@ def _collect_live_records(
         combined.records.extend(chunk.records)
         combined.seen += int(chunk.seen)
         combined.errors.extend(chunk.errors)
+        if getattr(chunk, "rate_limited", False):
+            combined.rate_limited = True
+            break
         if chunk.budget_exhausted:
             combined.budget_exhausted = True
             break
@@ -1786,6 +1840,7 @@ def ingest_flights_cuba(
     events_seen = 0
     events_stored = 0
     positions_stored = 0
+    rate_limited = False
 
     try:
         if _needs_airport_sync(now_utc, safe_mode):
@@ -1798,33 +1853,45 @@ def ingest_flights_cuba(
         known_codes = _known_cuba_airport_codes()
 
         has_events = db.session.query(FlightEvent.id).limit(1).first() is not None
-        do_backfill = bool(force_backfill)
-        if not do_backfill and get_flights_backfill_on_empty_db() and not has_events:
-            do_backfill = True
+        run_full_backfill = bool(force_backfill)
+        if not run_full_backfill and get_flights_backfill_on_empty_db() and not has_events:
+            run_full_backfill = True
+
+        historic_hours = 0
+        if run_full_backfill:
+            historic_hours = max(0, int(get_flights_backfill_days()) * 24)
+        else:
+            historic_hours = get_flights_polling_historic_hours()
 
         all_records: list[dict[str, Any]] = []
 
-        if do_backfill and get_flights_backfill_days() > 0:
-            run.is_backfill = True
-            run.backfill_days = get_flights_backfill_days()
+        if historic_hours > 0:
+            if run_full_backfill:
+                run.is_backfill = True
+                run.backfill_days = get_flights_backfill_days()
             if not (safe_mode and get_flights_safe_mode_skip_backfill()):
                 backfill_batch = _collect_backfill_records(
                     request_ctx,
                     known_codes,
-                    days=get_flights_backfill_days(),
+                    hours=historic_hours,
                 )
                 all_records.extend(backfill_batch.records)
                 events_seen += backfill_batch.seen
                 errors.extend(backfill_batch.errors)
+                if getattr(backfill_batch, "rate_limited", False):
+                    rate_limited = True
                 if backfill_batch.budget_exhausted:
                     request_ctx.budget_exhausted = True
 
-        live_batch = _collect_live_records(request_ctx, known_codes, safe_mode=safe_mode)
-        all_records.extend(live_batch.records)
-        events_seen += live_batch.seen
-        errors.extend(live_batch.errors)
-        if live_batch.budget_exhausted:
-            request_ctx.budget_exhausted = True
+        if not rate_limited:
+            live_batch = _collect_live_records(request_ctx, known_codes, safe_mode=safe_mode)
+            all_records.extend(live_batch.records)
+            events_seen += live_batch.seen
+            errors.extend(live_batch.errors)
+            if getattr(live_batch, "rate_limited", False):
+                rate_limited = True
+            if live_batch.budget_exhausted:
+                request_ctx.budget_exhausted = True
 
         if all_records:
             events_stored, positions_stored = _persist_records(all_records, run)
@@ -1861,6 +1928,7 @@ def ingest_flights_cuba(
                 "guardrail_reached": bool(_safe_mode_active(month_used_after, monthly_budget)),
             },
             "warnings": errors,
+            "rate_limited": bool(rate_limited),
             "budget_exhausted": bool(request_ctx.budget_exhausted),
         }
         run.payload_json = json.dumps(payload, ensure_ascii=False)
@@ -1878,6 +1946,7 @@ def ingest_flights_cuba(
             "events_seen": int(run.events_seen or 0),
             "events_stored": int(run.events_stored or 0),
             "positions_stored": int(run.positions_stored or 0),
+            "rate_limited": bool(rate_limited),
             "budget_exhausted": bool(request_ctx.budget_exhausted),
             "warnings": errors,
         }

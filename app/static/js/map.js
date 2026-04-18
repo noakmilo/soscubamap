@@ -168,6 +168,7 @@ const CONNECTIVITY_PAN_BOUNDS = {
   west: -90.0,
   east: -58.0,
 };
+const FLIGHTS_WINDOW_OPTIONS = [2, 6, 24, 168];
 const MOBILE_VIEWPORT_QUERY = "(max-width: 900px)";
 const ALERT_PANEL_HIDDEN_COOKIE = "soscuba_alert_panel_hidden";
 const ALERT_PANEL_HIDDEN_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
@@ -1485,7 +1486,7 @@ function setActiveConnectivityWindow(hours) {
 
 function setActiveFlightsWindow(hours) {
   const numeric = Number(hours);
-  if (![2, 6, 24].includes(numeric)) return;
+  if (!FLIGHTS_WINDOW_OPTIONS.includes(numeric)) return;
   flightsWindowHours = numeric;
   flightsWindowButtons.forEach((button) => {
     const buttonHours = Number(button?.dataset?.flightsWindowHours);
@@ -5965,7 +5966,7 @@ async function initMap() {
   flightsWindowButtons.forEach((button) => {
     button.addEventListener("click", async () => {
       const hours = Number(button.dataset.flightsWindowHours);
-      if (![2, 6, 24].includes(hours)) return;
+      if (!FLIGHTS_WINDOW_OPTIONS.includes(hours)) return;
       const changed = hours !== flightsWindowHours;
       setActiveFlightsWindow(hours);
       if (!changed) return;
