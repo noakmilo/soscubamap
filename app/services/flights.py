@@ -200,6 +200,74 @@ def _world_airports_json_path() -> Path:
     return Path(__file__).resolve().parents[1] / "static" / "data" / "aeropuertos.json"
 
 
+def _parse_world_airport_row(row: dict[str, Any]) -> dict[str, Any] | None:
+    if not isinstance(row, dict):
+        return None
+
+    # Legacy local schema:
+    # { "codigo": "HAV", "ciudad": "Havana", "pais": "CU", "latitud": 23.0, "longitud": -82.0 }
+    legacy_code = _clean_text(row.get("codigo"), upper=True, limit=8)
+    if legacy_code:
+        legacy_iata = _clean_text(row.get("iata"), upper=True, limit=8)
+        legacy_icao = _clean_text(row.get("icao"), upper=True, limit=8)
+        if not legacy_iata and len(legacy_code) == 3:
+            legacy_iata = legacy_code
+        if not legacy_icao and len(legacy_code) == 4:
+            legacy_icao = legacy_code
+        codes = [code for code in (legacy_iata, legacy_icao, legacy_code) if code]
+        # Remove duplicates preserving order.
+        codes = list(dict.fromkeys(codes))
+        return {
+            "codes": codes,
+            "name": _clean_text(row.get("nombre"), limit=255),
+            "city": _clean_text(row.get("ciudad"), limit=120),
+            "country": _clean_text(row.get("pais"), upper=True, limit=120),
+            "latitude": _safe_float(row.get("latitud")),
+            "longitude": _safe_float(row.get("longitud")),
+            "iata": legacy_iata,
+            "icao": legacy_icao,
+        }
+
+    # CDN airports-json schema:
+    # { "ident": "MUHA", "iata_code": "HAV", "municipality": "Havana", "iso_country": "CU", ... }
+    icao = _clean_text(row.get("ident"), upper=True, limit=8)
+    iata = _clean_text(row.get("iata_code"), upper=True, limit=8)
+    codes = [code for code in (iata, icao) if code]
+    if not codes:
+        return None
+
+    return {
+        "codes": codes,
+        "name": _clean_text(row.get("name"), limit=255),
+        "city": _clean_text(row.get("municipality"), limit=120),
+        "country": _clean_text(row.get("iso_country"), upper=True, limit=120),
+        "latitude": _safe_float(row.get("latitude_deg")),
+        "longitude": _safe_float(row.get("longitude_deg")),
+        "iata": iata,
+        "icao": icao,
+    }
+
+
+def _merge_world_airport_record(
+    current: dict[str, Any] | None,
+    incoming: dict[str, Any],
+) -> dict[str, Any]:
+    if current is None:
+        return dict(incoming)
+
+    merged = dict(current)
+    for key in ("name", "city", "country", "iata", "icao"):
+        if (not _clean_text(merged.get(key), limit=255)) and _clean_text(incoming.get(key), limit=255):
+            merged[key] = incoming.get(key)
+
+    if merged.get("latitude") is None and incoming.get("latitude") is not None:
+        merged["latitude"] = incoming.get("latitude")
+    if merged.get("longitude") is None and incoming.get("longitude") is not None:
+        merged["longitude"] = incoming.get("longitude")
+
+    return merged
+
+
 def _load_world_airports_index() -> dict[str, dict[str, Any]]:
     global _WORLD_AIRPORTS_BY_CODE, _WORLD_AIRPORTS_LOAD_ATTEMPTED
     if _WORLD_AIRPORTS_BY_CODE is not None:
@@ -219,29 +287,25 @@ def _load_world_airports_index() -> dict[str, dict[str, Any]]:
     index: dict[str, dict[str, Any]] = {}
     rows = payload if isinstance(payload, list) else []
     for row in rows:
-        if not isinstance(row, dict):
+        parsed = _parse_world_airport_row(row)
+        if not parsed:
             continue
-        code = _clean_text(row.get("codigo"), upper=True, limit=8)
-        if not code:
-            continue
-        city = _clean_text(row.get("ciudad"), limit=120)
-        country = _clean_text(row.get("pais"), upper=True, limit=120)
-        latitude = _safe_float(row.get("latitud"))
-        longitude = _safe_float(row.get("longitud"))
-        current = index.get(code)
-        if (
-            current
-            and current.get("latitude") is not None
-            and current.get("longitude") is not None
-        ):
-            continue
-        index[code] = {
-            "code": code,
-            "city": city,
-            "country": country,
-            "latitude": latitude,
-            "longitude": longitude,
-        }
+
+        for code in parsed.get("codes") or []:
+            if not code:
+                continue
+            record = {
+                "code": code,
+                "name": _clean_text(parsed.get("name"), limit=255) or code,
+                "city": _clean_text(parsed.get("city"), limit=120),
+                "country": _clean_text(parsed.get("country"), upper=True, limit=120),
+                "latitude": _safe_float(parsed.get("latitude")),
+                "longitude": _safe_float(parsed.get("longitude")),
+                "iata": _clean_text(parsed.get("iata"), upper=True, limit=8),
+                "icao": _clean_text(parsed.get("icao"), upper=True, limit=8),
+            }
+            current = index.get(code)
+            index[code] = _merge_world_airport_record(current, record)
 
     _WORLD_AIRPORTS_BY_CODE = index
     logger.info("Catalogo de aeropuertos estatico cargado: %s codigos", len(index))
