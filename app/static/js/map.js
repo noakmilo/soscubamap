@@ -115,6 +115,8 @@ let flightsOverlay;
 let flightsSummary;
 let flightsMeta;
 let flightsAirportsList;
+let flightsOriginCountryList;
+let flightsOriginAirportList;
 let flightsRoutesToggle;
 let flightsWindowButtons = [];
 let flightsWindowHours = 2;
@@ -275,7 +277,8 @@ const flightsDetailCacheByEvent = new Map();
 const flightsDetailCacheByAircraft = new Map();
 const AIS_MARKER_COLOR = "#0ea5e9";
 const FLIGHTS_MARKER_COLOR = "#ef4444";
-const FLIGHTS_ROUTE_COLOR = "#f59e0b";
+const FLIGHTS_ROUTE_ORIGIN_COLOR = "#ef4444";
+const FLIGHTS_ROUTE_DESTINATION_COLOR = "#3b82f6";
 const MAP_POPUP_OPTIONS = {
   maxWidth: 320,
   maxHeight: 320,
@@ -4605,6 +4608,68 @@ function renderFlightsAirportsList(payload) {
     .join("");
 }
 
+function renderFlightsOriginPanel(panel, rows, labelKey, fallbackLabel, emptyText, errorText = "") {
+  if (!panel) return;
+  if (errorText) {
+    panel.innerHTML = `<div class="flights-stats-empty">${escapeHtml(errorText)}</div>`;
+    return;
+  }
+
+  const safeRows = (Array.isArray(rows) ? rows : [])
+    .map((item) => ({
+      label: String(item?.[labelKey] || "").trim() || fallbackLabel,
+      count: Math.max(0, Number(item?.count) || 0),
+    }))
+    .filter((item) => item.count > 0);
+
+  if (!safeRows.length) {
+    panel.innerHTML = `<div class="flights-stats-empty">${escapeHtml(emptyText)}</div>`;
+    return;
+  }
+
+  const topRows = safeRows.slice(0, 16);
+  const totalTop = topRows.reduce((acc, item) => acc + item.count, 0);
+  const maxCount = Math.max(...topRows.map((item) => item.count), 1);
+  const rowsHtml = topRows
+    .map((item) => {
+      const width = Math.max(4, Math.round((item.count / maxCount) * 100));
+      return `
+        <div class="flights-stats-row">
+          <div class="flights-stats-label">${escapeHtml(item.label)}</div>
+          <div class="flights-stats-bar">
+            <span style="width:${width}%"></span>
+          </div>
+          <div class="flights-stats-value">${item.count.toLocaleString("es-ES")}</div>
+        </div>
+      `;
+    })
+    .join("");
+
+  panel.innerHTML = `
+    <div class="flights-stats-total">Top ventana: ${totalTop.toLocaleString("es-ES")} vuelos</div>
+    <div class="flights-stats-list">${rowsHtml}</div>
+  `;
+}
+
+function renderFlightsOriginStats(payload, errorText = "") {
+  renderFlightsOriginPanel(
+    flightsOriginCountryList,
+    payload?.summary?.by_origin_country,
+    "country",
+    "Pais N/D",
+    "Sin datos de paises de origen en esta ventana.",
+    errorText
+  );
+  renderFlightsOriginPanel(
+    flightsOriginAirportList,
+    payload?.summary?.by_origin_airport,
+    "airport",
+    "Origen N/D",
+    "Sin datos de aeropuertos de origen en esta ventana.",
+    errorText
+  );
+}
+
 function renderFlightsSummary(payload, errorText = "") {
   if (!flightsSummary || !flightsMeta) return;
   if (errorText) {
@@ -4616,6 +4681,8 @@ function renderFlightsSummary(payload, errorText = "") {
   const summary = payload?.summary || {};
   const totalFlights = Math.max(0, Number(summary?.total_flights) || 0);
   const destinationAirports = Math.max(0, Number(summary?.destination_airports) || 0);
+  const originCountries = Math.max(0, Number(summary?.origin_countries) || 0);
+  const originAirports = Math.max(0, Number(summary?.origin_airports) || 0);
   const stale = Boolean(payload?.stale);
   const staleLabel = stale ? "desactualizado" : "vigente";
   const run = payload?.latest_run || {};
@@ -4625,6 +4692,10 @@ function renderFlightsSummary(payload, errorText = "") {
   const generatedAt = formatUtcLabel(payload?.snapshot?.generated_at_utc || "");
 
   flightsSummary.textContent = `Vuelos en mapa: ${totalFlights.toLocaleString(
+    "es-ES"
+  )} · Paises origen: ${originCountries.toLocaleString(
+    "es-ES"
+  )} · Aeropuertos origen: ${originAirports.toLocaleString(
     "es-ES"
   )} · Aeropuertos destino: ${destinationAirports.toLocaleString("es-ES")} · Snapshot ${staleLabel}.`;
   flightsMeta.textContent = `Run: ${status} · ${safeModeLabel} · Actualizado: ${
@@ -4639,6 +4710,11 @@ function toFlightLatLng(latitude, longitude) {
   return [lat, lng];
 }
 
+function sameFlightLatLng(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  return a[0] === b[0] && a[1] === b[1];
+}
+
 function renderFlightsRoutes(payload) {
   if (!map) return;
   clearFlightsRoutes();
@@ -4651,17 +4727,30 @@ function renderFlightsRoutes(payload) {
   let routeCount = 0;
   points.forEach((item) => {
     const origin = toFlightLatLng(item?.origin_latitude, item?.origin_longitude);
+    const aircraft = toFlightLatLng(item?.latitude, item?.longitude);
     const destination = toFlightLatLng(item?.destination_latitude, item?.destination_longitude);
-    if (!origin || !destination) return;
+    if (!origin && !destination && !aircraft) return;
 
-    L.polyline([origin, destination], {
-      color: FLIGHTS_ROUTE_COLOR,
-      weight: 1.6,
-      opacity: 0.5,
-      dashArray: "5 6",
-      interactive: false,
-    }).addTo(layer);
-    routeCount += 1;
+    const routePoint = aircraft || destination || origin;
+    if (origin && routePoint && !sameFlightLatLng(origin, routePoint)) {
+      L.polyline([origin, routePoint], {
+        color: FLIGHTS_ROUTE_ORIGIN_COLOR,
+        weight: 2.1,
+        opacity: 0.5,
+        interactive: false,
+      }).addTo(layer);
+      routeCount += 1;
+    }
+
+    if (routePoint && destination && !sameFlightLatLng(routePoint, destination)) {
+      L.polyline([routePoint, destination], {
+        color: FLIGHTS_ROUTE_DESTINATION_COLOR,
+        weight: 2.1,
+        opacity: 0.5,
+        interactive: false,
+      }).addTo(layer);
+      routeCount += 1;
+    }
   });
 
   if (!routeCount) return;
@@ -4718,7 +4807,7 @@ function drawFlightTrack(trackPayload) {
       radius: 4,
       color: "#ffffff",
       weight: 1.5,
-      fillColor: "#ef4444",
+      fillColor: FLIGHTS_ROUTE_ORIGIN_COLOR,
       fillOpacity: 0.98,
     }).addTo(flightsTrackLayer);
   }
@@ -4728,14 +4817,14 @@ function drawFlightTrack(trackPayload) {
       radius: 4,
       color: "#ffffff",
       weight: 1.5,
-      fillColor: "#3b82f6",
+      fillColor: FLIGHTS_ROUTE_DESTINATION_COLOR,
       fillOpacity: 0.98,
     }).addTo(flightsTrackLayer);
   }
 
   if (routeOrigin && aircraftPoint) {
     const originToAircraft = L.polyline([routeOrigin, aircraftPoint], {
-      color: "#ef4444",
+      color: FLIGHTS_ROUTE_ORIGIN_COLOR,
       weight: 3,
       opacity: 0.92,
     });
@@ -4744,7 +4833,7 @@ function drawFlightTrack(trackPayload) {
 
   if (aircraftPoint && routeDestination) {
     const aircraftToDestination = L.polyline([aircraftPoint, routeDestination], {
-      color: "#3b82f6",
+      color: FLIGHTS_ROUTE_DESTINATION_COLOR,
       weight: 3,
       opacity: 0.92,
     });
@@ -5132,6 +5221,7 @@ async function refreshFlightsLayer() {
     renderFlightsLayer(payload);
     renderFlightsRoutes(payload);
     renderFlightsSummary(payload);
+    renderFlightsOriginStats(payload);
     renderFlightsAirportsList(payload);
   } catch (_error) {
     if (!flightsLastPayload) {
@@ -5140,6 +5230,10 @@ async function refreshFlightsLayer() {
       clearFlightsRoutes();
     }
     renderFlightsSummary(flightsLastPayload, "No fue posible actualizar la capa de vuelos.");
+    renderFlightsOriginStats(
+      flightsLastPayload,
+      "No fue posible actualizar el grafico en esta ventana."
+    );
     renderFlightsAirportsList(flightsLastPayload);
   }
 }
@@ -5163,6 +5257,7 @@ async function enableFlightsMode() {
   setFlightsOverlayVisible(true);
   ensureContextPanelVisible({ mobileState: "mid" });
   renderFlightsSummary(flightsLastPayload, "Cargando capa de vuelos...");
+  renderFlightsOriginStats(flightsLastPayload, "Cargando graficos de origen...");
   renderFlightsAirportsList(flightsLastPayload);
   await refreshFlightsLayer();
   startFlightsPolling();
@@ -6355,6 +6450,8 @@ async function initMap() {
   flightsSummary = document.getElementById("flightsSummary");
   flightsMeta = document.getElementById("flightsMeta");
   flightsAirportsList = document.getElementById("flightsAirportsList");
+  flightsOriginCountryList = document.getElementById("flightsOriginCountryList");
+  flightsOriginAirportList = document.getElementById("flightsOriginAirportList");
   flightsRoutesToggle = document.getElementById("flightsRoutesToggle");
   flightsWindowButtons = Array.from(document.querySelectorAll("[data-flights-window-hours]"));
   reportDetailPanel = document.getElementById("reportDetailPanel");

@@ -2813,7 +2813,11 @@ def flights_cuba_layer_v1():
         "window_hours": int(window_hours),
         "total_flights": 0,
         "destination_airports": 0,
+        "origin_countries": 0,
+        "origin_airports": 0,
         "by_destination_airport": [],
+        "by_origin_country": [],
+        "by_origin_airport": [],
     }
 
     if snapshot:
@@ -4114,6 +4118,75 @@ def analytics_v1():
         .all()
     )
     edit_status_map = {status: count for status, count in edit_status_query}
+    flight_base_filters = [
+        FlightEvent.last_seen_at_utc.isnot(None),
+        FlightEvent.last_seen_at_utc >= start_dt,
+        FlightEvent.last_seen_at_utc <= end_dt,
+        or_(
+            FlightEvent.destination_airport_id.isnot(None),
+            func.lower(func.coalesce(FlightEvent.destination_country, "")).contains(
+                "cuba"
+            ),
+            FlightEvent.destination_country == "CU",
+        ),
+    ]
+    flights_total = (
+        db.session.query(func.count(FlightEvent.id))
+        .filter(*flight_base_filters)
+        .scalar()
+        or 0
+    )
+
+    country_label_expr = func.coalesce(
+        func.nullif(FlightEvent.origin_country, ""),
+        "Pais N/D",
+    )
+    country_count_expr = func.count(FlightEvent.id)
+    origin_country_distribution = (
+        db.session.query(
+            country_label_expr.label("country"),
+            country_count_expr.label("count"),
+        )
+        .filter(*flight_base_filters)
+        .group_by(country_label_expr)
+        .order_by(country_count_expr.desc(), country_label_expr.asc())
+        .limit(20)
+        .all()
+    )
+    origin_country_items = [
+        {
+            "country": row[0],
+            "count": int(row[1] or 0),
+        }
+        for row in origin_country_distribution
+    ]
+
+    airport_label_expr = func.coalesce(
+        func.nullif(FlightEvent.origin_airport_name, ""),
+        func.nullif(FlightEvent.origin_airport_iata, ""),
+        func.nullif(FlightEvent.origin_airport_icao, ""),
+        "Origen N/D",
+    )
+    airport_count_expr = func.count(FlightEvent.id)
+    origin_airport_distribution = (
+        db.session.query(
+            airport_label_expr.label("airport"),
+            airport_count_expr.label("count"),
+        )
+        .filter(*flight_base_filters)
+        .group_by(airport_label_expr)
+        .order_by(airport_count_expr.desc(), airport_label_expr.asc())
+        .limit(20)
+        .all()
+    )
+    origin_airport_items = [
+        {
+            "airport": row[0],
+            "count": int(row[1] or 0),
+        }
+        for row in origin_airport_distribution
+    ]
+
     connectivity_outages = _build_connectivity_outage_events(start_dt, end_dt, province=province)
     connectivity_24h = _build_http_requests_24h_summary()
 
@@ -4143,6 +4216,11 @@ def analytics_v1():
                 "pending": edit_status_map.get("pending", 0),
                 "approved": edit_status_map.get("approved", 0),
                 "rejected": edit_status_map.get("rejected", 0),
+            },
+            "flights_origin_summary": {
+                "total_flights": int(flights_total),
+                "by_origin_country": origin_country_items,
+                "by_origin_airport": origin_airport_items,
             },
             "connectivity_outages": connectivity_outages,
             "connectivity_24h": connectivity_24h,

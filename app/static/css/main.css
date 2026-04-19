@@ -2650,12 +2650,74 @@ body.map-dashboard-page .map-canvas .leaflet-control-layers.map-layer-control in
   font-size: 11px;
 }
 
+.flights-stats-heading,
 .flights-airports-heading {
   color: #fff4df;
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.7px;
+}
+
+.flights-stats-panel {
+  border: 1px solid rgba(251, 191, 36, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.flights-stats-total {
+  color: #fff8ee;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.flights-stats-empty {
+  color: #ffdca8;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.flights-stats-list {
+  display: grid;
+  gap: 6px;
+}
+
+.flights-stats-row {
+  display: grid;
+  grid-template-columns: minmax(80px, 1fr) minmax(76px, 2fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.flights-stats-label {
+  color: #ffebcf;
+  font-size: 10.5px;
+  line-height: 1.25;
+}
+
+.flights-stats-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.2);
+  overflow: hidden;
+}
+
+.flights-stats-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ef4444 0%, #3b82f6 100%);
+}
+
+.flights-stats-value {
+  color: #fff8ee;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
 }
 
 .flights-airports-list {

@@ -383,6 +383,8 @@ const renderCharts = (payload, repressorStats) => {
   destroyChart("categoryDistribution");
   destroyChart("provinceDistribution");
   destroyChart("municipalityDistribution");
+  destroyChart("flightsByOriginCountry");
+  destroyChart("flightsByOriginAirport");
   destroyChart("repressorGeoDistribution");
   destroyChart("topVerified");
   destroyChart("commentsOverTime");
@@ -434,6 +436,41 @@ const renderCharts = (payload, repressorStats) => {
     document.getElementById("municipalityDistribution"),
     municipalityLabels,
     municipalityData,
+    true
+  );
+
+  const flightsOriginSummary = payload?.flights_origin_summary || {};
+  const countryRowsRaw = Array.isArray(flightsOriginSummary.by_origin_country)
+    ? flightsOriginSummary.by_origin_country
+    : [];
+  const airportRowsRaw = Array.isArray(flightsOriginSummary.by_origin_airport)
+    ? flightsOriginSummary.by_origin_airport
+    : [];
+
+  const countryRows =
+    countryRowsRaw.length > 0
+      ? countryRowsRaw.slice(0, 16)
+      : [{ country: "Sin datos", count: 0 }];
+  const airportRows =
+    airportRowsRaw.length > 0
+      ? airportRowsRaw.slice(0, 16)
+      : [{ airport: "Sin datos", count: 0 }];
+
+  const flightsCountryLabels = countryRows.map((item) => item?.country || "Pais N/D");
+  const flightsCountryData = countryRows.map((item) => Math.max(0, Number(item?.count) || 0));
+  state.charts.flightsByOriginCountry = buildBar(
+    document.getElementById("flightsByOriginCountry"),
+    flightsCountryLabels,
+    flightsCountryData,
+    true
+  );
+
+  const flightsAirportLabels = airportRows.map((item) => item?.airport || "Origen N/D");
+  const flightsAirportData = airportRows.map((item) => Math.max(0, Number(item?.count) || 0));
+  state.charts.flightsByOriginAirport = buildBar(
+    document.getElementById("flightsByOriginAirport"),
+    flightsAirportLabels,
+    flightsAirportData,
     true
   );
 

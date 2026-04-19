@@ -2509,6 +2509,8 @@ def _build_snapshot_payload(window_hours: int, now_utc: datetime | None = None) 
 
     points: list[dict[str, Any]] = []
     by_destination: Counter[str] = Counter()
+    by_origin_country: Counter[str] = Counter()
+    by_origin_airport: Counter[str] = Counter()
     airport_lookup_cache: dict[tuple[str, str], dict[str, Any]] = {}
 
     for row in rows:
@@ -2536,13 +2538,37 @@ def _build_snapshot_payload(window_hours: int, now_utc: datetime | None = None) 
         if destination_lng is None:
             destination_lng = _safe_float(destination_ref.get("longitude"))
         aircraft = row.aircraft
+        origin_name = (
+            _clean_text(row.origin_airport_name, limit=255)
+            or _clean_text(origin_ref.get("name"), limit=255)
+            or _clean_text(row.origin_airport_iata, upper=True, limit=8)
+            or _clean_text(row.origin_airport_icao, upper=True, limit=8)
+            or "Origen N/D"
+        )
+        origin_country_name = (
+            _clean_text(row.origin_country, limit=120)
+            or _clean_text(origin_ref.get("country"), limit=120)
+            or "Pais N/D"
+        )
         destination_name = (
             (row.destination_airport.name if row.destination_airport else "")
             or row.destination_airport_name
             or _clean_text(destination_ref.get("name"), limit=255)
             or "Aeropuerto Cuba"
         )
+        destination_country_name = (
+            _clean_text(row.destination_country, limit=120)
+            or (
+                _clean_text(row.destination_airport.country_name, limit=120)
+                if row.destination_airport
+                else ""
+            )
+            or _clean_text(destination_ref.get("country"), limit=120)
+            or "Cuba"
+        )
         by_destination[destination_name] += 1
+        by_origin_country[origin_country_name] += 1
+        by_origin_airport[origin_name] += 1
 
         photo_url = ""
         if aircraft:
@@ -2561,12 +2587,11 @@ def _build_snapshot_payload(window_hours: int, now_utc: datetime | None = None) 
                 "model": row.model,
                 "registration": row.registration,
                 "status": row.status,
-                "origin_airport_name": row.origin_airport_name,
+                "origin_airport_name": origin_name,
                 "origin_airport_icao": row.origin_airport_icao,
                 "origin_airport_iata": row.origin_airport_iata,
                 "origin_city": _clean_text(origin_ref.get("city"), limit=120),
-                "origin_country": _clean_text(row.origin_country, limit=120)
-                or _clean_text(origin_ref.get("country"), limit=120),
+                "origin_country": origin_country_name,
                 "destination_airport_name": destination_name,
                 "destination_airport_icao": row.destination_airport_icao,
                 "destination_airport_iata": row.destination_airport_iata,
@@ -2575,16 +2600,7 @@ def _build_snapshot_payload(window_hours: int, now_utc: datetime | None = None) 
                     if row.destination_airport
                     else _clean_text(destination_ref.get("city"), limit=120)
                 ),
-                "destination_country": (
-                    _clean_text(row.destination_country, limit=120)
-                    or (
-                        _clean_text(row.destination_airport.country_name, limit=120)
-                        if row.destination_airport
-                        else ""
-                    )
-                    or _clean_text(destination_ref.get("country"), limit=120)
-                    or "Cuba"
-                ),
+                "destination_country": destination_country_name,
                 "origin_latitude": origin_lat,
                 "origin_longitude": origin_lng,
                 "destination_latitude": destination_lat,
@@ -2605,9 +2621,19 @@ def _build_snapshot_payload(window_hours: int, now_utc: datetime | None = None) 
         "window_end_utc": serialize_flight_time(now),
         "total_flights": len(points),
         "destination_airports": len(by_destination),
+        "origin_countries": len(by_origin_country),
+        "origin_airports": len(by_origin_airport),
         "by_destination_airport": [
             {"airport": airport, "count": int(count)}
             for airport, count in by_destination.most_common(20)
+        ],
+        "by_origin_country": [
+            {"country": country, "count": int(count)}
+            for country, count in by_origin_country.most_common(20)
+        ],
+        "by_origin_airport": [
+            {"airport": airport, "count": int(count)}
+            for airport, count in by_origin_airport.most_common(20)
         ],
     }
 

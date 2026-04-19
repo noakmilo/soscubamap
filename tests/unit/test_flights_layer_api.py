@@ -107,7 +107,11 @@ def _seed_flights_data(app):
             "window_hours": 24,
             "total_flights": 1,
             "destination_airports": 1,
+            "origin_countries": 1,
+            "origin_airports": 1,
             "by_destination_airport": [{"airport": "Jose Marti", "count": 1}],
+            "by_origin_country": [{"country": "USA", "count": 1}],
+            "by_origin_airport": [{"airport": "Miami Intl", "count": 1}],
         }
         points = [
             {
@@ -166,6 +170,10 @@ def test_flights_layer_api_returns_snapshot_for_admin(app, client):
     assert isinstance(payload.get("points"), list)
     assert len(payload["points"]) == 1
     assert payload["summary"]["total_flights"] == 1
+    assert payload["summary"]["origin_countries"] == 1
+    assert payload["summary"]["origin_airports"] == 1
+    assert payload["summary"]["by_origin_country"][0]["country"] == "USA"
+    assert payload["summary"]["by_origin_airport"][0]["airport"] == "Miami Intl"
     assert payload["latest_run"]["status"] == "success"
     assert payload["points"][0]["origin_latitude"] == 25.7959
     assert payload["points"][0]["destination_latitude"] == 22.9892
