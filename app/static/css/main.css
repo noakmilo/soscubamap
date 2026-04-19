@@ -6572,6 +6572,10 @@ textarea {
     display: none;
   }
 
+  .nav-links .nav-link-icon {
+    font-size: 18px;
+  }
+
   .nav-links a,
   .nav-links .nav-link-btn {
     justify-content: center;
