@@ -1,0 +1,62 @@
+{% extends "shared/base.html" %}
+{% block title %} | Comentarios de reportes{% endblock %}
+{% block content %}
+<section class="panel">
+  <h1>Comentarios de reportes</h1>
+  <p class="muted">Listado administrativo de comentarios públicos en reportes.</p>
+
+  {% if comments %}
+    <div class="table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Reporte</th>
+            <th>Autor</th>
+            <th>Comentario</th>
+            <th>Fecha</th>
+            <th>Karma</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for comment in comments %}
+            <tr>
+              <td>#{{ comment.id }}</td>
+              <td>
+                {% if comment.post %}
+                  <a href="{{ url_for('map.report_detail', post_id=comment.post.id) }}" target="_blank" rel="noopener">
+                    {{ comment.post.title }}
+                  </a>
+                {% else %}
+                  <span class="muted">Reporte no disponible</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if comment.author and comment.author.anon_code %}
+                  Anon-{{ comment.author.anon_code }}
+                {% elif comment.author_label %}
+                  {{ comment.author_label }}
+                {% else %}
+                  Anónimo
+                {% endif %}
+              </td>
+              <td>{{ comment.body | truncate(220) }}</td>
+              <td>{{ comment.created_at }}</td>
+              <td>{{ comment.score() }}</td>
+              <td>
+                <form method="post" action="{{ url_for('admin.delete_report_comment', comment_id=comment.id) }}" onsubmit="return confirm('¿Eliminar este comentario?');">
+                  <input type="hidden" name="next" value="{{ url_for('admin.report_comments') }}" />
+                  <button class="btn-secondary" type="submit">Eliminar</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="muted">No hay comentarios de reportes.</div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -13,6 +13,7 @@ from app.services.map_providers import (
     set_map_provider_main,
 )
 from app.models.post import Post
+from app.models.comment import Comment
 from app.models.discussion_post import DiscussionPost
 from app.models.discussion_comment import DiscussionComment
 from app.models.discussion_tag import DiscussionTag
@@ -166,6 +167,21 @@ def reports():
     return render_template("admin/reports.html", posts=posts, status=status)
 
 
+@admin_bp.route("/reportes/comentarios")
+@login_required
+@role_required("administrador")
+def report_comments():
+    comments = (
+        Comment.query.options(
+            selectinload(Comment.post),
+            selectinload(Comment.author),
+        )
+        .order_by(Comment.created_at.desc(), Comment.id.desc())
+        .all()
+    )
+    return render_template("admin/report_comments.html", comments=comments)
+
+
 @admin_bp.route("/reportes-ubicacion")
 @login_required
 @role_required("administrador")
@@ -185,6 +201,18 @@ def discussions():
         .all()
     )
     return render_template("admin/discussions.html", posts=posts, comment_counts=counts)
+
+
+@admin_bp.route("/discusiones/comentarios")
+@login_required
+@role_required("administrador")
+def discussion_comments():
+    comments = (
+        DiscussionComment.query.options(selectinload(DiscussionComment.post))
+        .order_by(DiscussionComment.created_at.desc(), DiscussionComment.id.desc())
+        .all()
+    )
+    return render_template("admin/discussion_comments.html", comments=comments)
 
 
 @admin_bp.route("/donaciones", methods=["GET", "POST"])
@@ -683,15 +711,34 @@ def delete_discussion(post_id):
     return redirect(url_for("admin.discussions"))
 
 
+@admin_bp.route("/reportes/comentarios/<int:comment_id>/eliminar", methods=["POST"])
+@login_required
+@role_required("administrador")
+def delete_report_comment(comment_id):
+    comment = Comment.query.filter_by(id=comment_id).first_or_404()
+    next_url = (request.form.get("next") or "").strip()
+    if not next_url.startswith("/admin"):
+        next_url = request.referrer or url_for("admin.report_comments")
+
+    db.session.delete(comment)
+    db.session.commit()
+    flash("Comentario eliminado.", "success")
+    return redirect(next_url)
+
+
 @admin_bp.route("/discusiones/comentarios/<int:comment_id>/eliminar", methods=["POST"])
 @login_required
 @role_required("administrador")
 def delete_discussion_comment(comment_id):
-    comment = DiscussionComment.query.get_or_404(comment_id)
+    comment = DiscussionComment.query.filter_by(id=comment_id).first_or_404()
+    next_url = (request.form.get("next") or "").strip()
+    if not next_url.startswith("/admin"):
+        next_url = request.referrer or url_for("admin.discussion_comments")
+
     db.session.delete(comment)
     db.session.commit()
     flash("Comentario eliminado.", "success")
-    return redirect(request.referrer or url_for("admin.discussions"))
+    return redirect(next_url)
 
 
 @admin_bp.route("/reportes/<int:post_id>/estado", methods=["POST"])
