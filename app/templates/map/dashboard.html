@@ -465,8 +465,8 @@
   </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/map.js') }}"></script>
-<script src="{{ url_for('static', filename='js/push_alerts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/map.js') }}?v={{ config.ASSET_VERSION }}"></script>
+<script src="{{ url_for('static', filename='js/push_alerts.js') }}?v={{ config.ASSET_VERSION }}"></script>
 <link
   rel="stylesheet"
   href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
