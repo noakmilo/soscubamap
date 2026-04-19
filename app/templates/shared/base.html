@@ -32,40 +32,119 @@
         <span class="beta-badge">beta</span>
       </a>
       <nav class="nav-links">
-        <a href="{{ url_for('map.dashboard') }}">Mapa</a>
-        <a href="{{ url_for('discussions.index') }}">Discusiones</a>
+        <a href="{{ url_for('map.dashboard') }}" aria-label="Mapa">
+          <i class="fa-solid fa-map-location-dot nav-link-icon" aria-hidden="true"></i>
+          <span class="nav-link-label">Mapa</span>
+        </a>
+        <a href="{{ url_for('discussions.index') }}" aria-label="Discusiones">
+          <i class="fa-solid fa-comments nav-link-icon" aria-hidden="true"></i>
+          <span class="nav-link-label">Discusiones</span>
+        </a>
         {% if current_user.is_authenticated %}
-          <button class="btn-secondary" type="button" data-open-report data-url="{{ url_for('map.new_post') }}">Nuevo reporte</button>
-          <a href="{{ url_for('map.reports') }}">Reportes</a>
-          <a href="{{ url_for('map.repressors') }}">Represores</a>
-          <a href="{{ url_for('map.prisoners') }}">Prisioneros</a>
-          <a href="{{ url_for('map.export_data') }}">Exportar</a>
-          <a href="{{ url_for('map.analytics') }}">Analíticas</a>
-          <a href="{{ url_for('map.about') }}">Acerca de</a>
-          <a class="nav-donate" href="{{ url_for('map.donate') }}">Donar</a>
-          <a class="nav-sos" href="{{ url_for('panic.panic_page') }}">🚨 SOS</a>
+          <button
+            class="btn-secondary nav-link-btn"
+            type="button"
+            data-open-report
+            data-url="{{ url_for('map.new_post') }}"
+            aria-label="Nuevo reporte"
+          >
+            <i class="fa-solid fa-square-plus nav-link-icon" aria-hidden="true"></i>
+            <span class="nav-link-label">Nuevo reporte</span>
+          </button>
+          <a href="{{ url_for('map.reports') }}" aria-label="Reportes">
+            <i class="fa-solid fa-file-lines nav-link-icon" aria-hidden="true"></i>
+            <span class="nav-link-label">Reportes</span>
+          </a>
+          <a href="{{ url_for('map.repressors') }}" aria-label="Represores">
+            <i class="fa-solid fa-user-secret nav-link-icon" aria-hidden="true"></i>
+            <span class="nav-link-label">Represores</span>
+          </a>
+          <a href="{{ url_for('map.prisoners') }}" aria-label="Prisioneros">
+            <i class="fa-solid fa-landmark-dome nav-link-icon" aria-hidden="true"></i>
+            <span class="nav-link-label">Prisioneros</span>
+          </a>
+          <a href="{{ url_for('map.export_data') }}" aria-label="Exportar">
+            <i class="fa-solid fa-file-export nav-link-icon" aria-hidden="true"></i>
+            <span class="nav-link-label">Exportar</span>
+          </a>
+          <a href="{{ url_for('map.analytics') }}" aria-label="Analíticas">
+            <i class="fa-solid fa-chart-line nav-link-icon" aria-hidden="true"></i>
+            <span class="nav-link-label">Analíticas</span>
+          </a>
+          <a href="{{ url_for('map.about') }}" aria-label="Acerca de">
+            <i class="fa-solid fa-circle-info nav-link-icon" aria-hidden="true"></i>
+            <span class="nav-link-label">Acerca de</span>
+          </a>
+          <a class="nav-donate" href="{{ url_for('map.donate') }}" aria-label="Donar">
+            <i class="fa-solid fa-hand-holding-heart nav-link-icon" aria-hidden="true"></i>
+            <span class="nav-link-label">Donar</span>
+          </a>
+          <a class="nav-sos" href="{{ url_for('panic.panic_page') }}" aria-label="SOS">
+            <i class="fa-solid fa-triangle-exclamation nav-link-icon" aria-hidden="true"></i>
+            <span class="nav-link-label">SOS</span>
+          </a>
           {% if current_user.has_role('moderador') or current_user.has_role('administrador') %}
-            <a href="{{ url_for('moderation.dashboard') }}">
-              Moderación
+            <a href="{{ url_for('moderation.dashboard') }}" aria-label="Moderación">
+              <i class="fa-solid fa-shield-halved nav-link-icon" aria-hidden="true"></i>
+              <span class="nav-link-label">Moderación</span>
               {% if current_user.has_role('administrador') and (moderation_pending_count|int) > 0 %}
                 <span class="nav-badge">{{ moderation_pending_count }}</span>
               {% endif %}
             </a>
           {% endif %}
           {% if current_user.has_role('administrador') %}
-            <a href="{{ url_for('admin.dashboard') }}">Admin</a>
+            <a href="{{ url_for('admin.dashboard') }}" aria-label="Admin">
+              <i class="fa-solid fa-screwdriver-wrench nav-link-icon" aria-hidden="true"></i>
+              <span class="nav-link-label">Admin</span>
+            </a>
           {% endif %}
-          <a href="{{ url_for('auth.logout') }}">Salir</a>
+          <a href="{{ url_for('auth.logout') }}" aria-label="Salir">
+            <i class="fa-solid fa-right-from-bracket nav-link-icon" aria-hidden="true"></i>
+            <span class="nav-link-label">Salir</span>
+          </a>
         {% else %}
-          <a href="{{ url_for('map.reports') }}">Reportes</a>
-          <a href="{{ url_for('map.repressors') }}">Represores</a>
-          <a href="{{ url_for('map.prisoners') }}">Prisioneros</a>
-          <a href="{{ url_for('map.export_data') }}">Exportar</a>
-          <a href="{{ url_for('map.analytics') }}">Analíticas</a>
-          <a href="{{ url_for('map.about') }}">Acerca de</a>
-          <a class="nav-donate" href="{{ url_for('map.donate') }}">Donar</a>
-          <a class="nav-sos" href="{{ url_for('panic.panic_page') }}">🚨 SOS</a>
-          <button class="btn-cta" type="button" data-open-report data-url="{{ url_for('map.new_post') }}">Hacer reporte</button>
+          <a href="{{ url_for('map.reports') }}" aria-label="Reportes">
+            <i class="fa-solid fa-file-lines nav-link-icon" aria-hidden="true"></i>
+            <span class="nav-link-label">Reportes</span>
+          </a>
+          <a href="{{ url_for('map.repressors') }}" aria-label="Represores">
+            <i class="fa-solid fa-user-secret nav-link-icon" aria-hidden="true"></i>
+            <span class="nav-link-label">Represores</span>
+          </a>
+          <a href="{{ url_for('map.prisoners') }}" aria-label="Prisioneros">
+            <i class="fa-solid fa-landmark-dome nav-link-icon" aria-hidden="true"></i>
+            <span class="nav-link-label">Prisioneros</span>
+          </a>
+          <a href="{{ url_for('map.export_data') }}" aria-label="Exportar">
+            <i class="fa-solid fa-file-export nav-link-icon" aria-hidden="true"></i>
+            <span class="nav-link-label">Exportar</span>
+          </a>
+          <a href="{{ url_for('map.analytics') }}" aria-label="Analíticas">
+            <i class="fa-solid fa-chart-line nav-link-icon" aria-hidden="true"></i>
+            <span class="nav-link-label">Analíticas</span>
+          </a>
+          <a href="{{ url_for('map.about') }}" aria-label="Acerca de">
+            <i class="fa-solid fa-circle-info nav-link-icon" aria-hidden="true"></i>
+            <span class="nav-link-label">Acerca de</span>
+          </a>
+          <a class="nav-donate" href="{{ url_for('map.donate') }}" aria-label="Donar">
+            <i class="fa-solid fa-hand-holding-heart nav-link-icon" aria-hidden="true"></i>
+            <span class="nav-link-label">Donar</span>
+          </a>
+          <a class="nav-sos" href="{{ url_for('panic.panic_page') }}" aria-label="SOS">
+            <i class="fa-solid fa-triangle-exclamation nav-link-icon" aria-hidden="true"></i>
+            <span class="nav-link-label">SOS</span>
+          </a>
+          <button
+            class="btn-cta nav-link-btn"
+            type="button"
+            data-open-report
+            data-url="{{ url_for('map.new_post') }}"
+            aria-label="Hacer reporte"
+          >
+            <i class="fa-solid fa-square-plus nav-link-icon" aria-hidden="true"></i>
+            <span class="nav-link-label">Hacer reporte</span>
+          </button>
         {% endif %}
       </nav>
     </header>

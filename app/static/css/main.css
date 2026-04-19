@@ -106,6 +106,24 @@ h3 {
   gap: 6px;
 }
 
+.nav-links .nav-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav-link-icon {
+  width: 1.1em;
+  min-width: 1.1em;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.nav-link-label {
+  line-height: 1.1;
+}
+
 .nav-badge {
   display: inline-flex;
   align-items: center;
@@ -6547,6 +6565,29 @@ textarea {
 
   .nav-links {
     width: 100%;
+    gap: 8px;
+  }
+
+  .nav-links .nav-link-label {
+    display: none;
+  }
+
+  .nav-links a,
+  .nav-links .nav-link-btn {
+    justify-content: center;
+    gap: 0;
+    min-width: 36px;
+    min-height: 36px;
+    padding: 8px;
+  }
+
+  .nav-links .nav-link-btn {
+    padding: 8px;
+    border-radius: 8px;
+  }
+
+  .nav-links .nav-badge {
+    margin-left: 4px;
   }
 
   .hero {
