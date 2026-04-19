@@ -6565,7 +6565,15 @@ textarea {
 
   .nav-links {
     width: 100%;
-    gap: 8px;
+    gap: 4px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .nav-links::-webkit-scrollbar {
+    display: none;
   }
 
   .nav-links .nav-link-label {
@@ -6580,13 +6588,13 @@ textarea {
   .nav-links .nav-link-btn {
     justify-content: center;
     gap: 0;
-    min-width: 36px;
-    min-height: 36px;
-    padding: 8px;
+    min-width: 30px;
+    min-height: 30px;
+    padding: 6px;
   }
 
   .nav-links .nav-link-btn {
-    padding: 8px;
+    padding: 6px;
     border-radius: 8px;
   }
 
@@ -6603,10 +6611,14 @@ textarea {
   }
 
   .content,
-  .site-header,
   .site-footer {
     padding-left: 24px;
     padding-right: 24px;
+  }
+
+  .site-header {
+    padding-left: 8px;
+    padding-right: 8px;
   }
 
   .map-canvas {
@@ -6816,10 +6828,14 @@ textarea {
   }
 
   .content,
-  .site-header,
   .site-footer {
     padding-left: 16px;
     padding-right: 16px;
+  }
+
+  .site-header {
+    padding-left: 6px;
+    padding-right: 6px;
   }
 
   body.map-dashboard-page .content.map-dashboard-content {
