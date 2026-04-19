@@ -134,6 +134,7 @@ let alertConsoleUnreadCount = 0;
 let knownAlertIds = new Set();
 let alertsSnapshotReady = false;
 let searchMarker;
+let mapSearchWrap;
 let isAdmin = false;
 let allPosts = [];
 let mapImageModal;
@@ -1206,6 +1207,30 @@ function clearMarkers() {
   markerIndex = new Map();
 }
 
+function setMapSearchVisible(visible) {
+  if (!mapSearchWrap) return;
+  mapSearchWrap.hidden = !visible;
+  if (visible) return;
+
+  const input = mapSearchWrap.querySelector("#mapSearch");
+  const dropdown = mapSearchWrap.querySelector(".map-search-suggestions");
+  if (input) {
+    if (document.activeElement === input) input.blur();
+    input.setAttribute("aria-expanded", "false");
+  }
+  if (dropdown) {
+    dropdown.hidden = true;
+  }
+}
+
+function setAlertConsoleVisible(visible) {
+  if (!alertConsolePanel) return;
+  alertConsolePanel.hidden = !visible;
+  if (!visible && alertConsolePanel.contains(document.activeElement)) {
+    document.activeElement.blur();
+  }
+}
+
 function closeActivePopup() {
   if (!map || !activePopup) return;
   map.closePopup(activePopup);
@@ -1219,6 +1244,8 @@ async function switchBaseMode(nextMode, options = {}) {
   if (mode === "ais" && !isAdmin) {
     mode = "map";
   }
+  setMapSearchVisible(mode === "map" || mode === "satellite");
+  setAlertConsoleVisible(mode === "map" || mode === "satellite");
   applyMapPanBoundsForMode(mode);
   const {
     streetsLayer,
@@ -6378,6 +6405,9 @@ async function initMap() {
     !isAdmin && requestedBaseModeRaw === "ais"
       ? "map"
       : requestedBaseModeRaw;
+  mapSearchWrap = document.querySelector(".map-search-wrap");
+  setMapSearchVisible(requestedBaseMode === "map" || requestedBaseMode === "satellite");
+  setAlertConsoleVisible(requestedBaseMode === "map" || requestedBaseMode === "satellite");
   mapHintElement = document.getElementById("mapHint");
   reportLegendSection = document.getElementById("reportLegendSection");
   connectivityLegendOverlay = document.getElementById("connectivityLegendOverlay");
