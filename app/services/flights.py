@@ -510,16 +510,14 @@ def _normalize_identity_key(
     reg_token = _normalize_token(registration)
     ext_token = _normalize_token(external_flight_id)
 
+    # Aircraft identity must prefer tail/registration when present, because
+    # callsign/flight number changes per trip.
+    if reg_token:
+        return f"reg|{reg_token}"[:255]
     if call_token and model_token:
         return f"{call_token}|{model_token}"[:255]
-    if call_token and reg_token:
-        return f"{call_token}|{reg_token}"[:255]
-    if reg_token and model_token:
-        return f"{reg_token}|{model_token}"[:255]
     if call_token:
         return call_token[:255]
-    if reg_token:
-        return reg_token[:255]
     if ext_token:
         return f"flight|{ext_token}"[:255]
 
@@ -1904,19 +1902,141 @@ def _upsert_airport(parsed: dict[str, Any], airport_cache: dict[str, FlightAirpo
     return row
 
 
-def _upsert_aircraft(record: dict[str, Any], aircraft_cache: dict[str, FlightAircraft]) -> FlightAircraft:
+def _merge_aircraft_rows(
+    primary: FlightAircraft,
+    secondary: FlightAircraft,
+    *,
+    aircraft_cache: dict[str, FlightAircraft],
+    registration_cache: dict[str, FlightAircraft],
+) -> FlightAircraft:
+    if primary is secondary:
+        return primary
+    if primary.id is not None and secondary.id is not None and primary.id == secondary.id:
+        return primary
+
+    if not _clean_text(primary.call_sign, limit=64):
+        primary.call_sign = _clean_text(secondary.call_sign, limit=64) or primary.call_sign
+    if not _clean_text(primary.model, limit=120):
+        primary.model = _clean_text(secondary.model, limit=120) or primary.model
+    if not _clean_text(primary.registration, limit=64):
+        primary.registration = _clean_text(secondary.registration, upper=True, limit=64) or primary.registration
+    if not _clean_text(primary.operator_name, limit=255):
+        primary.operator_name = _clean_text(secondary.operator_name, limit=255) or primary.operator_name
+    if not _clean_text(primary.manufacturer, limit=120):
+        primary.manufacturer = _clean_text(secondary.manufacturer, limit=120) or primary.manufacturer
+
+    if not _clean_text(primary.photo_manual_url, limit=1000):
+        primary.photo_manual_url = (
+            _clean_text(secondary.photo_manual_url, limit=1000) or primary.photo_manual_url
+        )
+    if not _clean_text(primary.photo_api_url, limit=1000):
+        primary.photo_api_url = _clean_text(secondary.photo_api_url, limit=1000) or primary.photo_api_url
+
+    if secondary.photo_updated_at_utc and (
+        primary.photo_updated_at_utc is None
+        or secondary.photo_updated_at_utc > primary.photo_updated_at_utc
+    ):
+        primary.photo_updated_at_utc = secondary.photo_updated_at_utc
+
+    if secondary.first_seen_at_utc and (
+        primary.first_seen_at_utc is None or secondary.first_seen_at_utc < primary.first_seen_at_utc
+    ):
+        primary.first_seen_at_utc = secondary.first_seen_at_utc
+
+    if secondary.last_seen_at_utc and (
+        primary.last_seen_at_utc is None or secondary.last_seen_at_utc > primary.last_seen_at_utc
+    ):
+        primary.last_seen_at_utc = secondary.last_seen_at_utc
+
+    for event in FlightEvent.query.filter_by(aircraft_id=secondary.id).all():
+        event.aircraft = primary
+
+    for revision in FlightAircraftPhotoRevision.query.filter_by(aircraft_id=secondary.id).all():
+        revision.aircraft = primary
+
+    for key, value in list(aircraft_cache.items()):
+        if value.id == secondary.id:
+            aircraft_cache[key] = primary
+    for key, value in list(registration_cache.items()):
+        if value.id == secondary.id:
+            registration_cache[key] = primary
+
+    db.session.delete(secondary)
+    return primary
+
+
+def _upsert_aircraft(
+    record: dict[str, Any],
+    aircraft_cache: dict[str, FlightAircraft],
+    registration_cache: dict[str, FlightAircraft],
+) -> FlightAircraft:
     identity_key = _clean_text(record.get("identity_key"), limit=255) or "unknown"
-    row = aircraft_cache.get(identity_key)
-    if row is None:
-        row = FlightAircraft.query.filter_by(identity_key=identity_key).first()
-        if row is None:
-            row = FlightAircraft(identity_key=identity_key)
-            db.session.add(row)
-        aircraft_cache[identity_key] = row
+    registration = _clean_text(record.get("registration"), upper=True, limit=64)
+    row_by_identity = aircraft_cache.get(identity_key)
+    if row_by_identity is None:
+        row_by_identity = FlightAircraft.query.filter_by(identity_key=identity_key).first()
+        if row_by_identity is not None:
+            aircraft_cache[identity_key] = row_by_identity
+
+    row_by_registration: FlightAircraft | None = None
+    if registration:
+        row_by_registration = registration_cache.get(registration)
+        if row_by_registration is None:
+            registration_rows = (
+                FlightAircraft.query.filter(
+                    func.upper(func.coalesce(FlightAircraft.registration, "")) == registration
+                )
+                .order_by(
+                    func.coalesce(
+                        FlightAircraft.last_seen_at_utc,
+                        FlightAircraft.updated_at,
+                        FlightAircraft.created_at,
+                    ).desc(),
+                    FlightAircraft.id.desc(),
+                )
+                .all()
+            )
+            if registration_rows:
+                row_by_registration = registration_rows[0]
+                for duplicate in registration_rows[1:]:
+                    row_by_registration = _merge_aircraft_rows(
+                        row_by_registration,
+                        duplicate,
+                        aircraft_cache=aircraft_cache,
+                        registration_cache=registration_cache,
+                    )
+                registration_cache[registration] = row_by_registration
+
+    row: FlightAircraft
+    if row_by_registration is not None:
+        row = row_by_registration
+        if row_by_identity is not None and row_by_identity.id != row.id:
+            row = _merge_aircraft_rows(
+                row,
+                row_by_identity,
+                aircraft_cache=aircraft_cache,
+                registration_cache=registration_cache,
+            )
+    elif row_by_identity is not None:
+        row = row_by_identity
+    else:
+        row = FlightAircraft(identity_key=identity_key)
+        db.session.add(row)
+
+    if identity_key and identity_key != "unknown":
+        conflict = FlightAircraft.query.filter_by(identity_key=identity_key).first()
+        if conflict is not None and conflict.id != row.id:
+            row = _merge_aircraft_rows(
+                row,
+                conflict,
+                aircraft_cache=aircraft_cache,
+                registration_cache=registration_cache,
+            )
+        row.identity_key = identity_key
 
     row.call_sign = record.get("call_sign") or row.call_sign
     row.model = record.get("model") or row.model
-    row.registration = record.get("registration") or row.registration
+    row.registration = registration or row.registration
 
     observed_at = record.get("observed_at_utc")
     if observed_at:
@@ -1924,6 +2044,11 @@ def _upsert_aircraft(record: dict[str, Any], aircraft_cache: dict[str, FlightAir
             row.first_seen_at_utc = observed_at
         if row.last_seen_at_utc is None or observed_at > row.last_seen_at_utc:
             row.last_seen_at_utc = observed_at
+
+    aircraft_cache[identity_key] = row
+    aircraft_cache[_clean_text(row.identity_key, limit=255) or identity_key] = row
+    if registration:
+        registration_cache[registration] = row
 
     return row
 
@@ -2445,6 +2570,7 @@ def _persist_records(
 
     airport_cache: dict[str, FlightAirport] = {}
     aircraft_cache: dict[str, FlightAircraft] = {}
+    registration_cache: dict[str, FlightAircraft] = {}
     event_cache: dict[str, FlightEvent] = {}
 
     sorted_records = sorted(
@@ -2457,7 +2583,7 @@ def _persist_records(
 
     for record in sorted_records:
         destination_airport = _resolve_destination_airport(record, airport_cache)
-        aircraft = _upsert_aircraft(record, aircraft_cache)
+        aircraft = _upsert_aircraft(record, aircraft_cache, registration_cache)
         db.session.flush()
 
         event, created = _upsert_event(

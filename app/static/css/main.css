@@ -3029,6 +3029,27 @@ body.map-dashboard-page .map-canvas .leaflet-control-layers.map-layer-control in
   color: #e2f3ff;
 }
 
+.flight-profile-photo-wrap {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.flight-profile-photo {
+  max-height: 240px;
+}
+
+.flight-profile-photo-meta {
+  color: #9ec6dd;
+  font-size: 11px;
+  letter-spacing: 0.2px;
+}
+
+.flight-profile-photo-empty {
+  color: #9ec6dd;
+  font-size: 12px;
+}
+
 .flight-profile-meta-row {
   display: flex;
   align-items: baseline;

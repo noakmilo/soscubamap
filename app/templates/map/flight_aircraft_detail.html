@@ -18,6 +18,29 @@
   <div class="flight-profile-grid">
     <article class="flight-profile-card">
       <h2>Identidad</h2>
+      {% if aircraft.photo_url %}
+        {% set photo_source = (aircraft.photo_source or 'none')|lower %}
+        <figure class="flight-profile-photo-wrap">
+          <img
+            class="flights-detail-photo flight-profile-photo"
+            src="{{ aircraft.photo_url }}"
+            alt="Foto del avión {{ aircraft.registration or profile_registration }}"
+            loading="lazy"
+          />
+          <figcaption class="flight-profile-photo-meta">
+            Fuente:
+            {% if photo_source == 'manual' %}
+              asignada manualmente
+            {% elif photo_source == 'api' %}
+              API
+            {% else %}
+              no especificada
+            {% endif %}
+          </figcaption>
+        </figure>
+      {% else %}
+        <div class="flight-profile-photo-empty">Sin foto disponible para esta aeronave.</div>
+      {% endif %}
       <div class="flight-profile-meta-row"><span>Call sign</span><strong>{{ aircraft.call_sign or 'N/D' }}</strong></div>
       <div class="flight-profile-meta-row"><span>Matrícula</span><strong>{{ aircraft.registration or 'N/D' }}</strong></div>
       <div class="flight-profile-meta-row"><span>Modelo</span><strong>{{ aircraft.model or 'N/D' }}</strong></div>
