@@ -29,6 +29,7 @@ from sqlalchemy.orm import selectinload
 from app.extensions import db, limiter
 from app.models.category import Category
 from app.models.donation_log import DonationLog
+from app.models.flight_aircraft import FlightAircraft
 from app.models.location_report import LocationReport
 from app.models.media import Media
 from app.models.post import Post
@@ -95,6 +96,7 @@ from app.services.repressor_edits import (
 from app.services.prisoner_edits import apply_prisoner_payload, snapshot_prisoner
 from app.services.vote_identity import get_voter_hash
 from app.services.map_providers import get_map_provider_forms, get_map_provider_main
+from app.services.flights import build_aircraft_detail_payload
 
 from . import map_bp
 
@@ -110,6 +112,7 @@ _REPRESSOR_VIEWER_STACK_KEY = "repressors_viewer_stack"
 _REPRESSOR_VIEWER_INDEX_KEY = "repressors_viewer_index"
 _AUTO_CONNECTIVITY_REPORT_MARKER = "auto_connectivity_cloudflare"
 _TOKEN_SANITIZE_RE = re.compile(r"[^a-z0-9]+")
+_FLIGHT_REG_SANITIZE_RE = re.compile(r"[^A-Z0-9-]+")
 _MAP_LAYER_ALIASES = {
     "map": "map",
     "mapa": "map",
@@ -375,6 +378,60 @@ def _normalize_token(value: str) -> str:
     return _TOKEN_SANITIZE_RE.sub("", text)
 
 
+def _normalize_flight_registration(value: str | None) -> str:
+    text = str(value or "").strip().upper()
+    if not text:
+        return ""
+    return _FLIGHT_REG_SANITIZE_RE.sub("", text)[:64]
+
+
+def _format_flight_airport_label(
+    name: str | None,
+    city: str | None,
+    country: str | None,
+    *,
+    fallback: str,
+) -> str:
+    base = (name or "").strip() or fallback
+    suffix_parts = [part for part in ((city or "").strip(), (country or "").strip()) if part]
+    if not suffix_parts:
+        return base
+    return f"{base} ({' · '.join(suffix_parts)})"
+
+
+def _build_flight_history_rows(history: list[dict[str, Any]]) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for item in history:
+        if not isinstance(item, dict):
+            continue
+        timestamp = (
+            str(item.get("last_seen_at_utc") or "")
+            or str(item.get("arrival_at_utc") or "")
+            or str(item.get("departure_at_utc") or "")
+            or "N/D"
+        )
+        rows.append(
+            {
+                "timestamp": timestamp,
+                "origin": _format_flight_airport_label(
+                    item.get("origin_airport_name"),
+                    item.get("origin_city"),
+                    item.get("origin_country"),
+                    fallback="Origen N/D",
+                ),
+                "destination": _format_flight_airport_label(
+                    item.get("destination_airport_name"),
+                    item.get("destination_city"),
+                    item.get("destination_country"),
+                    fallback="Destino N/D",
+                ),
+                "status": str(item.get("status") or "N/D").strip() or "N/D",
+                "event_id": str(item.get("event_id") or "-"),
+            }
+        )
+    return rows
+
+
 def _palette_for_type_name(type_name: str) -> dict[str, str]:
     key = _normalize_token(type_name)
     return _REPRESSOR_TYPE_PALETTES.get(key) or _REPRESSOR_TYPE_PALETTES["default"]
@@ -536,6 +593,66 @@ def dashboard(layer_slug: str | None = None):
         google_maps_api_key=_google_maps_api_key(),
         initial_base_mode=initial_base_mode,
         map_layer_route_template=url_for("map.dashboard", layer_slug="__layer__"),
+    )
+
+
+@map_bp.route("/vuelos/matricula/<string:registration>")
+def flight_aircraft_detail(registration: str):
+    normalized_registration = _normalize_flight_registration(registration)
+    if not normalized_registration:
+        abort(404)
+
+    aircraft: FlightAircraft | None = None
+    raw_aircraft_id = (request.args.get("aircraft_id") or "").strip()
+    if raw_aircraft_id:
+        try:
+            aircraft_id = int(raw_aircraft_id)
+        except Exception:
+            aircraft_id = 0
+        if aircraft_id > 0:
+            aircraft = FlightAircraft.query.filter_by(id=aircraft_id).first()
+            if aircraft is None:
+                abort(404)
+            aircraft_registration = _normalize_flight_registration(aircraft.registration)
+            if aircraft_registration and aircraft_registration != normalized_registration:
+                return redirect(
+                    url_for(
+                        "map.flight_aircraft_detail",
+                        registration=aircraft_registration,
+                        aircraft_id=aircraft.id,
+                    )
+                )
+
+    if aircraft is None:
+        aircraft = (
+            FlightAircraft.query.filter(
+                func.upper(func.coalesce(FlightAircraft.registration, "")) == normalized_registration
+            )
+            .order_by(
+                func.coalesce(
+                    FlightAircraft.last_seen_at_utc,
+                    FlightAircraft.updated_at,
+                    FlightAircraft.created_at,
+                ).desc(),
+                FlightAircraft.id.desc(),
+            )
+            .first()
+        )
+
+    if aircraft is None:
+        abort(404)
+
+    payload = build_aircraft_detail_payload(aircraft)
+    aircraft_payload = payload.get("aircraft") if isinstance(payload.get("aircraft"), dict) else {}
+    summary_payload = payload.get("summary_30d") if isinstance(payload.get("summary_30d"), dict) else {}
+    history_payload = payload.get("history") if isinstance(payload.get("history"), list) else []
+
+    return render_template(
+        "map/flight_aircraft_detail.html",
+        aircraft=aircraft_payload,
+        summary_30d=summary_payload,
+        history_rows=_build_flight_history_rows(history_payload),
+        profile_registration=normalized_registration,
     )
 
 

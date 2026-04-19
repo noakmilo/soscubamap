@@ -1,0 +1,90 @@
+{% extends "shared/base.html" %}
+{% block title %} | Ficha de avión {{ aircraft.registration or profile_registration }}{% endblock %}
+{% block meta_description %}Ficha de avión con historial de viajes hacia Cuba en formato de log tipo consola.{% endblock %}
+{% block content %}
+<section class="panel flight-profile-panel">
+  <div class="flight-profile-head">
+    <div>
+      <h1>Ficha de avión {{ aircraft.registration or profile_registration }}</h1>
+      <p class="muted">
+        Historial de viajes hacia Cuba (ventana: {{ summary_30d.window_days or 30 }} días).
+      </p>
+    </div>
+    <div class="flight-profile-actions">
+      <a class="btn-secondary" href="{{ url_for('map.dashboard', layer_slug='vuelos-cuba') }}">Volver al mapa</a>
+    </div>
+  </div>
+
+  <div class="flight-profile-grid">
+    <article class="flight-profile-card">
+      <h2>Identidad</h2>
+      <div class="flight-profile-meta-row"><span>Call sign</span><strong>{{ aircraft.call_sign or 'N/D' }}</strong></div>
+      <div class="flight-profile-meta-row"><span>Matrícula</span><strong>{{ aircraft.registration or 'N/D' }}</strong></div>
+      <div class="flight-profile-meta-row"><span>Modelo</span><strong>{{ aircraft.model or 'N/D' }}</strong></div>
+      <div class="flight-profile-meta-row"><span>Operador</span><strong>{{ aircraft.operator_name or 'N/D' }}</strong></div>
+      <div class="flight-profile-meta-row"><span>Fabricante</span><strong>{{ aircraft.manufacturer or 'N/D' }}</strong></div>
+      <div class="flight-profile-meta-row"><span>Primer registro UTC</span><strong>{{ aircraft.first_seen_at_utc or 'N/D' }}</strong></div>
+      <div class="flight-profile-meta-row"><span>Último registro UTC</span><strong>{{ aircraft.last_seen_at_utc or 'N/D' }}</strong></div>
+    </article>
+
+    <article class="flight-profile-card">
+      <h2>Resumen 30d</h2>
+      <div class="flight-profile-meta-row">
+        <span>Viajes a Cuba</span>
+        <strong>{{ summary_30d.trips_to_cuba or 0 }}</strong>
+      </div>
+      <div class="flight-profile-meta-row"><span>Inicio ventana UTC</span><strong>{{ summary_30d.window_start_utc or 'N/D' }}</strong></div>
+      <div class="flight-profile-meta-row"><span>Fin ventana UTC</span><strong>{{ summary_30d.window_end_utc or 'N/D' }}</strong></div>
+
+      <div class="flight-profile-list">
+        <h3>Orígenes frecuentes</h3>
+        {% if summary_30d.origins %}
+          <ul>
+            {% for row in summary_30d.origins[:6] %}
+              <li>{{ row.origin or 'N/D' }} <strong>{{ row.count or 0 }}</strong></li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="muted">Sin datos.</p>
+        {% endif %}
+      </div>
+
+      <div class="flight-profile-list">
+        <h3>Destinos en Cuba</h3>
+        {% if summary_30d.destinations %}
+          <ul>
+            {% for row in summary_30d.destinations[:6] %}
+              <li>{{ row.destination or 'N/D' }} <strong>{{ row.count or 0 }}</strong></li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="muted">Sin datos.</p>
+        {% endif %}
+      </div>
+    </article>
+  </div>
+
+  <article class="flight-console-card">
+    <h2>Log de viajes</h2>
+    <div class="flight-console" data-allow-zoom="1">
+      {% if history_rows %}
+        {% for row in history_rows %}
+          <div class="flight-console-line">
+            <span class="flight-console-ts">[{{ row.timestamp }}]</span>
+            <span class="flight-console-route">{{ row.origin }} -> {{ row.destination }}</span>
+            <span class="flight-console-status">status={{ row.status }}</span>
+            <span class="flight-console-event">event={{ row.event_id }}</span>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="flight-console-line">
+          <span class="flight-console-ts">[sin datos]</span>
+          <span class="flight-console-route">No hay vuelos hacia Cuba en la ventana actual.</span>
+          <span class="flight-console-status">status=none</span>
+          <span class="flight-console-event">event=-</span>
+        </div>
+      {% endif %}
+    </div>
+  </article>
+</section>
+{% endblock %}

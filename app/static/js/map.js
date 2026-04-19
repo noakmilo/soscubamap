@@ -583,6 +583,26 @@ function safeUrl(value) {
   return url.replaceAll('"', "%22").replaceAll("'", "%27");
 }
 
+function normalizeAircraftRegistration(value) {
+  return String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9-]/g, "");
+}
+
+function buildAircraftProfileUrl(registration, aircraftId) {
+  const normalizedRegistration = normalizeAircraftRegistration(registration);
+  if (!normalizedRegistration) return "";
+  const params = new URLSearchParams();
+  const numericAircraftId = Number(aircraftId);
+  if (Number.isFinite(numericAircraftId) && numericAircraftId > 0) {
+    params.set("aircraft_id", String(Math.trunc(numericAircraftId)));
+  }
+  const query = params.toString();
+  const path = `/vuelos/matricula/${encodeURIComponent(normalizedRegistration)}`;
+  return query ? `${path}?${query}` : path;
+}
+
 function normalizeNameList(value) {
   if (!Array.isArray(value)) return [];
   return value
@@ -4930,7 +4950,8 @@ function renderFlightDetail(item, detailPayload, trackPayload) {
   const destinations = Array.isArray(summary30d?.destinations) ? summary30d.destinations : [];
   const callSign = escapeHtml(aircraft?.call_sign || item?.call_sign || "Vuelo");
   const model = escapeHtml(aircraft?.model || item?.model || "Modelo N/D");
-  const registration = escapeHtml(aircraft?.registration || item?.registration || "N/D");
+  const rawRegistration = aircraft?.registration || item?.registration || "";
+  const registration = escapeHtml(rawRegistration || "N/D");
   const operator = escapeHtml(aircraft?.operator_name || "N/D");
   const tripsToCuba = Math.max(0, Number(summary30d?.trips_to_cuba) || 0).toLocaleString("es-ES");
   const photoUrl = safeUrl(aircraft?.photo_url || item?.photo_url || "");
@@ -4945,6 +4966,7 @@ function renderFlightDetail(item, detailPayload, trackPayload) {
   const canUploadPhoto = photoUploadEnabled && Number.isFinite(aircraftId);
   const hasPhoto = Boolean(photoUrl);
   const photoGallery = Array.isArray(detailPayload?.photo_gallery) ? detailPayload.photo_gallery : [];
+  const profileUrl = buildAircraftProfileUrl(rawRegistration, aircraftId);
   const galleryCards = photoGallery
     .map((entry) => {
       const entryUrl = safeUrl(entry?.photo_url || "");
@@ -5037,8 +5059,23 @@ function renderFlightDetail(item, detailPayload, trackPayload) {
       <div class=\"report-detail-meta\">Track disponible: ${latestTrackPointCount.toLocaleString("es-ES")} puntos</div>
       <div class=\"report-detail-meta\">Foto: ${escapeHtml(photoSourceLabel)}</div>
       ${
+        profileUrl
+          ? `<a class=\"info-btn info-btn-outline flights-profile-link\" href=\"${escapeHtml(profileUrl)}\">Ver ficha y log completo</a>`
+          : ""
+      }
+      ${
         photoUrl
-          ? `<img class=\"flights-detail-photo\" src=\"${photoUrl}\" alt=\"Foto de aeronave\" loading=\"lazy\" />`
+          ? `
+            <button
+              type=\"button\"
+              class=\"info-media-thumb flights-photo-zoom-btn\"
+              data-image=\"${photoUrl}\"
+              data-caption=\"${callSign} · Matrícula ${registration}\"
+              aria-label=\"Ampliar foto de aeronave\"
+            >
+              <img class=\"flights-detail-photo\" src=\"${photoUrl}\" alt=\"Foto de aeronave\" loading=\"lazy\" />
+            </button>
+          `
           : `<div class=\"report-detail-meta\">No hay foto disponible para esta aeronave.</div>`
       }
       ${replacePrompt}
@@ -5063,6 +5100,7 @@ function renderFlightDetail(item, detailPayload, trackPayload) {
     </div>
   `;
   triggerReportDetailReveal();
+  attachMediaThumbHandlers(reportDetailPanel);
   if (mapSideScroll) mapSideScroll.scrollTop = 0;
 
   let modal = reportDetailPanel.querySelector("[data-flight-photo-modal]");

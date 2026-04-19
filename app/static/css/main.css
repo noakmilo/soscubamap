@@ -2829,6 +2829,14 @@ body.map-dashboard-page .map-canvas .leaflet-control-layers.map-layer-control in
   border: 1px solid rgba(148, 163, 184, 0.35);
 }
 
+.flights-photo-zoom-btn {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+
 .flights-photo-gallery {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2942,6 +2950,18 @@ body.map-dashboard-page .map-canvas .leaflet-control-layers.map-layer-control in
   color: #fff0cf;
 }
 
+.flights-profile-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.flights-profile-link:hover {
+  border-color: rgba(110, 231, 183, 0.55);
+  color: #d8ffe9;
+}
+
 .flights-photo-modal-shell {
   width: min(380px, 90vw);
   height: auto;
@@ -2968,6 +2988,163 @@ body.map-dashboard-page .map-canvas .leaflet-control-layers.map-layer-control in
   justify-content: flex-end;
   gap: 8px;
   margin-top: 2px;
+}
+
+.flight-profile-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.flight-profile-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.flight-profile-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.flight-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.flight-profile-card {
+  border: 1px solid rgba(125, 211, 252, 0.24);
+  border-radius: 10px;
+  background: rgba(10, 16, 20, 0.72);
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.flight-profile-card h2 {
+  margin: 0;
+  font-size: 15px;
+  color: #e2f3ff;
+}
+
+.flight-profile-meta-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  color: #cfe7f8;
+  font-size: 13px;
+}
+
+.flight-profile-meta-row strong {
+  color: #f6fbff;
+  font-weight: 600;
+  text-align: right;
+  max-width: 60%;
+  overflow-wrap: anywhere;
+}
+
+.flight-profile-list {
+  display: grid;
+  gap: 6px;
+}
+
+.flight-profile-list h3 {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #9bd7f5;
+}
+
+.flight-profile-list ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
+.flight-profile-list li {
+  color: #cde8fa;
+  font-size: 12px;
+}
+
+.flight-profile-list li strong {
+  color: #f6fbff;
+}
+
+.flight-console-card {
+  border: 1px solid rgba(125, 211, 252, 0.24);
+  border-radius: 10px;
+  background: rgba(8, 12, 17, 0.85);
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.flight-console-card h2 {
+  margin: 0;
+  font-size: 15px;
+  color: #d8ecff;
+}
+
+.flight-console {
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 8px;
+  background: #05080d;
+  padding: 10px;
+  display: grid;
+  gap: 6px;
+  max-height: 520px;
+  overflow-y: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.flight-console-line {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: baseline;
+  gap: 10px;
+  color: #d5dbe3;
+}
+
+.flight-console-ts {
+  color: #60a5fa;
+  white-space: nowrap;
+}
+
+.flight-console-route {
+  color: #e5edf7;
+  overflow-wrap: anywhere;
+}
+
+.flight-console-status {
+  color: #86efac;
+  white-space: nowrap;
+}
+
+.flight-console-event {
+  color: #a5b4fc;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .flight-profile-head {
+    flex-direction: column;
+  }
+
+  .flight-profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .flight-console-line {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
 }
 
 .ais-overlay {
