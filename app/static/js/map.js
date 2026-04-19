@@ -106,7 +106,6 @@ let aisOverlay;
 let aisSummary;
 let aisPortList;
 let flightsLayerGroup;
-let flightsAirportsLayer;
 let flightsTrackLayer;
 let flightsRoutesLayer;
 let flightsRefreshTimer;
@@ -279,7 +278,6 @@ const flightsDetailCacheByEvent = new Map();
 const flightsDetailCacheByAircraft = new Map();
 const AIS_MARKER_COLOR = "#0ea5e9";
 const FLIGHTS_MARKER_COLOR = "#ef4444";
-const FLIGHTS_AIRPORT_MARKER_COLOR = "#f59e0b";
 const FLIGHTS_ROUTE_ORIGIN_COLOR = "#ef4444";
 const FLIGHTS_ROUTE_DESTINATION_COLOR = "#3b82f6";
 const MAP_POPUP_OPTIONS = {
@@ -4478,14 +4476,6 @@ function clearFlightsLayer() {
     map.removeLayer(flightsLayerGroup);
   }
   flightsLayerGroup = null;
-  clearFlightsAirportsLayer();
-}
-
-function clearFlightsAirportsLayer() {
-  if (flightsAirportsLayer && map) {
-    map.removeLayer(flightsAirportsLayer);
-  }
-  flightsAirportsLayer = null;
 }
 
 function clearFlightsTrack() {
@@ -4530,16 +4520,6 @@ function buildFlightsMarkerIcon(heading) {
     iconSize: [34, 34],
     iconAnchor: [17, 17],
     popupAnchor: [0, -16],
-  });
-}
-
-function buildFlightsAirportMarkerIcon() {
-  return L.divIcon({
-    className: "flights-airport-marker-wrap",
-    html: `<span class="flights-airport-marker" style="--flight-airport-marker-color:${FLIGHTS_AIRPORT_MARKER_COLOR};" aria-hidden="true"><i class="fa-solid fa-location-dot"></i></span>`,
-    iconSize: [22, 22],
-    iconAnchor: [11, 11],
-    popupAnchor: [0, -10],
   });
 }
 
@@ -4659,21 +4639,6 @@ function flightsPopupHtml(item) {
   `;
 }
 
-function flightsAirportPopupHtml(item) {
-  const airportName = escapeHtml(item?.airport_name || "Aeropuerto Cuba");
-  const airportCode = escapeHtml(item?.airport_code || "N/D");
-  const city = escapeHtml(item?.city || "Ciudad N/D");
-  const count = Math.max(0, Number(item?.count) || 0).toLocaleString("es-ES");
-  return `
-    <div class="flights-airport-popup">
-      <div class="flights-airport-popup-title">${airportName}</div>
-      <div class="flights-airport-popup-meta">Codigo: ${airportCode}</div>
-      <div class="flights-airport-popup-meta">Ciudad: ${city}</div>
-      <div class="flights-airport-popup-meta">Vuelos en ventana: ${count}</div>
-    </div>
-  `;
-}
-
 function renderFlightsAirportsList(payload) {
   if (!flightsAirportsList) return;
   const rows = Array.isArray(payload?.summary?.by_destination_airport)
@@ -4786,59 +4751,6 @@ function renderFlightsSummary(payload, errorText = "") {
   flightsMeta.textContent = `Run: ${status} · ${safeModeLabel} · Actualizado: ${
     generatedAt || "N/D"
   }.`;
-}
-
-function renderFlightsAirportsOnMap(payload) {
-  if (!map) return;
-  clearFlightsAirportsLayer();
-
-  const points = Array.isArray(payload?.points) ? payload.points : [];
-  if (!points.length) return;
-
-  const airportsByKey = new Map();
-  points.forEach((item) => {
-    const latlng = toFlightLatLng(item?.destination_latitude, item?.destination_longitude);
-    if (!latlng) return;
-
-    const iata = String(item?.destination_airport_iata || "").trim().toUpperCase();
-    const icao = String(item?.destination_airport_icao || "").trim().toUpperCase();
-    const destinationCountry = String(item?.destination_country || "").trim().toLowerCase();
-    const looksLikeCubaByCode = icao.startsWith("MU");
-    const looksLikeCubaByCountry =
-      !destinationCountry || destinationCountry.includes("cuba") || destinationCountry === "cu";
-    if (!looksLikeCubaByCountry && !looksLikeCubaByCode) return;
-    const city = String(item?.destination_city || "").trim();
-    const airportName = String(item?.destination_airport_name || "").trim() || "Aeropuerto Cuba";
-    const airportCode = iata || icao || "N/D";
-    const key = airportCode !== "N/D" ? airportCode : `${latlng[0].toFixed(4)},${latlng[1].toFixed(4)}`;
-
-    const existing = airportsByKey.get(key);
-    if (existing) {
-      existing.count += 1;
-      return;
-    }
-
-    airportsByKey.set(key, {
-      latlng,
-      airport_name: airportName,
-      airport_code: airportCode,
-      city,
-      count: 1,
-    });
-  });
-
-  if (!airportsByKey.size) return;
-
-  flightsAirportsLayer = L.layerGroup();
-  airportsByKey.forEach((airport) => {
-    const marker = L.marker(airport.latlng, {
-      icon: buildFlightsAirportMarkerIcon(),
-      title: airport.airport_name,
-    });
-    marker.bindPopup(flightsAirportPopupHtml(airport), MAP_POPUP_OPTIONS);
-    marker.addTo(flightsAirportsLayer);
-  });
-  flightsAirportsLayer.addTo(map);
 }
 
 function toFlightLatLng(latitude, longitude) {
@@ -5317,7 +5229,6 @@ function renderFlightsLayer(payload) {
   if (!map) return;
   clearFlightsLayer();
   clearFlightsTrack();
-  renderFlightsAirportsOnMap(payload);
   flightsLayerGroup = L.layerGroup();
 
   const points = Array.isArray(payload?.points) ? payload.points : [];
