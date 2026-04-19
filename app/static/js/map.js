@@ -4777,12 +4777,11 @@ function renderFlightsRoutes(payload) {
   let routeCount = 0;
   points.forEach((item) => {
     const origin = toFlightLatLng(item?.origin_latitude, item?.origin_longitude);
-    if (!origin) return;
-    const aircraft = toFlightLatLng(item?.latitude, item?.longitude);
     const destination = toFlightLatLng(item?.destination_latitude, item?.destination_longitude);
-    if (!destination && !aircraft) return;
+    if (!origin || !destination) return;
+    const aircraft = toFlightLatLng(item?.latitude, item?.longitude);
 
-    const routePoint = aircraft || destination || origin;
+    const routePoint = aircraft || destination;
     if (origin && routePoint && !sameFlightLatLng(origin, routePoint)) {
       L.polyline([origin, routePoint], {
         color: FLIGHTS_ROUTE_ORIGIN_COLOR,
@@ -4830,8 +4829,9 @@ function drawFlightTrack(trackPayload) {
 
   const routeOrigin = hasRouteOrigin ? routeOriginCandidate : null;
   const routeDestination = hasRouteDestination ? routeDestinationCandidate : null;
+  const hasFullRoute = Boolean(routeOrigin && routeDestination);
 
-  if (!latlngs.length && !routeOrigin && !routeDestination) return;
+  if (!latlngs.length && !hasFullRoute) return;
 
   flightsTrackLayer = L.layerGroup();
 
@@ -4845,11 +4845,9 @@ function drawFlightTrack(trackPayload) {
     trackLine.addTo(flightsTrackLayer);
   }
 
-  const aircraftPoint = latlngs.length
-    ? latlngs[latlngs.length - 1]
-    : routeDestination || routeOrigin || null;
+  const aircraftPoint = latlngs.length ? latlngs[latlngs.length - 1] : null;
 
-  if (routeOrigin) {
+  if (hasFullRoute) {
     L.circleMarker(routeOrigin, {
       radius: 4,
       color: "#ffffff",
@@ -4857,9 +4855,7 @@ function drawFlightTrack(trackPayload) {
       fillColor: FLIGHTS_ROUTE_ORIGIN_COLOR,
       fillOpacity: 0.98,
     }).addTo(flightsTrackLayer);
-  }
 
-  if (routeDestination) {
     L.circleMarker(routeDestination, {
       radius: 4,
       color: "#ffffff",
@@ -4867,24 +4863,24 @@ function drawFlightTrack(trackPayload) {
       fillColor: FLIGHTS_ROUTE_DESTINATION_COLOR,
       fillOpacity: 0.98,
     }).addTo(flightsTrackLayer);
-  }
 
-  if (routeOrigin && aircraftPoint) {
-    const originToAircraft = L.polyline([routeOrigin, aircraftPoint], {
-      color: FLIGHTS_ROUTE_ORIGIN_COLOR,
-      weight: 3,
-      opacity: 0.92,
-    });
-    originToAircraft.addTo(flightsTrackLayer);
-  }
+    if (aircraftPoint && !sameFlightLatLng(routeOrigin, aircraftPoint)) {
+      const originToAircraft = L.polyline([routeOrigin, aircraftPoint], {
+        color: FLIGHTS_ROUTE_ORIGIN_COLOR,
+        weight: 3,
+        opacity: 0.92,
+      });
+      originToAircraft.addTo(flightsTrackLayer);
+    }
 
-  if (routeOrigin && aircraftPoint && routeDestination) {
-    const aircraftToDestination = L.polyline([aircraftPoint, routeDestination], {
-      color: FLIGHTS_ROUTE_DESTINATION_COLOR,
-      weight: 3,
-      opacity: 0.92,
-    });
-    aircraftToDestination.addTo(flightsTrackLayer);
+    if (aircraftPoint && !sameFlightLatLng(aircraftPoint, routeDestination)) {
+      const aircraftToDestination = L.polyline([aircraftPoint, routeDestination], {
+        color: FLIGHTS_ROUTE_DESTINATION_COLOR,
+        weight: 3,
+        opacity: 0.92,
+      });
+      aircraftToDestination.addTo(flightsTrackLayer);
+    }
   }
 
   if (aircraftPoint) {
