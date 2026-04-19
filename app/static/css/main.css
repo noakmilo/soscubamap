@@ -221,6 +221,15 @@ body.map-dashboard-page .map-canvas {
   padding: 8px 10px;
 }
 
+body.map-dashboard-page[data-map-base-mode]:not([data-map-base-mode="map"]):not(
+    [data-map-base-mode="satellite"]
+  ) .map-floating-stack .map-search-wrap,
+body.map-dashboard-page[data-map-base-mode]:not([data-map-base-mode="map"]):not(
+    [data-map-base-mode="satellite"]
+  ) #alertConsolePanel {
+  display: none !important;
+}
+
 .map-side-panel {
   grid-area: side;
   min-width: 0;

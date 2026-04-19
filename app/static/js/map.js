@@ -1040,6 +1040,10 @@ function setupContextPanelLayout() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  mapSearchWrap = document.querySelector(".map-search-wrap");
+  alertConsolePanel = document.getElementById("alertConsolePanel");
+  syncFloatingControlsVisibilityForMode(parseBaseModeFromPath(window.location.pathname));
+
   const searchInput = document.getElementById("mapSearch");
   if (searchInput) {
     const placeholders = [
@@ -1241,6 +1245,16 @@ function setAlertConsoleVisible(visible) {
   }
 }
 
+function syncFloatingControlsVisibilityForMode(mode) {
+  const normalized = normalizeBaseMode(mode);
+  const visible = normalized === "map" || normalized === "satellite";
+  setMapSearchVisible(visible);
+  setAlertConsoleVisible(visible);
+  if (document?.body) {
+    document.body.setAttribute("data-map-base-mode", normalized);
+  }
+}
+
 function closeActivePopup() {
   if (!map || !activePopup) return;
   map.closePopup(activePopup);
@@ -1254,8 +1268,7 @@ async function switchBaseMode(nextMode, options = {}) {
   if (mode === "ais" && !isAdmin) {
     mode = "map";
   }
-  setMapSearchVisible(mode === "map" || mode === "satellite");
-  setAlertConsoleVisible(mode === "map" || mode === "satellite");
+  syncFloatingControlsVisibilityForMode(mode);
   applyMapPanBoundsForMode(mode);
   const {
     streetsLayer,
@@ -4764,9 +4777,10 @@ function renderFlightsRoutes(payload) {
   let routeCount = 0;
   points.forEach((item) => {
     const origin = toFlightLatLng(item?.origin_latitude, item?.origin_longitude);
+    if (!origin) return;
     const aircraft = toFlightLatLng(item?.latitude, item?.longitude);
     const destination = toFlightLatLng(item?.destination_latitude, item?.destination_longitude);
-    if (!origin && !destination && !aircraft) return;
+    if (!destination && !aircraft) return;
 
     const routePoint = aircraft || destination || origin;
     if (origin && routePoint && !sameFlightLatLng(origin, routePoint)) {
@@ -4814,12 +4828,8 @@ function drawFlightTrack(trackPayload) {
   const hasRouteDestination =
     Number.isFinite(routeDestinationCandidate[0]) && Number.isFinite(routeDestinationCandidate[1]);
 
-  const fallbackOrigin = latlngs[0];
-  const fallbackDestination = latlngs.length ? latlngs[latlngs.length - 1] : null;
-  const routeOrigin = hasRouteOrigin ? routeOriginCandidate : fallbackOrigin || null;
-  const routeDestination = hasRouteDestination
-    ? routeDestinationCandidate
-    : fallbackDestination || routeOrigin || null;
+  const routeOrigin = hasRouteOrigin ? routeOriginCandidate : null;
+  const routeDestination = hasRouteDestination ? routeDestinationCandidate : null;
 
   if (!latlngs.length && !routeOrigin && !routeDestination) return;
 
@@ -4868,7 +4878,7 @@ function drawFlightTrack(trackPayload) {
     originToAircraft.addTo(flightsTrackLayer);
   }
 
-  if (aircraftPoint && routeDestination) {
+  if (routeOrigin && aircraftPoint && routeDestination) {
     const aircraftToDestination = L.polyline([aircraftPoint, routeDestination], {
       color: FLIGHTS_ROUTE_DESTINATION_COLOR,
       weight: 3,
@@ -6416,8 +6426,7 @@ async function initMap() {
       ? "map"
       : requestedBaseModeRaw;
   mapSearchWrap = document.querySelector(".map-search-wrap");
-  setMapSearchVisible(requestedBaseMode === "map" || requestedBaseMode === "satellite");
-  setAlertConsoleVisible(requestedBaseMode === "map" || requestedBaseMode === "satellite");
+  syncFloatingControlsVisibilityForMode(requestedBaseMode);
   mapHintElement = document.getElementById("mapHint");
   reportLegendSection = document.getElementById("reportLegendSection");
   connectivityLegendOverlay = document.getElementById("connectivityLegendOverlay");
