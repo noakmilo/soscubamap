@@ -1210,6 +1210,11 @@ function clearMarkers() {
 function setMapSearchVisible(visible) {
   if (!mapSearchWrap) return;
   mapSearchWrap.hidden = !visible;
+  if (visible) {
+    mapSearchWrap.style.removeProperty("display");
+  } else {
+    mapSearchWrap.style.display = "none";
+  }
   if (visible) return;
 
   const input = mapSearchWrap.querySelector("#mapSearch");
@@ -1226,6 +1231,11 @@ function setMapSearchVisible(visible) {
 function setAlertConsoleVisible(visible) {
   if (!alertConsolePanel) return;
   alertConsolePanel.hidden = !visible;
+  if (visible) {
+    alertConsolePanel.style.removeProperty("display");
+  } else {
+    alertConsolePanel.style.display = "none";
+  }
   if (!visible && alertConsolePanel.contains(document.activeElement)) {
     document.activeElement.blur();
   }
