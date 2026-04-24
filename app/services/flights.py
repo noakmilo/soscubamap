@@ -815,6 +815,55 @@ def get_flights_summary_on_demand_limit() -> int:
     return max(1, min(raw, 200))
 
 
+def get_flights_detail_preload_enabled() -> bool:
+    return _safe_bool(_config_value("FLIGHTS_DETAIL_PRELOAD_ENABLED", True), True)
+
+
+def get_flights_detail_preload_delay_seconds() -> int:
+    raw = _safe_int(_config_value("FLIGHTS_DETAIL_PRELOAD_DELAY_SECONDS", 2), 2)
+    return max(raw, 0)
+
+
+def get_flights_detail_preload_max_events_per_run() -> int:
+    raw = _safe_int(_config_value("FLIGHTS_DETAIL_PRELOAD_MAX_EVENTS_PER_RUN", 120), 120)
+    return max(1, min(raw, 2000))
+
+
+def get_flights_detail_preload_daily_enabled() -> bool:
+    return _safe_bool(_config_value("FLIGHTS_DETAIL_PRELOAD_DAILY_ENABLED", True), True)
+
+
+def get_flights_detail_preload_daily_interval_seconds() -> int:
+    raw = _safe_int(
+        _config_value("FLIGHTS_DETAIL_PRELOAD_DAILY_INTERVAL_SECONDS", 86400),
+        86400,
+    )
+    return max(3600, raw)
+
+
+def get_flights_detail_preload_daily_max_events() -> int:
+    raw = _safe_int(_config_value("FLIGHTS_DETAIL_PRELOAD_DAILY_MAX_EVENTS", 500), 500)
+    return max(1, min(raw, 5000))
+
+
+def get_flights_detail_preload_daily_lookback_hours() -> int:
+    raw = _safe_int(
+        _config_value("FLIGHTS_DETAIL_PRELOAD_DAILY_LOOKBACK_HOURS", 168),
+        168,
+    )
+    return max(1, min(raw, 24 * 31))
+
+
+def get_flights_detail_preload_opensky_request_cap() -> int:
+    raw = _safe_int(_config_value("FLIGHTS_DETAIL_PRELOAD_OPENSKY_REQUEST_CAP", 120), 120)
+    return max(1, raw)
+
+
+def get_flights_detail_preload_fr24_request_cap() -> int:
+    raw = _safe_int(_config_value("FLIGHTS_DETAIL_PRELOAD_FR24_REQUEST_CAP", 80), 80)
+    return max(1, raw)
+
+
 def get_flights_opensky_enabled() -> bool:
     return _safe_bool(_config_value("FLIGHTS_OPENSKY_ENABLED", False), False)
 
@@ -3105,6 +3154,272 @@ def _needs_summary_enrichment(aircraft: FlightAircraft, event: FlightEvent | Non
     return aircraft_missing or origin_missing or destination_missing or timing_missing
 
 
+def _needs_opensky_event_enrichment(event: FlightEvent | None) -> bool:
+    if event is None:
+        return False
+
+    origin_missing = not (
+        _clean_text(event.origin_airport_icao, upper=True, limit=8)
+        or _clean_text(event.origin_airport_iata, upper=True, limit=8)
+        or _clean_text(event.origin_airport_name, limit=255)
+    )
+    destination_missing = not (
+        _clean_text(event.destination_airport_icao, upper=True, limit=8)
+        or _clean_text(event.destination_airport_iata, upper=True, limit=8)
+        or _clean_text(event.destination_airport_name, limit=255)
+    )
+    timing_missing = event.departure_at_utc is None and event.arrival_at_utc is None
+    return origin_missing or destination_missing or timing_missing
+
+
+def _opensky_arrival_selector_attempts(
+    aircraft: FlightAircraft,
+    event: FlightEvent | None,
+    known_cuba_codes: set[str],
+) -> list[dict[str, Any]]:
+    if event is None:
+        return []
+
+    now_utc = _utc_now_naive()
+    center = (
+        event.last_seen_at_utc
+        or event.arrival_at_utc
+        or event.departure_at_utc
+        or aircraft.last_seen_at_utc
+        or now_utc
+    )
+    lookback_hours = max(1, min(get_flights_summary_on_demand_hours(), 72))
+    range_from = center - timedelta(hours=lookback_hours)
+    range_to = center + timedelta(hours=6)
+    begin_epoch = int(range_from.replace(tzinfo=timezone.utc).timestamp())
+    end_epoch = int(range_to.replace(tzinfo=timezone.utc).timestamp())
+
+    airport_codes: list[str] = []
+
+    def _push_airport(code: Any) -> None:
+        clean = _clean_text(code, upper=True, limit=8)
+        if not clean:
+            return
+        if len(clean) == 3:
+            alias = _clean_text(_CUBA_CODE_ALIASES.get(clean), upper=True, limit=8)
+            clean = alias or clean
+        if len(clean) != 4:
+            return
+        if clean in airport_codes:
+            return
+        airport_codes.append(clean)
+
+    _push_airport(event.destination_airport_icao)
+    _push_airport(event.destination_airport_iata)
+    if event.destination_airport is not None:
+        _push_airport(event.destination_airport.airport_code_icao)
+        _push_airport(event.destination_airport.airport_code_iata)
+
+    if not airport_codes:
+        known_airports = sorted(
+            code
+            for code in known_cuba_codes
+            if len(_clean_text(code, upper=True, limit=8)) == 4
+        )
+        for code in known_airports[:2]:
+            _push_airport(code)
+
+    return [
+        {
+            "airport": code,
+            "begin": begin_epoch,
+            "end": end_epoch,
+        }
+        for code in airport_codes
+    ]
+
+
+def _score_opensky_arrival_record(
+    record: dict[str, Any],
+    aircraft: FlightAircraft,
+    event: FlightEvent | None,
+    airport_code: str,
+) -> float:
+    score = 0.0
+
+    row_callsign = _clean_text(record.get("call_sign"), upper=True, limit=64)
+    target_callsign = _clean_text(
+        (event.call_sign if event else "") or aircraft.call_sign,
+        upper=True,
+        limit=64,
+    )
+    if row_callsign and target_callsign and row_callsign == target_callsign:
+        score += 100.0
+
+    row_registration = _clean_text(record.get("registration"), upper=True, limit=64)
+    target_registration = _clean_text(
+        (event.registration if event else "") or aircraft.registration,
+        upper=True,
+        limit=64,
+    )
+    if row_registration and target_registration and row_registration == target_registration:
+        score += 140.0
+
+    destination_icao = _clean_text(record.get("destination_airport_icao"), upper=True, limit=8)
+    if destination_icao and destination_icao == _clean_text(airport_code, upper=True, limit=8):
+        score += 40.0
+
+    target_origin_icao = _clean_text(event.origin_airport_icao if event else "", upper=True, limit=8)
+    row_origin_icao = _clean_text(record.get("origin_airport_icao"), upper=True, limit=8)
+    if target_origin_icao and row_origin_icao and target_origin_icao == row_origin_icao:
+        score += 15.0
+
+    reference_time = (
+        (event.last_seen_at_utc if event else None)
+        or (event.arrival_at_utc if event else None)
+        or (event.departure_at_utc if event else None)
+        or aircraft.last_seen_at_utc
+    )
+    row_time = (
+        _normalize_utc_datetime(record.get("arrival_at_utc"))
+        or _normalize_utc_datetime(record.get("observed_at_utc"))
+        or _normalize_utc_datetime(record.get("departure_at_utc"))
+    )
+    if reference_time and row_time:
+        delta_hours = abs((reference_time - row_time).total_seconds()) / 3600.0
+        score += max(0.0, 30.0 - min(delta_hours, 30.0))
+
+    return score
+
+
+def _best_opensky_arrival_record(
+    rows: list[dict[str, Any]],
+    aircraft: FlightAircraft,
+    event: FlightEvent | None,
+    airport_code: str,
+) -> dict[str, Any] | None:
+    if not rows:
+        return None
+    ranked = sorted(
+        rows,
+        key=lambda row: _score_opensky_arrival_record(row, aircraft, event, airport_code),
+        reverse=True,
+    )
+    best = ranked[0]
+    if _score_opensky_arrival_record(best, aircraft, event, airport_code) <= 0:
+        return None
+    return best
+
+
+def _apply_opensky_arrival_cache(
+    row: dict[str, Any],
+    aircraft: FlightAircraft,
+    event: FlightEvent | None,
+) -> bool:
+    changed = False
+
+    call_sign = _clean_text(row.get("call_sign"), limit=64)
+    registration = _clean_text(row.get("registration"), upper=True, limit=64)
+    first_seen = _normalize_utc_datetime(row.get("departure_at_utc"))
+    last_seen = _normalize_utc_datetime(row.get("arrival_at_utc")) or _normalize_utc_datetime(
+        row.get("observed_at_utc")
+    )
+
+    if call_sign and not _clean_text(aircraft.call_sign, limit=64):
+        aircraft.call_sign = call_sign
+        changed = True
+    if registration and not _clean_text(aircraft.registration, upper=True, limit=64):
+        aircraft.registration = registration
+        changed = True
+    if first_seen and (aircraft.first_seen_at_utc is None or first_seen < aircraft.first_seen_at_utc):
+        aircraft.first_seen_at_utc = first_seen
+        changed = True
+    if last_seen and (aircraft.last_seen_at_utc is None or last_seen > aircraft.last_seen_at_utc):
+        aircraft.last_seen_at_utc = last_seen
+        changed = True
+
+    if event is None:
+        return changed
+
+    origin_icao = _clean_text(row.get("origin_airport_icao"), upper=True, limit=8)
+    origin_iata = _clean_text(row.get("origin_airport_iata"), upper=True, limit=8)
+    origin_name = _clean_text(row.get("origin_airport_name"), limit=255)
+    origin_country = _clean_text(row.get("origin_country"), limit=120)
+    destination_icao = _clean_text(row.get("destination_airport_icao"), upper=True, limit=8)
+    destination_iata = _clean_text(row.get("destination_airport_iata"), upper=True, limit=8)
+    destination_name = _clean_text(row.get("destination_airport_name"), limit=255)
+    destination_country = _clean_text(row.get("destination_country"), limit=120)
+    status = _clean_text(row.get("status"), limit=64)
+    departure_at = _normalize_utc_datetime(row.get("departure_at_utc"))
+    arrival_at = _normalize_utc_datetime(row.get("arrival_at_utc"))
+    observed_at = _normalize_utc_datetime(row.get("observed_at_utc"))
+    lat = _safe_float(row.get("latitude"))
+    lng = _safe_float(row.get("longitude"))
+    altitude = _safe_float(row.get("altitude"))
+    speed = _safe_float(row.get("speed"))
+    heading = _safe_float(row.get("heading"))
+
+    if call_sign and not _clean_text(event.call_sign, limit=64):
+        event.call_sign = call_sign
+        changed = True
+    if registration and not _clean_text(event.registration, upper=True, limit=64):
+        event.registration = registration
+        changed = True
+    if origin_icao and not _clean_text(event.origin_airport_icao, upper=True, limit=8):
+        event.origin_airport_icao = origin_icao
+        changed = True
+    if origin_iata and not _clean_text(event.origin_airport_iata, upper=True, limit=8):
+        event.origin_airport_iata = origin_iata
+        changed = True
+    if origin_name and not _clean_text(event.origin_airport_name, limit=255):
+        event.origin_airport_name = origin_name
+        changed = True
+    if origin_country and not _clean_text(event.origin_country, limit=120):
+        event.origin_country = origin_country
+        changed = True
+    if destination_icao and not _clean_text(event.destination_airport_icao, upper=True, limit=8):
+        event.destination_airport_icao = destination_icao
+        changed = True
+    if destination_iata and not _clean_text(event.destination_airport_iata, upper=True, limit=8):
+        event.destination_airport_iata = destination_iata
+        changed = True
+    if destination_name and not _clean_text(event.destination_airport_name, limit=255):
+        event.destination_airport_name = destination_name
+        changed = True
+    if destination_country and (
+        not _clean_text(event.destination_country, limit=120)
+        or _clean_text(event.destination_country, limit=120) == "Cuba"
+    ):
+        event.destination_country = destination_country
+        changed = True
+    if departure_at and event.departure_at_utc is None:
+        event.departure_at_utc = departure_at
+        changed = True
+    if arrival_at and event.arrival_at_utc is None:
+        event.arrival_at_utc = arrival_at
+        changed = True
+    if observed_at and (event.first_seen_at_utc is None or observed_at < event.first_seen_at_utc):
+        event.first_seen_at_utc = observed_at
+        changed = True
+    if observed_at and (event.last_seen_at_utc is None or observed_at > event.last_seen_at_utc):
+        event.last_seen_at_utc = observed_at
+        changed = True
+    if lat is not None and lng is not None and (
+        event.latest_latitude is None or event.latest_longitude is None
+    ):
+        event.latest_latitude = lat
+        event.latest_longitude = lng
+        event.latest_altitude = altitude
+        event.latest_speed = speed
+        event.latest_heading = heading
+        changed = True
+    if status and not _clean_text(event.status, limit=64):
+        event.status = status
+        changed = True
+
+    if changed:
+        event.last_source_kind = (
+            _clean_text(event.last_source_kind, limit=64) or "opensky_detail_preload"
+        )
+
+    return changed
+
+
 def _summary_selector_attempts(
     aircraft: FlightAircraft,
     event: FlightEvent | None,
@@ -3165,31 +3480,44 @@ def _summary_selector_attempts(
 def _fetch_summary_rows_on_demand(
     aircraft: FlightAircraft,
     event: FlightEvent | None,
-) -> tuple[list[dict[str, Any]], list[str], bool, int]:
+    request_ctx: RequestContext | None = None,
+) -> tuple[list[dict[str, Any]], list[str], bool, bool, int]:
     warnings: list[str] = []
     attempts = _summary_selector_attempts(aircraft, event)
     if not attempts:
-        return [], warnings, False, 0
+        return [], warnings, False, False, 0
 
-    request_ctx = RequestContext(
+    shared_ctx = request_ctx is not None
+    ctx = request_ctx or RequestContext(
         request_cap=max(1, len(attempts)),
         rate_limit_per_second=get_flights_request_rate_limit(),
     )
+    start_requests = int(ctx.request_count)
     for params in attempts:
         try:
-            payload = _api_get(get_flights_summary_light_path(), params, request_ctx)
+            payload = _api_get(get_flights_summary_light_path(), params, ctx)
+        except RequestBudgetExhausted as exc:
+            warnings.append(str(exc))
+            consumed = int(ctx.request_count) - start_requests
+            return [], warnings, False, True, int(max(0, consumed))
         except FlightsApiRateLimited as exc:
             warnings.append(str(exc))
-            return [], warnings, True, int(request_ctx.request_count)
+            consumed = int(ctx.request_count) - start_requests
+            return [], warnings, True, False, int(max(0, consumed))
         except Exception as exc:
             warnings.append(str(exc))
+            if shared_ctx and ctx.budget_exhausted:
+                consumed = int(ctx.request_count) - start_requests
+                return [], warnings, False, True, int(max(0, consumed))
             continue
 
         rows = _extract_items(payload, ("data", "items", "results"))
         if rows:
-            return rows, warnings, False, int(request_ctx.request_count)
+            consumed = int(ctx.request_count) - start_requests
+            return rows, warnings, False, False, int(max(0, consumed))
 
-    return [], warnings, False, int(request_ctx.request_count)
+    consumed = int(ctx.request_count) - start_requests
+    return [], warnings, False, False, int(max(0, consumed))
 
 
 def _score_summary_row(
@@ -3414,15 +3742,137 @@ def _apply_summary_row_cache(
     return changed
 
 
+def enrich_aircraft_detail_from_opensky(
+    aircraft: FlightAircraft,
+    event: FlightEvent | None = None,
+    *,
+    request_ctx: RequestContext | None = None,
+    known_cuba_codes: set[str] | None = None,
+    airport_lookup: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    meta: dict[str, Any] = {
+        "status": "skipped",
+        "enabled": bool(get_flights_opensky_enabled()),
+        "event_id": int(event.id) if event else None,
+        "requests": 0,
+        "warnings": [],
+        "updated": False,
+        "rate_limited": False,
+        "budget_exhausted": False,
+    }
+
+    if not get_flights_opensky_enabled():
+        meta["reason"] = "opensky_disabled"
+        return meta
+    if not _opensky_credentials_ready():
+        meta["reason"] = "missing_opensky_credentials"
+        return meta
+    if event is None:
+        meta["reason"] = "event_required"
+        return meta
+    if not _needs_summary_enrichment(aircraft, event):
+        meta["status"] = "cached"
+        meta["reason"] = "already_enriched"
+        return meta
+    if not _needs_opensky_event_enrichment(event):
+        meta["status"] = "cached"
+        meta["reason"] = "opensky_not_needed_for_current_missing_fields"
+        return meta
+
+    safe_known_codes = known_cuba_codes or _known_cuba_airport_codes()
+    attempts = _opensky_arrival_selector_attempts(aircraft, event, safe_known_codes)
+    if not attempts:
+        meta["status"] = "no_selector"
+        return meta
+
+    ctx = request_ctx or RequestContext(
+        request_cap=max(1, len(attempts)),
+        rate_limit_per_second=get_flights_opensky_request_rate_limit(),
+    )
+    start_requests = int(ctx.request_count)
+    airport_lookup_index = airport_lookup or _build_cuba_airport_lookup(safe_known_codes)
+
+    best_row = None
+    warnings: list[str] = []
+    for params in attempts:
+        try:
+            payload = _opensky_api_get("/flights/arrival", params, ctx)
+        except RequestBudgetExhausted as exc:
+            warnings.append(str(exc))
+            meta["status"] = "budget_exhausted"
+            meta["budget_exhausted"] = True
+            break
+        except FlightsApiRateLimited as exc:
+            warnings.append(str(exc))
+            meta["status"] = "rate_limited"
+            meta["rate_limited"] = True
+            break
+        except Exception as exc:
+            warnings.append(str(exc))
+            continue
+
+        rows: list[dict[str, Any]] = []
+        if isinstance(payload, list):
+            rows = [item for item in payload if isinstance(item, dict)]
+        elif isinstance(payload, dict):
+            rows = _extract_items(payload, ("data", "items", "results"))
+
+        parsed_rows: list[dict[str, Any]] = []
+        for row in rows:
+            parsed = _parse_opensky_arrival_record(row, params.get("airport", ""), airport_lookup_index)
+            if parsed:
+                parsed_rows.append(parsed)
+
+        candidate = _best_opensky_arrival_record(
+            parsed_rows,
+            aircraft,
+            event,
+            params.get("airport", ""),
+        )
+        if candidate is not None:
+            best_row = candidate
+            break
+
+    consumed = int(ctx.request_count) - start_requests
+    meta["requests"] = int(max(0, consumed))
+    meta["warnings"] = warnings
+
+    if meta["status"] in {"rate_limited", "budget_exhausted"}:
+        return meta
+    if best_row is None:
+        meta["status"] = "no_match"
+        return meta
+
+    changed = _apply_opensky_arrival_cache(best_row, aircraft, event)
+    meta["updated"] = bool(changed)
+    if not changed:
+        meta["status"] = "cached"
+        return meta
+
+    try:
+        db.session.commit()
+        meta["status"] = "enriched"
+        return meta
+    except Exception as exc:
+        db.session.rollback()
+        logger.exception("Error guardando enriquecimiento OpenSky de Flight detail")
+        meta["status"] = "error"
+        meta["warnings"] = list(meta.get("warnings") or []) + [str(exc)]
+        return meta
+
+
 def enrich_aircraft_detail_from_summary_light(
     aircraft: FlightAircraft,
     event: FlightEvent | None = None,
+    *,
+    request_ctx: RequestContext | None = None,
 ) -> dict[str, Any]:
     meta: dict[str, Any] = {
         "status": "skipped",
         "enabled": bool(get_flights_summary_on_demand_enabled()),
         "event_id": int(event.id) if event else None,
         "requests": 0,
+        "budget_exhausted": False,
         "warnings": [],
         "updated": False,
     }
@@ -3439,9 +3889,17 @@ def enrich_aircraft_detail_from_summary_light(
         return meta
 
     known_cuba_codes = _known_cuba_airport_codes()
-    rows, warnings, rate_limited, request_count = _fetch_summary_rows_on_demand(aircraft, event)
+    rows, warnings, rate_limited, budget_exhausted, request_count = _fetch_summary_rows_on_demand(
+        aircraft,
+        event,
+        request_ctx=request_ctx,
+    )
     meta["warnings"] = warnings
     meta["requests"] = int(request_count)
+    meta["budget_exhausted"] = bool(budget_exhausted)
+    if budget_exhausted:
+        meta["status"] = "budget_exhausted"
+        return meta
     if rate_limited:
         meta["status"] = "rate_limited"
         return meta
@@ -3470,6 +3928,141 @@ def enrich_aircraft_detail_from_summary_light(
         meta["status"] = "error"
         meta["warnings"] = list(meta.get("warnings") or []) + [str(exc)]
         return meta
+
+
+def preload_missing_flight_details(
+    *,
+    run_id: int | None = None,
+    max_events: int | None = None,
+    lookback_hours: int | None = None,
+) -> dict[str, Any]:
+    now_utc = _utc_now_naive()
+    safe_run_id = _safe_int(run_id, 0)
+
+    if safe_run_id > 0:
+        target_limit = max_events or get_flights_detail_preload_max_events_per_run()
+    else:
+        target_limit = max_events or get_flights_detail_preload_daily_max_events()
+    target_limit = max(1, min(int(target_limit), 5000))
+
+    query = FlightEvent.query.options(
+        selectinload(FlightEvent.aircraft),
+        selectinload(FlightEvent.destination_airport),
+    ).filter(
+        or_(
+            FlightEvent.destination_airport_id.isnot(None),
+            func.lower(func.coalesce(FlightEvent.destination_country, "")).contains("cuba"),
+            FlightEvent.destination_country == "CU",
+        )
+    )
+    if safe_run_id > 0:
+        query = query.filter(FlightEvent.ingestion_run_id == safe_run_id)
+    else:
+        safe_lookback_hours = int(lookback_hours or get_flights_detail_preload_daily_lookback_hours())
+        safe_lookback_hours = max(1, min(safe_lookback_hours, 24 * 31))
+        window_start = now_utc - timedelta(hours=safe_lookback_hours)
+        query = query.filter(
+            FlightEvent.last_seen_at_utc.isnot(None),
+            FlightEvent.last_seen_at_utc >= window_start,
+        )
+
+    events = (
+        query.order_by(FlightEvent.last_seen_at_utc.desc(), FlightEvent.id.desc())
+        .limit(target_limit)
+        .all()
+    )
+
+    opensky_stage_active = bool(get_flights_opensky_enabled() and _opensky_credentials_ready())
+    fr24_stage_active = bool(get_flights_summary_on_demand_enabled() and get_flights_api_key())
+    known_cuba_codes = _known_cuba_airport_codes()
+    airport_lookup = _build_cuba_airport_lookup(known_cuba_codes)
+    opensky_ctx = RequestContext(
+        request_cap=get_flights_detail_preload_opensky_request_cap(),
+        rate_limit_per_second=get_flights_opensky_request_rate_limit(),
+    )
+    fr24_ctx = RequestContext(
+        request_cap=get_flights_detail_preload_fr24_request_cap(),
+        rate_limit_per_second=get_flights_request_rate_limit(),
+    )
+
+    skipped_without_aircraft = 0
+    skipped_complete = 0
+    opensky_attempted = 0
+    opensky_enriched = 0
+    fr24_attempted = 0
+    fr24_enriched = 0
+    warnings: list[str] = []
+
+    for event in events:
+        aircraft = event.aircraft
+        if aircraft is None:
+            skipped_without_aircraft += 1
+            continue
+        if not _needs_summary_enrichment(aircraft, event):
+            skipped_complete += 1
+            continue
+
+        if opensky_stage_active:
+            opensky_attempted += 1
+            opensky_meta = enrich_aircraft_detail_from_opensky(
+                aircraft,
+                event=event,
+                request_ctx=opensky_ctx,
+                known_cuba_codes=known_cuba_codes,
+                airport_lookup=airport_lookup,
+            )
+            if opensky_meta.get("status") == "enriched":
+                opensky_enriched += 1
+            for warning in list(opensky_meta.get("warnings") or []):
+                if warning and len(warnings) < 20:
+                    warnings.append(f"event={event.id} opensky: {warning}")
+            if opensky_meta.get("status") in {"rate_limited", "budget_exhausted"}:
+                opensky_stage_active = False
+
+        if not _needs_summary_enrichment(aircraft, event):
+            continue
+        if not fr24_stage_active:
+            continue
+
+        fr24_attempted += 1
+        fr24_meta = enrich_aircraft_detail_from_summary_light(
+            aircraft,
+            event=event,
+            request_ctx=fr24_ctx,
+        )
+        if fr24_meta.get("status") == "enriched":
+            fr24_enriched += 1
+        for warning in list(fr24_meta.get("warnings") or []):
+            if warning and len(warnings) < 20:
+                warnings.append(f"event={event.id} fr24: {warning}")
+        if fr24_meta.get("status") in {"rate_limited", "budget_exhausted"}:
+            fr24_stage_active = False
+
+    return {
+        "status": "success",
+        "run_id": int(safe_run_id) if safe_run_id > 0 else None,
+        "selected_events": len(events),
+        "skipped_without_aircraft": int(skipped_without_aircraft),
+        "skipped_complete": int(skipped_complete),
+        "opensky": {
+            "enabled": bool(get_flights_opensky_enabled()),
+            "attempted_events": int(opensky_attempted),
+            "enriched_events": int(opensky_enriched),
+            "request_count": int(opensky_ctx.request_count),
+            "budget_exhausted": bool(opensky_ctx.budget_exhausted),
+            "stage_active_end": bool(opensky_stage_active),
+        },
+        "fr24": {
+            "enabled": bool(get_flights_summary_on_demand_enabled() and get_flights_api_key()),
+            "attempted_events": int(fr24_attempted),
+            "enriched_events": int(fr24_enriched),
+            "request_count": int(fr24_ctx.request_count),
+            "estimated_credits": int(fr24_ctx.estimated_credits),
+            "budget_exhausted": bool(fr24_ctx.budget_exhausted),
+            "stage_active_end": bool(fr24_stage_active),
+        },
+        "warnings": warnings,
+    }
 
 
 def _effective_photo_payload(aircraft: FlightAircraft | None) -> tuple[str, str]:

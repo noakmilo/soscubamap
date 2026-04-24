@@ -102,6 +102,7 @@ from app.services.flights import (
     build_aircraft_detail_payload,
     build_event_track_payload,
     decode_snapshot_json,
+    enrich_aircraft_detail_from_opensky,
     enrich_snapshot_points_with_route_coordinates,
     enrich_aircraft_detail_from_summary_light,
     get_flights_frontend_refresh_seconds,
@@ -2900,9 +2901,42 @@ def flights_aircraft_detail_v1(aircraft_id):
             event_id = 0
         if event_id > 0:
             event = FlightEvent.query.filter_by(id=event_id, aircraft_id=aircraft.id).first()
+    if event is None:
+        newest_seen = func.coalesce(
+            FlightEvent.last_seen_at_utc,
+            FlightEvent.departure_at_utc,
+            FlightEvent.arrival_at_utc,
+            FlightEvent.created_at,
+        )
+        event = (
+            FlightEvent.query.filter(FlightEvent.aircraft_id == aircraft.id)
+            .filter(
+                or_(
+                    FlightEvent.destination_airport_id.isnot(None),
+                    func.lower(func.coalesce(FlightEvent.destination_country, "")).contains("cuba"),
+                    FlightEvent.destination_country == "CU",
+                )
+            )
+            .order_by(newest_seen.desc(), FlightEvent.id.desc())
+            .first()
+        )
+    if event is None:
+        newest_seen = func.coalesce(
+            FlightEvent.last_seen_at_utc,
+            FlightEvent.departure_at_utc,
+            FlightEvent.arrival_at_utc,
+            FlightEvent.created_at,
+        )
+        event = (
+            FlightEvent.query.filter(FlightEvent.aircraft_id == aircraft.id)
+            .order_by(newest_seen.desc(), FlightEvent.id.desc())
+            .first()
+        )
 
+    opensky_cache = enrich_aircraft_detail_from_opensky(aircraft, event=event)
     summary_cache = enrich_aircraft_detail_from_summary_light(aircraft, event=event)
     payload = build_aircraft_detail_payload(aircraft)
+    payload["opensky_cache"] = opensky_cache
     payload["summary_light_cache"] = summary_cache
     payload["photo_upload_enabled"] = bool(
         current_app.config.get("CLOUDINARY_CLOUD_NAME")

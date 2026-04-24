@@ -7,6 +7,7 @@ PROTEST_INGESTION_TASK = "app.tasks.protests.ingest_protests_feeds"
 CONNECTIVITY_POLL_TASK = "app.tasks.connectivity.poll_connectivity_and_create_reports"
 AIS_INGESTION_TASK = "app.tasks.ais.ingest_aisstream_cuba_targets"
 FLIGHTS_INGESTION_TASK = "app.tasks.flights.ingest_flights_cuba"
+FLIGHTS_DETAIL_PRELOAD_DAILY_TASK = "app.tasks.flights.preload_flights_detail_daily"
 REPRESSOR_INGESTION_TASK = "app.tasks.repressors.ingest_repressors_catalog"
 POST_EXPIRATION_TASK = "app.tasks.posts.expire_map_alert_posts"
 
@@ -114,6 +115,35 @@ def _build_beat_schedule(flask_app):
             "schedule": interval_seconds,
             "options": {"queue": queue_name},
         }
+
+        detail_preload_daily_enabled = bool(
+            flask_app.config.get("FLIGHTS_DETAIL_PRELOAD_ENABLED", True)
+        ) and bool(flask_app.config.get("FLIGHTS_DETAIL_PRELOAD_DAILY_ENABLED", True))
+        if detail_preload_daily_enabled:
+            preload_interval_seconds = 86400
+            try:
+                with flask_app.app_context():
+                    from app.services.flights import (
+                        get_flights_detail_preload_daily_interval_seconds,
+                    )
+
+                    preload_interval_seconds = get_flights_detail_preload_daily_interval_seconds()
+            except Exception:
+                interval_raw = flask_app.config.get(
+                    "FLIGHTS_DETAIL_PRELOAD_DAILY_INTERVAL_SECONDS",
+                    86400,
+                )
+                try:
+                    preload_interval_seconds = int(interval_raw)
+                except Exception:
+                    preload_interval_seconds = 86400
+                preload_interval_seconds = max(3600, preload_interval_seconds)
+
+            schedule["flights-detail-preload-daily"] = {
+                "task": FLIGHTS_DETAIL_PRELOAD_DAILY_TASK,
+                "schedule": preload_interval_seconds,
+                "options": {"queue": queue_name},
+            }
 
     repressor_enabled = bool(
         flask_app.config.get("CELERY_REPRESSOR_INGESTION_ENABLED", True)

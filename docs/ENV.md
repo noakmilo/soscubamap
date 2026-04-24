@@ -184,7 +184,33 @@ Layer administrativo para visualizar vuelos con destino a aeropuertos cubanos co
 | `FLIGHTS_SUMMARY_ON_DEMAND_ENABLED` | `1` habilita enriquecimiento por `Flight summary light` al abrir detalle del avión. | `1` |
 | `FLIGHTS_SUMMARY_ON_DEMAND_HOURS` | Rango de búsqueda alrededor del evento clicado para query de summary. | `48` |
 | `FLIGHTS_SUMMARY_ON_DEMAND_LIMIT` | Límite de resultados solicitados en query summary on-demand. | `20` |
+| `FLIGHTS_DETAIL_PRELOAD_ENABLED` | `1` habilita precarga automática de detalle tras cada ingesta (OpenSky→FR24). | `1` |
+| `FLIGHTS_DETAIL_PRELOAD_DELAY_SECONDS` | Segundos de espera antes de lanzar la precarga post-ingesta. | `2` |
+| `FLIGHTS_DETAIL_PRELOAD_MAX_EVENTS_PER_RUN` | Máximo de eventos evaluados por precarga post-ingesta. | `120` |
+| `FLIGHTS_DETAIL_PRELOAD_DAILY_ENABLED` | `1` habilita tarea diaria de relleno de detalles faltantes. | `1` |
+| `FLIGHTS_DETAIL_PRELOAD_DAILY_INTERVAL_SECONDS` | Intervalo de la tarea diaria de precarga global. | `86400` |
+| `FLIGHTS_DETAIL_PRELOAD_DAILY_MAX_EVENTS` | Máximo de eventos evaluados por la tarea diaria. | `500` |
+| `FLIGHTS_DETAIL_PRELOAD_DAILY_LOOKBACK_HOURS` | Ventana histórica (horas) escaneada por la tarea diaria. | `168` |
+| `FLIGHTS_DETAIL_PRELOAD_OPENSKY_REQUEST_CAP` | Cap de requests OpenSky en cada corrida de precarga. | `120` |
+| `FLIGHTS_DETAIL_PRELOAD_FR24_REQUEST_CAP` | Cap de requests FR24 en cada corrida de precarga. | `80` |
 | `FLIGHTS_CUBA_AIRPORT_CODES` | Lista CSV base de códigos (IATA/ICAO) para detección de destino Cuba. | `MUHA,HAV,MUCU,SCU,MUVR,VRA,MUCC,CCC,MUCM,CMW,MUSC,SNU,MUBY,BCA,MUGT,BWW,MUMZ,MZG,MUCL,CYO,MUBA` |
+| `FLIGHTS_OPENSKY_ENABLED` | `1` habilita integración OpenSky para fallback/precarga de detalle. | `1` |
+| `FLIGHTS_OPENSKY_CLIENT_ID` | Client ID OAuth2 de OpenSky. | (vacío) |
+| `FLIGHTS_OPENSKY_CLIENT_SECRET` | Client secret OAuth2 de OpenSky. | (vacío) |
+| `FLIGHTS_OPENSKY_TOKEN_URL` | Endpoint de token OAuth2 OpenSky. | `https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token` |
+| `FLIGHTS_OPENSKY_API_BASE_URL` | Base URL OpenSky API. | `https://opensky-network.org/api` |
+| `FLIGHTS_OPENSKY_TIMEOUT_SECONDS` | Timeout HTTP por request OpenSky. | `20` |
+| `FLIGHTS_OPENSKY_REQUEST_RATE_LIMIT` | Máximo de requests OpenSky por segundo. | `2` |
+| `FLIGHTS_OPENSKY_REQUEST_CAP_PER_RUN` | Cap OpenSky por corrida de ingesta principal. | `180` |
+| `FLIGHTS_OPENSKY_MAX_RETRIES` | Reintentos por request OpenSky (401/429/5xx). | `2` |
+| `FLIGHTS_OPENSKY_RETRY_BACKOFF_SECONDS` | Backoff base OpenSky para reintentos. | `1.5` |
+| `FLIGHTS_OPENSKY_FALLBACK_ON_RATE_LIMITED` | `1` usa OpenSky cuando FR24 responde rate-limit. | `1` |
+| `FLIGHTS_OPENSKY_FALLBACK_ON_BUDGET_EXHAUSTED` | `1` usa OpenSky cuando FR24 agota cap interno. | `1` |
+| `FLIGHTS_OPENSKY_FALLBACK_ON_EMPTY` | `1` usa OpenSky si FR24 no devuelve registros. | `0` |
+| `FLIGHTS_OPENSKY_INCLUDE_LIVE_STATES` | `1` incluye `states/all` en fallback OpenSky. | `1` |
+| `FLIGHTS_OPENSKY_INCLUDE_ARRIVALS` | `1` incluye `flights/arrival` en fallback OpenSky. | `1` |
+| `FLIGHTS_OPENSKY_LIVE_BOUNDS` | Bounding box para consulta `states/all` OpenSky. | `24.2,19.4,-85.2,-73.9` |
+| `FLIGHTS_OPENSKY_ARRIVAL_CHUNK_HOURS` | Tamaño de chunk (horas) para `flights/arrival` OpenSky. | `48` |
 
 ## Protestas (RSS / NLP)
 

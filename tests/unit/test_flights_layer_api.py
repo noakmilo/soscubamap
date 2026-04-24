@@ -289,3 +289,30 @@ def test_flights_detail_uses_event_id_for_summary_enrichment(app, client, monkey
     assert payload["summary_light_cache"]["event_id"] == seeded["event_id"]
     assert captured["aircraft_id"] == seeded["aircraft_id"]
     assert captured["event_id"] == seeded["event_id"]
+
+
+def test_flights_detail_uses_latest_event_when_event_id_missing(app, client, monkeypatch):
+    seeded = _seed_flights_data(app)
+    _login_admin(client, seeded["admin_id"])
+
+    captured = {"opensky_event_id": None, "summary_event_id": None}
+
+    def fake_opensky_enrich(aircraft, event=None):
+        captured["opensky_event_id"] = event.id if event is not None else None
+        return {"status": "cached", "event_id": captured["opensky_event_id"], "requests": 0, "warnings": []}
+
+    def fake_summary_enrich(aircraft, event=None):
+        captured["summary_event_id"] = event.id if event is not None else None
+        return {"status": "cached", "event_id": captured["summary_event_id"], "requests": 0, "warnings": []}
+
+    monkeypatch.setattr("app.blueprints.api.routes.enrich_aircraft_detail_from_opensky", fake_opensky_enrich)
+    monkeypatch.setattr("app.blueprints.api.routes.enrich_aircraft_detail_from_summary_light", fake_summary_enrich)
+
+    response = client.get(f"/api/v1/flights/aircraft/{seeded['aircraft_id']}/detail")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload is not None
+    assert payload["opensky_cache"]["event_id"] == seeded["event_id"]
+    assert payload["summary_light_cache"]["event_id"] == seeded["event_id"]
+    assert captured["opensky_event_id"] == seeded["event_id"]
+    assert captured["summary_event_id"] == seeded["event_id"]
