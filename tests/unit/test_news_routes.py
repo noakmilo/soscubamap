@@ -1,4 +1,5 @@
 from app.extensions import db
+from app.models.news_comment import NewsComment
 from app.models.news_post import NewsPost
 from app.models.role import Role
 from app.models.user import User
@@ -69,3 +70,57 @@ def test_admin_can_create_news_post(app, client):
         post = NewsPost.query.filter_by(slug="titulo-con-acentos").first()
         assert post is not None
         assert "<strong>importante</strong>" in post.body_html
+
+
+def test_news_detail_accepts_comment(app, client):
+    with app.app_context():
+        post = NewsPost(
+            title="Noticia con comentarios",
+            slug="noticia-con-comentarios",
+            author_name="Equipo",
+            summary="Resumen",
+            body="Contenido",
+            body_html="<p>Contenido</p>",
+        )
+        db.session.add(post)
+        db.session.commit()
+        post_id = post.id
+
+    response = client.post(
+        "/noticias/noticia-con-comentarios",
+        data={
+            "comment_nickname": "Lector",
+            "comment_body": "Comentario **útil**",
+        },
+        follow_redirects=True,
+    )
+
+    html = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert "Comentario agregado" in html
+    with app.app_context():
+        comment = NewsComment.query.filter_by(post_id=post_id).first()
+        assert comment is not None
+        assert "<strong>útil</strong>" in comment.body_html
+
+
+def test_admin_news_panel_lists_post(app, client):
+    admin_id = _seed_admin(app)
+    with app.app_context():
+        post = NewsPost(
+            title="Noticia admin",
+            slug="noticia-admin",
+            author_name="Equipo",
+            summary="Resumen",
+            body="Contenido",
+            body_html="<p>Contenido</p>",
+        )
+        db.session.add(post)
+        db.session.commit()
+
+    _login_admin(client, admin_id)
+    response = client.get("/admin/noticias")
+    html = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert "Noticia admin" in html
+    assert "Editar" in html

@@ -1,54 +1,64 @@
 import json
-import re
-import unicodedata
+import secrets
 
-from flask import current_app, flash, jsonify, redirect, render_template, request, url_for
+from flask import current_app, flash, jsonify, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
-from sqlalchemy import func
 
 from app.extensions import db, limiter
+from app.models.news_comment import NewsComment
 from app.models.news_post import NewsPost
+from app.services.ai_text import generate_news_summary
 from app.services.authz import role_required
 from app.services.input_safety import has_malicious_input
 from app.services.markdown_utils import render_markdown
 from app.services.media_upload import parse_media_json, upload_files, validate_files
-from app.services.ai_text import generate_news_summary
+from app.services.news_posts import (
+    clean_image_alts,
+    fallback_news_summary,
+    replace_news_image_tokens,
+    unique_news_slug,
+)
+from app.services.recaptcha import recaptcha_enabled, verify_recaptcha
 from . import news_bp
 
 
-def _slugify(value: str) -> str:
-    normalized = unicodedata.normalize("NFKD", value or "")
-    ascii_value = normalized.encode("ascii", "ignore").decode("ascii")
-    slug = re.sub(r"[^a-zA-Z0-9]+", "-", ascii_value).strip("-").lower()
-    return slug[:180] or "noticia"
+def _get_news_nick():
+    allow_admin = current_user.is_authenticated and current_user.has_role("administrador")
+    nick = session.get("news_nick")
+    if nick and (nick.lower() != "admin" or allow_admin):
+        return nick
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    code = "".join(secrets.choice(alphabet) for _ in range(4))
+    nick = f"Anon-{code}"
+    session["news_nick"] = nick
+    return nick
 
 
-def _unique_slug(title: str) -> str:
-    base = _slugify(title)
-    slug = base
-    counter = 2
-    while NewsPost.query.filter(func.lower(NewsPost.slug) == slug.lower()).first():
-        suffix = f"-{counter}"
-        slug = f"{base[: 240 - len(suffix)]}{suffix}"
-        counter += 1
-    return slug
+def _resolve_news_nick(nickname: str) -> str:
+    allow_admin = current_user.is_authenticated and current_user.has_role("administrador")
+    value = (nickname or "").strip()
+    if not value:
+        value = _get_news_nick()
+    if value.lower() == "admin" and not allow_admin:
+        value = _get_news_nick()
+    value = value[:80]
+    session["news_nick"] = value
+    return value
 
 
-def _fallback_summary(body: str) -> str:
-    compact = re.sub(r"\s+", " ", re.sub(r"[\*_#>`\[\]\(\)]", "", body or "")).strip()
-    if len(compact) <= 300:
-        return compact
-    return compact[:297].rstrip() + "..."
-
-
-def _clean_image_alts(raw, count):
-    alts = []
-    for idx in range(count):
-        value = ""
-        if raw and idx < len(raw):
-            value = (raw[idx] or "").strip()
-        alts.append(value[:255])
-    return alts
+def _comment_tree(post_id: int):
+    comments = NewsComment.query.filter_by(post_id=post_id).order_by(NewsComment.created_at.asc()).all()
+    comment_map = {comment.id: comment for comment in comments}
+    roots = []
+    for comment in comments:
+        comment.thread_children = []
+        comment.rendered_body_html = comment.body_html or render_markdown(comment.body)
+    for comment in comments:
+        if comment.parent_id and comment.parent_id in comment_map:
+            comment_map[comment.parent_id].thread_children.append(comment)
+        else:
+            roots.append(comment)
+    return roots
 
 
 @news_bp.route("/noticias")
@@ -66,6 +76,12 @@ def index():
 @limiter.limit("3/minute; 40/day", methods=["POST"])
 def new_post():
     if request.method == "POST":
+        if recaptcha_enabled():
+            token = request.form.get("g-recaptcha-response", "")
+            if not verify_recaptcha(token, request.remote_addr):
+                flash("Verificación reCAPTCHA falló. Intenta nuevamente.", "error")
+                return redirect(url_for("news.new_post"))
+
         title = request.form.get("title", "").strip()
         author_name = request.form.get("author_name", "").strip()
         summary = request.form.get("summary", "").strip()
@@ -91,28 +107,28 @@ def new_post():
                 flash(error, "error")
                 return redirect(url_for("news.new_post"))
 
-        if not summary:
-            summary = _fallback_summary(body)
-        summary = summary[:500]
-
-        images_json = None
+        uploaded_items = []
         if images:
             media_urls = upload_files(images)
-            alts = _clean_image_alts(image_alts, len(media_urls))
-            items = [
+            alts = clean_image_alts(image_alts, len(media_urls))
+            uploaded_items = [
                 {"url": url, "alt": alts[idx] if idx < len(alts) else ""}
                 for idx, url in enumerate(media_urls)
             ]
-            images_json = json.dumps(items)
+            body = replace_news_image_tokens(body, uploaded_items)
+
+        if not summary:
+            summary = fallback_news_summary(body)
+        summary = summary[:500]
 
         post = NewsPost(
             title=title[:220],
-            slug=_unique_slug(title),
+            slug=unique_news_slug(title),
             author_name=author_name[:120],
             summary=summary,
             body=body,
             body_html=render_markdown(body),
-            images_json=images_json,
+            images_json=json.dumps(uploaded_items) if uploaded_items else None,
             created_by_id=current_user.id if current_user.is_authenticated else None,
         )
         db.session.add(post)
@@ -120,7 +136,12 @@ def new_post():
         flash("Noticia publicada.", "success")
         return redirect(url_for("news.detail", slug=post.slug))
 
-    return render_template("news/new.html")
+    return render_template(
+        "news/new.html",
+        post=None,
+        images=[],
+        recaptcha_site_key=current_app.config.get("RECAPTCHA_V2_SITE_KEY"),
+    )
 
 
 @news_bp.route("/noticias/resumen", methods=["POST"])
@@ -147,8 +168,68 @@ def summarize():
     return jsonify({"ok": True, "summary": summary})
 
 
-@news_bp.route("/noticias/<slug>")
+@news_bp.route("/noticias/comentarios/<int:comment_id>/eliminar", methods=["POST"])
+@login_required
+@role_required("administrador")
+def delete_comment(comment_id):
+    comment = NewsComment.query.get_or_404(comment_id)
+    slug = comment.post.slug
+    db.session.delete(comment)
+    db.session.commit()
+    flash("Comentario eliminado.", "success")
+    return redirect(url_for("news.detail", slug=slug))
+
+
+@news_bp.route("/noticias/<slug>", methods=["GET", "POST"])
+@limiter.limit("6/minute; 120/day", methods=["POST"])
 def detail(slug):
     post = NewsPost.query.filter_by(slug=slug).first_or_404()
+
+    if request.method == "POST":
+        if recaptcha_enabled():
+            token = request.form.get("g-recaptcha-response", "")
+            if not verify_recaptcha(token, request.remote_addr):
+                flash("Verificación reCAPTCHA falló. Intenta nuevamente.", "error")
+                return redirect(url_for("news.detail", slug=post.slug))
+        body = request.form.get("comment_body", "").strip()
+        nickname = request.form.get("comment_nickname", "").strip()
+        parent_id = request.form.get("parent_id", "").strip()
+        if has_malicious_input([body, nickname]):
+            flash("Se detectó contenido sospechoso. Revisa y vuelve a intentar.", "error")
+            return redirect(url_for("news.detail", slug=post.slug))
+        if not body:
+            flash("El comentario no puede estar vacío.", "error")
+            return redirect(url_for("news.detail", slug=post.slug))
+
+        parent = None
+        if parent_id:
+            try:
+                parent_id_int = int(parent_id)
+                parent = NewsComment.query.filter_by(id=parent_id_int, post_id=post.id).first()
+            except Exception:
+                parent = None
+
+        comment = NewsComment(
+            post_id=post.id,
+            parent_id=parent.id if parent else None,
+            body=body,
+            body_html=render_markdown(body),
+            author_label=_resolve_news_nick(nickname),
+        )
+        db.session.add(comment)
+        db.session.commit()
+        flash("Comentario agregado.", "success")
+        return redirect(url_for("news.detail", slug=post.slug))
+
     images = parse_media_json(post.images_json)
-    return render_template("news/detail.html", post=post, images=images)
+    primary_image = images[0] if images else None
+    return render_template(
+        "news/detail.html",
+        post=post,
+        images=images,
+        primary_image=primary_image,
+        comments=_comment_tree(post.id),
+        nick=_get_news_nick(),
+        recaptcha_site_key=current_app.config.get("RECAPTCHA_V2_SITE_KEY"),
+        canonical_url=url_for("news.detail", slug=post.slug, _external=True),
+    )

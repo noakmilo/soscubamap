@@ -176,7 +176,9 @@ function setupVotes() {
       const url =
         type === "post"
           ? `/api/discusiones/${id}/vote`
-          : `/api/discusiones/comentarios/${id}/vote`;
+          : type === "news-comment"
+            ? `/api/noticias/comentarios/${id}/vote`
+            : `/api/discusiones/comentarios/${id}/vote`;
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

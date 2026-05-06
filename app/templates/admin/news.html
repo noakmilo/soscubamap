@@ -1,0 +1,49 @@
+{% extends "shared/base.html" %}
+{% block title %} | Admin Noticias{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="admin-toolbar">
+    <h1>Noticias</h1>
+    <div class="admin-actions">
+      <a class="btn-primary news-create-btn" href="{{ url_for('news.new_post') }}"><i class="fa-solid fa-plus" aria-hidden="true"></i><span>Nueva noticia</span></a>
+      <a class="btn-secondary" href="{{ url_for('admin.dashboard') }}">Volver al Admin</a>
+    </div>
+  </div>
+
+  {% if posts %}
+    <div class="table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Título</th>
+            <th>Autor</th>
+            <th>Fecha</th>
+            <th>Comentarios</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for post in posts %}
+            <tr>
+              <td><a href="{{ url_for('news.detail', slug=post.slug) }}">{{ post.title }}</a></td>
+              <td>{{ post.author_name }}</td>
+              <td>{{ post.created_at }}</td>
+              <td>{{ comment_counts.get(post.id, 0) }}</td>
+              <td>
+                <div class="admin-actions">
+                  <a class="btn-secondary" href="{{ url_for('admin.edit_news_post', post_id=post.id) }}">Editar</a>
+                  <form method="post" action="{{ url_for('admin.delete_news_post', post_id=post.id) }}" onsubmit="return confirm('¿Eliminar esta noticia?');">
+                    <button class="btn-secondary" type="submit">Eliminar</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="muted">No hay noticias publicadas todavía.</div>
+  {% endif %}
+</section>
+{% endblock %}

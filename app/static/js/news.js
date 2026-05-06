@@ -9,8 +9,18 @@ function newsWrapSelection(textarea, before, after, placeholder = "") {
   textarea.focus();
 }
 
+const newsImageObjectUrls = new Map();
+
+function newsResolveImageTokens(source) {
+  let raw = source || "";
+  newsImageObjectUrls.forEach((url, idx) => {
+    raw = raw.replaceAll(`news-image:${idx}`, url);
+  });
+  return raw;
+}
+
 function newsRenderMarkdown(source) {
-  const raw = source || "";
+  const raw = newsResolveImageTokens(source);
   if (window.marked) {
     window.marked.setOptions({ breaks: true });
     const parsed = window.marked.parse(raw);
@@ -50,6 +60,16 @@ function setupNewsEditor() {
   });
 }
 
+function insertNewsImage(idx) {
+  const textarea = document.getElementById("newsBody");
+  if (!textarea) return;
+  const altInput = document.querySelector(`[data-news-image-alt="${idx}"]`);
+  const alt = altInput && altInput.value.trim() ? altInput.value.trim() : "Imagen";
+  newsWrapSelection(textarea, `\n![${alt}](news-image:${idx})\n`, "", "");
+  const preview = document.getElementById("newsPreview");
+  if (preview) preview.innerHTML = newsRenderMarkdown(textarea.value);
+}
+
 function setupNewsImages() {
   const input = document.querySelector('.news-form input[name="images"]');
   const status = document.getElementById("newsImageStatus");
@@ -69,6 +89,7 @@ function setupNewsImages() {
   };
 
   const renderPreviews = () => {
+    newsImageObjectUrls.clear();
     if (!input.files || input.files.length === 0) {
       previewList.innerHTML = "";
       return;
@@ -76,18 +97,32 @@ function setupNewsImages() {
     previewList.innerHTML = Array.from(input.files)
       .map((file, idx) => {
         const url = URL.createObjectURL(file);
+        newsImageObjectUrls.set(idx, url);
         const label = idx === 0 ? "ALT de imagen principal" : "ALT de imagen";
         return `
           <div class="image-preview-card">
             <img src="${url}" alt="Vista previa ${idx + 1}" />
             <label class="image-caption">
               ${label}
-              <input type="text" name="image_alts[]" maxlength="255" placeholder="${file.name}" />
+              <input type="text" name="image_alts[]" maxlength="255" placeholder="${file.name}" data-news-image-alt="${idx}" />
             </label>
+            <button type="button" class="btn-secondary news-insert-image-btn" data-news-insert-image="${idx}">
+              <i class="fa-solid fa-image" aria-hidden="true"></i>
+              <span>Insertar imagen</span>
+            </button>
           </div>
         `;
       })
       .join("");
+    previewList.querySelectorAll("[data-news-insert-image]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const idx = Number(btn.getAttribute("data-news-insert-image"));
+        if (Number.isFinite(idx)) insertNewsImage(idx);
+      });
+    });
+    const textarea = document.getElementById("newsBody");
+    const preview = document.getElementById("newsPreview");
+    if (textarea && preview) preview.innerHTML = newsRenderMarkdown(textarea.value);
   };
 
   input.addEventListener("change", () => {
@@ -174,7 +209,7 @@ function setupNewsSubmit() {
     if (!submit) return;
     submit.disabled = true;
     submit.dataset.loading = "true";
-    submit.textContent = "Publicando...";
+    submit.textContent = submit.textContent.includes("Guardar") ? "Guardando..." : "Publicando...";
   });
 }
 

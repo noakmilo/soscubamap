@@ -19,6 +19,11 @@ class NewsPost(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     created_by = db.relationship("User")
+    comments = db.relationship(
+        "NewsComment",
+        back_populates="post",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self):
         return f"<NewsPost {self.id} {self.slug}>"

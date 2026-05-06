@@ -17,6 +17,8 @@ from app.models.comment import Comment
 from app.models.discussion_post import DiscussionPost
 from app.models.discussion_comment import DiscussionComment
 from app.models.discussion_tag import DiscussionTag
+from app.models.news_post import NewsPost
+from app.models.news_comment import NewsComment
 from app.models.location_report import LocationReport
 from app.models.post_revision import PostRevision
 from app.models.post_edit_request import PostEditRequest
@@ -33,7 +35,7 @@ from app.models.repressor import (
 )
 from app.extensions import db
 from app.models.media import Media
-from app.services.media_upload import media_json_from_post, parse_media_json, get_media_payload
+from app.services.media_upload import media_json_from_post, parse_media_json, get_media_payload, upload_files, validate_files
 from app.services.input_safety import has_malicious_input
 from app.services.content_quality import validate_title, validate_description
 from app.services.category_rules import is_other_type_allowed
@@ -47,6 +49,12 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import selectinload
 from app.services.markdown_utils import render_markdown
 from app.services.discussion_tags import upsert_tags
+from app.services.news_posts import (
+    clean_image_alts,
+    fallback_news_summary,
+    replace_news_image_tokens,
+    unique_news_slug,
+)
 from app.services.protests import get_rss_feed_urls
 from app.services.protest_settings import (
     get_protest_settings_schema,
@@ -709,6 +717,94 @@ def delete_discussion(post_id):
     db.session.commit()
     flash("Discusión eliminada.", "success")
     return redirect(url_for("admin.discussions"))
+
+
+@admin_bp.route("/noticias")
+@login_required
+@role_required("administrador")
+def news_posts():
+    posts = NewsPost.query.order_by(NewsPost.created_at.desc()).all()
+    counts = dict(
+        db.session.query(NewsComment.post_id, func.count(NewsComment.id))
+        .group_by(NewsComment.post_id)
+        .all()
+    )
+    return render_template("admin/news.html", posts=posts, comment_counts=counts)
+
+
+@admin_bp.route("/noticias/<int:post_id>/editar", methods=["GET", "POST"])
+@login_required
+@role_required("administrador")
+def edit_news_post(post_id):
+    post = NewsPost.query.get_or_404(post_id)
+    existing_images = parse_media_json(post.images_json)
+
+    if request.method == "POST":
+        title = request.form.get("title", "").strip()
+        author_name = request.form.get("author_name", "").strip()
+        summary = request.form.get("summary", "").strip()
+        body = request.form.get("body", "").strip()
+        images = [
+            file
+            for file in request.files.getlist("images")
+            if file and (file.filename or "").strip()
+        ]
+        image_alts = request.form.getlist("image_alts[]")
+
+        if has_malicious_input([title, author_name, summary, body] + image_alts):
+            flash("Se detectó contenido sospechoso. Revisa y vuelve a intentar.", "error")
+            return redirect(url_for("admin.edit_news_post", post_id=post.id))
+
+        if not title or not author_name or not body:
+            flash("Título, autor y cuerpo son obligatorios.", "error")
+            return redirect(url_for("admin.edit_news_post", post_id=post.id))
+
+        uploaded_items = []
+        if images:
+            ok, error = validate_files(images)
+            if not ok:
+                flash(error, "error")
+                return redirect(url_for("admin.edit_news_post", post_id=post.id))
+            media_urls = upload_files(images)
+            alts = clean_image_alts(image_alts, len(media_urls))
+            uploaded_items = [
+                {"url": url, "alt": alts[idx] if idx < len(alts) else ""}
+                for idx, url in enumerate(media_urls)
+            ]
+            body = replace_news_image_tokens(body, uploaded_items)
+
+        if not summary:
+            summary = fallback_news_summary(body)
+
+        post.title = title[:220]
+        post.slug = unique_news_slug(title, current_post_id=post.id)
+        post.author_name = author_name[:120]
+        post.summary = summary[:500]
+        post.body = body
+        post.body_html = render_markdown(body)
+        if uploaded_items:
+            post.images_json = json.dumps(existing_images + uploaded_items)
+        db.session.commit()
+        flash("Noticia actualizada.", "success")
+        return redirect(url_for("admin.news_posts"))
+
+    return render_template(
+        "news/new.html",
+        post=post,
+        images=existing_images,
+        recaptcha_site_key=None,
+    )
+
+
+@admin_bp.route("/noticias/<int:post_id>/eliminar", methods=["POST"])
+@login_required
+@role_required("administrador")
+def delete_news_post(post_id):
+    post = NewsPost.query.get_or_404(post_id)
+    db.session.delete(post)
+    db.session.commit()
+    flash("Noticia eliminada.", "success")
+    return redirect(url_for("admin.news_posts"))
 
 
 @admin_bp.route("/reportes/comentarios/<int:comment_id>/eliminar", methods=["POST"])

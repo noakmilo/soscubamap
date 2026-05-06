@@ -30,6 +30,7 @@ from app.models.chat_message import ChatMessage
 from app.models.chat_presence import ChatPresence
 from app.models.discussion_post import DiscussionPost
 from app.models.discussion_comment import DiscussionComment
+from app.models.news_comment import NewsComment
 from app.models.push_subscription import PushSubscription
 from app.models.vote_record import VoteRecord
 from app.services.vote_identity import get_voter_hash
@@ -4550,6 +4551,57 @@ def vote_discussion_comment(comment_id):
     else:
         existing = VoteRecord(
             target_type="discussion_comment",
+            target_id=comment.id,
+            voter_hash=voter_hash,
+            value=value,
+        )
+        db.session.add(existing)
+
+    _apply_vote(comment, value)
+    db.session.commit()
+
+    return jsonify(
+        {
+            "ok": True,
+            "upvotes": comment.upvotes or 0,
+            "downvotes": comment.downvotes or 0,
+            "score": (comment.upvotes or 0) - (comment.downvotes or 0),
+        }
+    )
+
+
+@api_bp.route("/noticias/comentarios/<int:comment_id>/vote", methods=["POST"])
+@limiter.limit("10/minute; 200/day")
+def vote_news_comment(comment_id):
+    comment = NewsComment.query.get_or_404(comment_id)
+    data = request.get_json(silent=True) or {}
+    value = data.get("value")
+    if value not in (1, -1):
+        return jsonify({"ok": False, "error": "Voto inválido."}), 400
+
+    voter_hash = get_voter_hash(current_user, request, current_app.config.get("SECRET_KEY", ""))
+    existing = VoteRecord.query.filter_by(
+        target_type="news_comment",
+        target_id=comment.id,
+        voter_hash=voter_hash,
+    ).first()
+
+    if existing and existing.value == value:
+        return jsonify(
+            {
+                "ok": True,
+                "upvotes": comment.upvotes or 0,
+                "downvotes": comment.downvotes or 0,
+                "score": (comment.upvotes or 0) - (comment.downvotes or 0),
+            }
+        )
+
+    if existing:
+        _remove_vote(comment, existing.value)
+        existing.value = value
+    else:
+        existing = VoteRecord(
+            target_type="news_comment",
             target_id=comment.id,
             voter_hash=voter_hash,
             value=value,

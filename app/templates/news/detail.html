@@ -1,6 +1,18 @@
 {% extends "shared/base.html" %}
 {% block title %} | {{ post.title }}{% endblock %}
 {% block meta_description %}{{ post.summary }}{% endblock %}
+{% block head_extra %}
+<link rel="canonical" href="{{ canonical_url }}">
+<meta property="og:type" content="article">
+<meta property="og:title" content="{{ post.title }}">
+<meta property="og:description" content="{{ post.summary }}">
+<meta property="og:url" content="{{ canonical_url }}">
+{% if primary_image %}<meta property="og:image" content="{{ primary_image.url }}">{% endif %}
+<meta name="twitter:card" content="{% if primary_image %}summary_large_image{% else %}summary{% endif %}">
+<meta name="twitter:title" content="{{ post.title }}">
+<meta name="twitter:description" content="{{ post.summary }}">
+{% if primary_image %}<meta name="twitter:image" content="{{ primary_image.url }}">{% endif %}
+{% endblock %}
 {% block content %}
 <article class="panel news-page news-detail">
   <a class="btn-secondary" href="{{ url_for('news.index') }}">Volver a noticias</a>
@@ -30,4 +42,75 @@
     </div>
   {% endif %}
 </article>
+
+<section class="panel discussion-page news-page news-comments-panel">
+  {% macro render_news_comment(comment, depth=0) %}
+    <div class="discussion-comment" data-comment-id="{{ comment.id }}" style="margin-left: {{ depth * 18 }}px;">
+      <div class="discussion-meta">{{ comment.author_label }} · {{ comment.created_at }}</div>
+      <div class="discussion-body">{{ comment.rendered_body_html|safe }}</div>
+      <div class="discussion-actions">
+        <button class="vote-btn" data-type="news-comment" data-id="{{ comment.id }}" data-value="1">▲</button>
+        <span class="vote-score {% if comment.score < 0 %}score-negative{% endif %}" id="comment-score-{{ comment.id }}">{{ comment.score }}</span>
+        <button class="vote-btn" data-type="news-comment" data-id="{{ comment.id }}" data-value="-1">▼</button>
+        <button class="btn-secondary reply-toggle" type="button" data-reply-toggle="{{ comment.id }}">Responder</button>
+        {% if current_user.is_authenticated and current_user.has_role('administrador') %}
+          <form method="post" action="{{ url_for('news.delete_comment', comment_id=comment.id) }}" onsubmit="return confirm('¿Eliminar comentario?');">
+            <button class="btn-secondary" type="submit">Eliminar</button>
+          </form>
+        {% endif %}
+      </div>
+      <form id="reply-form-{{ comment.id }}" class="comment-form reply-form is-hidden" method="post">
+        <input type="hidden" name="parent_id" value="{{ comment.id }}" />
+        <label>
+          Nick
+          <input type="text" name="comment_nickname" value="{{ nick }}" maxlength="80" />
+        </label>
+        <label>
+          Comentario
+          <textarea name="comment_body" rows="4" required placeholder="Responde con contexto y fuentes"></textarea>
+        </label>
+        <button type="submit" class="btn-primary">Publicar comentario</button>
+      </form>
+    </div>
+    {% if comment.thread_children %}
+      {% for child in comment.thread_children %}
+        {{ render_news_comment(child, depth + 1) }}
+      {% endfor %}
+    {% endif %}
+  {% endmacro %}
+
+  <div class="discussion-comments">
+    <h2>Comentarios</h2>
+    {% if comments %}
+      {% for comment in comments %}
+        {{ render_news_comment(comment, 0) }}
+      {% endfor %}
+    {% else %}
+      <div class="muted">No hay comentarios aún.</div>
+    {% endif %}
+  </div>
+
+  <form class="comment-form" method="post">
+    <label>
+      Nick
+      <input type="text" name="comment_nickname" value="{{ nick }}" maxlength="80" />
+    </label>
+    <label>
+      Comentario
+      <textarea name="comment_body" rows="5" required placeholder="Responde con contexto y fuentes"></textarea>
+    </label>
+    {% if recaptcha_site_key %}
+      <div class="recaptcha-wrap">
+        <div class="g-recaptcha" id="newsCommentRecaptcha" data-sitekey="{{ recaptcha_site_key }}"></div>
+      </div>
+      <div class="field-error-msg" id="discussionRecaptchaStatus"></div>
+    {% endif %}
+    <button type="submit" class="btn-primary">Publicar comentario</button>
+  </form>
+</section>
+
+<script src="{{ url_for('static', filename='js/discussions.js') }}?v={{ config.ASSET_VERSION }}"></script>
+{% if recaptcha_site_key %}
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+{% endif %}
 {% endblock %}
