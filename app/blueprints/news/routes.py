@@ -61,6 +61,25 @@ def _comment_tree(post_id: int):
     return roots
 
 
+def _uploaded_news_items_from_form():
+    raw = (request.form.get("uploaded_images_json") or "").strip()
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw) or []
+    except Exception:
+        return []
+    items = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        url = (item.get("url") or "").strip()
+        if not url:
+            continue
+        items.append({"url": url, "alt": (item.get("alt") or "").strip()[:255]})
+    return items
+
+
 @news_bp.route("/noticias")
 def index():
     posts = NewsPost.query.order_by(NewsPost.created_at.desc()).all()
@@ -92,6 +111,7 @@ def new_post():
             if file and (file.filename or "").strip()
         ]
         image_alts = request.form.getlist("image_alts[]")
+        uploaded_items = _uploaded_news_items_from_form()
 
         if has_malicious_input([title, author_name, summary, body] + image_alts):
             flash("Se detectó contenido sospechoso. Revisa y vuelve a intentar.", "error")
@@ -107,15 +127,15 @@ def new_post():
                 flash(error, "error")
                 return redirect(url_for("news.new_post"))
 
-        uploaded_items = []
         if images:
             media_urls = upload_files(images)
             alts = clean_image_alts(image_alts, len(media_urls))
-            uploaded_items = [
+            posted_items = [
                 {"url": url, "alt": alts[idx] if idx < len(alts) else ""}
                 for idx, url in enumerate(media_urls)
             ]
-            body = replace_news_image_tokens(body, uploaded_items)
+            body = replace_news_image_tokens(body, posted_items)
+            uploaded_items.extend(posted_items)
 
         if not summary:
             summary = fallback_news_summary(body)
@@ -142,6 +162,35 @@ def new_post():
         images=[],
         recaptcha_site_key=current_app.config.get("RECAPTCHA_V2_SITE_KEY"),
     )
+
+
+@news_bp.route("/noticias/imagen", methods=["POST"])
+@login_required
+@role_required("administrador")
+@limiter.limit("12/minute; 120/hour", methods=["POST"])
+def upload_image():
+    images = [
+        file
+        for file in request.files.getlist("images")
+        if file and (file.filename or "").strip()
+    ]
+    image_alts = request.form.getlist("image_alts[]")
+    if has_malicious_input(image_alts):
+        return jsonify({"ok": False, "error": "Se detectó contenido sospechoso."}), 400
+    if not images:
+        return jsonify({"ok": False, "error": "Selecciona al menos una imagen."}), 400
+    ok, error = validate_files(images)
+    if not ok:
+        return jsonify({"ok": False, "error": error}), 400
+
+    media_urls = upload_files(images)
+    alts = clean_image_alts(image_alts, len(media_urls))
+    items = [
+        {"url": url, "alt": alts[idx] if idx < len(alts) else ""}
+        for idx, url in enumerate(media_urls)
+    ]
+    markdown = "\n".join(f"![{item.get('alt') or 'Imagen'}]({item['url']})" for item in items)
+    return jsonify({"ok": True, "items": items, "markdown": markdown})
 
 
 @news_bp.route("/noticias/resumen", methods=["POST"])

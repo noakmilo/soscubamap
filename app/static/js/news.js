@@ -9,18 +9,8 @@ function newsWrapSelection(textarea, before, after, placeholder = "") {
   textarea.focus();
 }
 
-const newsImageObjectUrls = new Map();
-
-function newsResolveImageTokens(source) {
-  let raw = source || "";
-  newsImageObjectUrls.forEach((url, idx) => {
-    raw = raw.replaceAll(`news-image:${idx}`, url);
-  });
-  return raw;
-}
-
 function newsRenderMarkdown(source) {
-  const raw = newsResolveImageTokens(source);
+  const raw = source || "";
   if (window.marked) {
     window.marked.setOptions({ breaks: true });
     const parsed = window.marked.parse(raw);
@@ -60,20 +50,32 @@ function setupNewsEditor() {
   });
 }
 
-function insertNewsImage(idx) {
+function insertNewsMarkdown(markdown) {
   const textarea = document.getElementById("newsBody");
   if (!textarea) return;
-  const altInput = document.querySelector(`[data-news-image-alt="${idx}"]`);
-  const alt = altInput && altInput.value.trim() ? altInput.value.trim() : "Imagen";
-  newsWrapSelection(textarea, `\n![${alt}](news-image:${idx})\n`, "", "");
+  newsWrapSelection(textarea, `\n${markdown}\n`, "", "");
   const preview = document.getElementById("newsPreview");
   if (preview) preview.innerHTML = newsRenderMarkdown(textarea.value);
+}
+
+function syncUploadedNewsItems(items) {
+  const input = document.getElementById("newsUploadedImagesJson");
+  if (!input) return;
+  let current = [];
+  try {
+    current = JSON.parse(input.value || "[]") || [];
+  } catch (error) {
+    current = [];
+  }
+  input.value = JSON.stringify(current.concat(items || []));
 }
 
 function setupNewsImages() {
   const input = document.querySelector('.news-form input[name="images"]');
   const status = document.getElementById("newsImageStatus");
   const previewList = document.getElementById("newsImagePreviewList");
+  const uploadBtn = document.getElementById("uploadInsertNewsImages");
+  const form = document.querySelector(".news-form");
   if (!input || !previewList) return;
 
   const maxFiles = parseInt(input.dataset.maxFiles || "3", 10);
@@ -89,7 +91,6 @@ function setupNewsImages() {
   };
 
   const renderPreviews = () => {
-    newsImageObjectUrls.clear();
     if (!input.files || input.files.length === 0) {
       previewList.innerHTML = "";
       return;
@@ -97,7 +98,6 @@ function setupNewsImages() {
     previewList.innerHTML = Array.from(input.files)
       .map((file, idx) => {
         const url = URL.createObjectURL(file);
-        newsImageObjectUrls.set(idx, url);
         const label = idx === 0 ? "ALT de imagen principal" : "ALT de imagen";
         return `
           <div class="image-preview-card">
@@ -106,20 +106,10 @@ function setupNewsImages() {
               ${label}
               <input type="text" name="image_alts[]" maxlength="255" placeholder="${file.name}" data-news-image-alt="${idx}" />
             </label>
-            <button type="button" class="btn-secondary news-insert-image-btn" data-news-insert-image="${idx}">
-              <i class="fa-solid fa-image" aria-hidden="true"></i>
-              <span>Insertar imagen</span>
-            </button>
           </div>
         `;
       })
       .join("");
-    previewList.querySelectorAll("[data-news-insert-image]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const idx = Number(btn.getAttribute("data-news-insert-image"));
-        if (Number.isFinite(idx)) insertNewsImage(idx);
-      });
-    });
     const textarea = document.getElementById("newsBody");
     const preview = document.getElementById("newsPreview");
     if (textarea && preview) preview.innerHTML = newsRenderMarkdown(textarea.value);
@@ -152,6 +142,47 @@ function setupNewsImages() {
     if (status) status.textContent = "";
     renderPreviews();
   });
+
+  if (uploadBtn && form) {
+    uploadBtn.addEventListener("click", async () => {
+      const endpoint = form.dataset.imageUploadUrl || "";
+      if (!endpoint) return;
+      if (!input.files || input.files.length === 0) {
+        showError("Selecciona una imagen primero.");
+        return;
+      }
+
+      const formData = new FormData();
+      Array.from(input.files).forEach((file) => formData.append("images", file));
+      Array.from(document.querySelectorAll("[data-news-image-alt]")).forEach((altInput) => {
+        formData.append("image_alts[]", altInput.value || "");
+      });
+
+      uploadBtn.disabled = true;
+      uploadBtn.dataset.loading = "true";
+      showError("Subiendo imagen...");
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          body: formData,
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.error || "No se pudo subir la imagen.");
+        }
+        syncUploadedNewsItems(payload.items || []);
+        insertNewsMarkdown(payload.markdown || "");
+        input.value = "";
+        previewList.innerHTML = "";
+        showError("Imagen subida e insertada.");
+      } catch (error) {
+        showError(error.message || "No se pudo subir la imagen.");
+      } finally {
+        uploadBtn.disabled = false;
+        uploadBtn.dataset.loading = "";
+      }
+    });
+  }
 }
 
 function setupNewsSummary() {

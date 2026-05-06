@@ -750,6 +750,18 @@ def edit_news_post(post_id):
             if file and (file.filename or "").strip()
         ]
         image_alts = request.form.getlist("image_alts[]")
+        uploaded_items = []
+        raw_uploaded = (request.form.get("uploaded_images_json") or "").strip()
+        if raw_uploaded:
+            try:
+                uploaded_data = json.loads(raw_uploaded) or []
+            except Exception:
+                uploaded_data = []
+            for item in uploaded_data:
+                if isinstance(item, dict) and item.get("url"):
+                    uploaded_items.append(
+                        {"url": (item.get("url") or "").strip(), "alt": (item.get("alt") or "").strip()[:255]}
+                    )
 
         if has_malicious_input([title, author_name, summary, body] + image_alts):
             flash("Se detectó contenido sospechoso. Revisa y vuelve a intentar.", "error")
@@ -759,7 +771,6 @@ def edit_news_post(post_id):
             flash("Título, autor y cuerpo son obligatorios.", "error")
             return redirect(url_for("admin.edit_news_post", post_id=post.id))
 
-        uploaded_items = []
         if images:
             ok, error = validate_files(images)
             if not ok:
@@ -767,11 +778,12 @@ def edit_news_post(post_id):
                 return redirect(url_for("admin.edit_news_post", post_id=post.id))
             media_urls = upload_files(images)
             alts = clean_image_alts(image_alts, len(media_urls))
-            uploaded_items = [
+            posted_items = [
                 {"url": url, "alt": alts[idx] if idx < len(alts) else ""}
                 for idx, url in enumerate(media_urls)
             ]
-            body = replace_news_image_tokens(body, uploaded_items)
+            body = replace_news_image_tokens(body, posted_items)
+            uploaded_items.extend(posted_items)
 
         if not summary:
             summary = fallback_news_summary(body)
