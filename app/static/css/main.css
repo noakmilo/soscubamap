@@ -116,12 +116,13 @@ h3 {
   width: 1.1em;
   min-width: 1.1em;
   text-align: center;
-  font-size: 13px;
+  font-size: 11px;
   line-height: 1;
 }
 
 .nav-link-label {
   line-height: 1.1;
+  font-size: 11px;
 }
 
 .nav-badge {
