@@ -4725,6 +4725,141 @@ button[data-loading="true"]::after {
   gap: 6px;
 }
 
+.news-page {
+  max-width: 980px;
+}
+
+.news-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.news-list {
+  display: grid;
+  gap: 18px;
+}
+
+.news-card {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #0c1216;
+  overflow: hidden;
+}
+
+.news-thumb {
+  display: block;
+  min-height: 150px;
+  background: #0b1014;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.news-thumb img {
+  width: 100%;
+  height: 100%;
+  min-height: 150px;
+  object-fit: cover;
+  display: block;
+}
+
+.news-thumb-empty {
+  min-height: 150px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+}
+
+.news-card-body {
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  padding: 14px 14px 14px 0;
+}
+
+.news-card h2 {
+  font-size: 21px;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.news-card h2 a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.news-card h2 a:hover {
+  color: var(--accent);
+}
+
+.news-card p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.news-meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.news-detail {
+  display: grid;
+  gap: 18px;
+}
+
+.news-article-head {
+  display: grid;
+  gap: 10px;
+}
+
+.news-article-head h1 {
+  max-width: 820px;
+}
+
+.news-article-head p {
+  max-width: 760px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.news-hero-image {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0b1014;
+}
+
+.news-hero-image img {
+  width: 100%;
+  max-height: 520px;
+  object-fit: cover;
+  display: block;
+}
+
+.news-body {
+  max-width: 760px;
+}
+
+.news-gallery img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.news-form label {
+  display: grid;
+  gap: 8px;
+}
+
 @media (max-width: 900px) {
   .analytics-card {
     height: 320px;
@@ -4736,6 +4871,18 @@ button[data-loading="true"]::after {
   }
   .editor-grid {
     grid-template-columns: 1fr;
+  }
+
+  .news-head {
+    display: grid;
+  }
+
+  .news-card {
+    grid-template-columns: 1fr;
+  }
+
+  .news-card-body {
+    padding: 14px;
   }
 }
 

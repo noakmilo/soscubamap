@@ -40,6 +40,10 @@
           <i class="fa-solid fa-comments nav-link-icon" aria-hidden="true"></i>
           <span class="nav-link-label">Discusiones</span>
         </a>
+        <a href="{{ url_for('news.index') }}" aria-label="Noticias">
+          <i class="fa-solid fa-newspaper nav-link-icon" aria-hidden="true"></i>
+          <span class="nav-link-label">Noticias</span>
+        </a>
         {% if current_user.is_authenticated %}
           <button
             class="btn-secondary nav-link-btn"

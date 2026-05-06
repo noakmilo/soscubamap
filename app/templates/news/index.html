@@ -1,0 +1,39 @@
+{% extends "shared/base.html" %}
+{% block title %} | Noticias{% endblock %}
+{% block meta_description %}Noticias y actualizaciones de #SOSCuba Map.{% endblock %}
+{% block content %}
+<section class="panel news-page">
+  <div class="news-head">
+    <div>
+      <h1>Noticias</h1>
+      <p class="muted">Actualizaciones, contexto y publicaciones de #SOSCuba Map.</p>
+    </div>
+    {% if current_user.is_authenticated and current_user.has_role('administrador') %}
+      <a class="btn-primary" href="{{ url_for('news.new_post') }}">Nueva noticia</a>
+    {% endif %}
+  </div>
+
+  {% if posts %}
+    <div class="news-list">
+      {% for post in posts %}
+        <article class="news-card">
+          <a class="news-thumb" href="{{ url_for('news.detail', slug=post.slug) }}" aria-label="{{ post.title }}">
+            {% if post.thumbnail %}
+              <img src="{{ post.thumbnail.url }}" alt="{{ post.thumbnail.alt or post.title }}" loading="lazy" />
+            {% else %}
+              <div class="news-thumb-empty">#SOSCuba</div>
+            {% endif %}
+          </a>
+          <div class="news-card-body">
+            <div class="news-meta">{{ post.author_name }} · {{ post.created_at.strftime("%d/%m/%Y") if post.created_at else "" }}</div>
+            <h2><a href="{{ url_for('news.detail', slug=post.slug) }}">{{ post.title }}</a></h2>
+            <p>{{ post.summary }}</p>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="muted">No hay noticias publicadas todavía.</p>
+  {% endif %}
+</section>
+{% endblock %}

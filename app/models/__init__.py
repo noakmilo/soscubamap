@@ -14,6 +14,7 @@ from .chat_presence import ChatPresence
 from .discussion_post import DiscussionPost
 from .discussion_comment import DiscussionComment
 from .discussion_tag import DiscussionTag, discussion_post_tags
+from .news_post import NewsPost
 from .push_subscription import PushSubscription
 from .vote_record import VoteRecord
 from .donation_log import DonationLog
@@ -62,6 +63,7 @@ __all__ = [
     "DiscussionComment",
     "DiscussionTag",
     "discussion_post_tags",
+    "NewsPost",
     "PushSubscription",
     "VoteRecord",
     "DonationLog",

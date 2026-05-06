@@ -1,0 +1,67 @@
+{% extends "shared/base.html" %}
+{% block title %} | Nueva noticia{% endblock %}
+{% block meta_description %}Crear una nueva noticia en #SOSCuba Map.{% endblock %}
+{% block content %}
+<section class="panel discussion-page news-page">
+  <div class="news-head">
+    <div>
+      <h1>Nueva noticia</h1>
+      <p class="muted">Publicación tipo blog visible en /noticias.</p>
+    </div>
+    <a class="btn-secondary" href="{{ url_for('news.index') }}">Volver</a>
+  </div>
+
+  <form class="discussion-form news-form" method="post" enctype="multipart/form-data" data-summary-url="{{ url_for('news.summarize') }}">
+    <label>
+      Título
+      <input type="text" name="title" id="newsTitle" required maxlength="220" placeholder="Título de la noticia" />
+    </label>
+    <label>
+      Autor
+      <input type="text" name="author_name" required maxlength="120" placeholder="Nombre del autor" />
+    </label>
+    <label>
+      Resumen
+      <textarea name="summary" id="newsSummary" rows="4" maxlength="500" placeholder="Resumen para la tarjeta de /noticias"></textarea>
+      <button type="button" class="btn-secondary" id="generateNewsSummary">Generar resumen con IA</button>
+      <span class="media-status" id="newsSummaryStatus"></span>
+    </label>
+
+    <div class="editor-grid">
+      <div class="editor-column">
+        <div class="editor-toolbar">
+          <button type="button" class="editor-btn" data-md="bold"><strong>B</strong></button>
+          <button type="button" class="editor-btn" data-md="italic"><em>I</em></button>
+          <button type="button" class="editor-btn" data-md="underline"><span style="text-decoration: underline;">U</span></button>
+          <button type="button" class="editor-btn" data-md="h2">H2</button>
+          <button type="button" class="editor-btn" data-md="h3">H3</button>
+          <button type="button" class="editor-btn" data-md="link">Link</button>
+        </div>
+        <textarea id="newsBody" name="body" rows="16" required placeholder="Escribe la noticia en markdown..."></textarea>
+      </div>
+      <div class="editor-preview" id="newsPreview"></div>
+    </div>
+
+    <label>
+      Imágenes (máx {{ config.IMAGE_MAX_PER_SUBMIT }}, {{ config.IMAGE_MAX_MB }}MB c/u)
+      <input
+        type="file"
+        name="images"
+        multiple
+        accept=".jpg,.jpeg,.png,.webp,.heic,image/heic,image/heif"
+        data-max-files="{{ config.IMAGE_MAX_PER_SUBMIT }}"
+        data-max-mb="{{ config.IMAGE_MAX_MB }}"
+        data-allowed-ext="{{ config.IMAGE_ALLOWED_EXTENSIONS }}"
+      />
+      <div class="media-status" id="newsImageStatus"></div>
+    </label>
+    <div class="image-previews" id="newsImagePreviewList"></div>
+
+    <button type="submit" class="btn-primary">Publicar noticia</button>
+  </form>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+<script src="{{ url_for('static', filename='js/news.js') }}?v={{ config.ASSET_VERSION }}"></script>
+{% endblock %}

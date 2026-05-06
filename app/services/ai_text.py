@@ -9,6 +9,7 @@ MAX_INPUT_LENGTH = {
     FIELD_TITLE: 200,
     FIELD_DESCRIPTION: 6000,
 }
+MAX_NEWS_BODY_LENGTH = 12000
 
 
 def _build_system_prompt(field: str) -> str:
@@ -134,3 +135,52 @@ def optimize_report_text(
     if normalized_field == FIELD_TITLE:
         return message[:200].strip()
     return message.strip()
+
+
+def generate_news_summary(title: str, body: str) -> str:
+    title_value = (title or "").strip()[:220]
+    body_value = (body or "").strip()
+    if not body_value:
+        raise ValueError("No hay cuerpo de noticia para resumir.")
+    if len(body_value) > MAX_NEWS_BODY_LENGTH:
+        raise ValueError(f"El cuerpo supera el maximo permitido ({MAX_NEWS_BODY_LENGTH} caracteres).")
+    if has_malicious_input([title_value, body_value]):
+        raise ValueError("Se detecto contenido sospechoso.")
+
+    model = (current_app.config.get("OPENAI_TEXT_MODEL") or "gpt-4o-mini").strip()
+    if not model:
+        model = "gpt-4o-mini"
+
+    client = _load_openai_client()
+    response = client.chat.completions.create(
+        model=model,
+        temperature=0.2,
+        max_tokens=130,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "Eres un editor de noticias en espanol. Resume una noticia para una "
+                    "tarjeta de blog en 1 o 2 frases, maximo 320 caracteres. No inventes "
+                    "hechos, no agregues opinion y devuelve solo el resumen."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"Titulo: {title_value}\n\n"
+                    f"Cuerpo en markdown:\n{body_value[:MAX_NEWS_BODY_LENGTH]}\n\n"
+                    "Devuelve solo el resumen final."
+                ),
+            },
+        ],
+    )
+
+    message = ""
+    if response and getattr(response, "choices", None):
+        first = response.choices[0]
+        if first and getattr(first, "message", None):
+            message = (first.message.content or "").strip()
+    if not message:
+        raise RuntimeError("OpenAI no devolvio resumen.")
+    return message[:500].strip()

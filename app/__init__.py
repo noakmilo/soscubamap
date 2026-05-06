@@ -10,6 +10,7 @@ from .blueprints.moderation import moderation_bp
 from .blueprints.api import api_bp
 from .blueprints.discussions import discussions_bp
 from .blueprints.panic import panic_bp
+from .blueprints.news import news_bp
 
 
 def create_app(config_object="config.settings.Config"):
@@ -32,6 +33,7 @@ def create_app(config_object="config.settings.Config"):
     app.register_blueprint(api_bp, url_prefix="/api")
     app.register_blueprint(discussions_bp)
     app.register_blueprint(panic_bp)
+    app.register_blueprint(news_bp)
 
     @app.context_processor
     def inject_moderation_pending_count():

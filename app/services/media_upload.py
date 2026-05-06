@@ -122,5 +122,9 @@ def parse_media_json(raw: str) -> List[Dict[str, Any]]:
             if not url:
                 continue
             caption = item.get("caption") or ""
-            items.append({"url": url, "caption": caption})
+            alt = item.get("alt") or item.get("alt_text") or ""
+            media_item = {"url": url, "caption": caption}
+            if alt:
+                media_item["alt"] = alt
+            items.append(media_item)
     return items

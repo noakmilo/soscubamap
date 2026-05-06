@@ -1,0 +1,33 @@
+{% extends "shared/base.html" %}
+{% block title %} | {{ post.title }}{% endblock %}
+{% block meta_description %}{{ post.summary }}{% endblock %}
+{% block content %}
+<article class="panel news-page news-detail">
+  <a class="btn-secondary" href="{{ url_for('news.index') }}">Volver a noticias</a>
+  <header class="news-article-head">
+    <div class="news-meta">{{ post.author_name }} · {{ post.created_at.strftime("%d/%m/%Y") if post.created_at else "" }}</div>
+    <h1>{{ post.title }}</h1>
+    <p>{{ post.summary }}</p>
+  </header>
+
+  {% if images %}
+    <div class="news-hero-image">
+      <img src="{{ images[0].url }}" alt="{{ images[0].alt or post.title }}" />
+    </div>
+  {% endif %}
+
+  <div class="discussion-body news-body">
+    {{ post.body_html|safe }}
+  </div>
+
+  {% if images|length > 1 %}
+    <div class="discussion-gallery news-gallery">
+      {% for image in images[1:] %}
+        <figure class="discussion-media-item">
+          <img src="{{ image.url }}" alt="{{ image.alt or post.title }}" loading="lazy" />
+        </figure>
+      {% endfor %}
+    </div>
+  {% endif %}
+</article>
+{% endblock %}
