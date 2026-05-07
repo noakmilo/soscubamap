@@ -102,6 +102,8 @@
     const artFrame = clone.querySelector(".repressor-duel-art-frame");
     if (artFrame) {
       artFrame.style.background = "#262324";
+      artFrame.style.width = "360px";
+      artFrame.style.justifySelf = "center";
       artFrame.style.minHeight = "0";
       artFrame.style.height = "auto";
       artFrame.style.aspectRatio = "1 / 1";
@@ -109,8 +111,8 @@
     clone.querySelectorAll(".repressor-duel-art").forEach((img) => {
       img.style.width = "100%";
       img.style.height = "100%";
-      img.style.objectFit = "contain";
-      img.style.objectPosition = "top center";
+      img.style.objectFit = "cover";
+      img.style.objectPosition = "center";
       img.style.background = "#262324";
     });
 

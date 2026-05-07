@@ -4833,10 +4833,12 @@ button[data-loading="true"]::after {
   border-radius: 8px;
   overflow: hidden;
   background: #0b1014;
+  display: grid;
+  place-items: center;
 }
 
 .news-hero-image img {
-  width: 100%;
+  max-width: 720px;
   max-height: 520px;
   object-fit: cover;
   display: block;
@@ -4927,6 +4929,9 @@ button[data-loading="true"]::after {
 .editor-preview img,
 .news-body img {
   max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 18px auto;
   border-radius: 8px;
 }
 
@@ -6131,8 +6136,9 @@ textarea {
 
 .repressor-duel-art-frame {
   margin-top: 2px;
-  width: 100%;
+  width: min(100%, 360px);
   aspect-ratio: 1 / 1;
+  justify-self: center;
   border-radius: 12px;
   border: 1px solid var(--border);
   background: #0a1116;
@@ -6157,7 +6163,8 @@ textarea {
   height: 100%;
   max-width: none;
   max-height: none;
-  object-fit: contain;
+  object-fit: cover;
+  object-position: center;
 }
 
 .repressor-duel-art-empty {
@@ -6455,6 +6462,7 @@ textarea {
   }
 
   .repressor-duel-art-frame {
+    width: min(100%, 300px);
     min-height: 0;
   }
 
