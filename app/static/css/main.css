@@ -4928,7 +4928,8 @@ button[data-loading="true"]::after {
 .news-preview-image,
 .editor-preview img,
 .news-body img {
-  max-width: 100%;
+  width: auto;
+  max-width: min(100%, 720px);
   height: auto;
   display: block;
   margin: 18px auto;
