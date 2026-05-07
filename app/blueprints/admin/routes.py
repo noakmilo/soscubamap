@@ -793,7 +793,7 @@ def edit_news_post(post_id):
         post.author_name = author_name[:120]
         post.summary = summary[:500]
         post.body = body
-        post.body_html = render_markdown(body)
+        post.body_html = render_markdown(body, allow_images=True)
         if uploaded_items:
             post.images_json = json.dumps(existing_images + uploaded_items)
         db.session.commit()

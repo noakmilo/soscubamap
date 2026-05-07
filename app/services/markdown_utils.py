@@ -21,7 +21,12 @@ ALLOWED_ATTRS = {
 }
 
 
-def render_markdown(text: str) -> str:
+def render_markdown(text: str, allow_images: bool = False) -> str:
     raw = md.markdown(text or "", extensions=["extra", "sane_lists", "nl2br"])
-    clean = bleach.clean(raw, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS, strip=True)
+    tags = list(ALLOWED_TAGS)
+    attrs = dict(ALLOWED_ATTRS)
+    if allow_images:
+        tags.append("img")
+        attrs["img"] = ["src", "alt", "title"]
+    clean = bleach.clean(raw, tags=tags, attributes=attrs, strip=True)
     return clean

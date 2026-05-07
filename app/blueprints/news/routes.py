@@ -16,6 +16,7 @@ from app.services.news_posts import (
     clean_image_alts,
     fallback_news_summary,
     replace_news_image_tokens,
+    standalone_news_images,
     unique_news_slug,
 )
 from app.services.recaptcha import recaptcha_enabled, verify_recaptcha
@@ -147,7 +148,7 @@ def new_post():
             author_name=author_name[:120],
             summary=summary,
             body=body,
-            body_html=render_markdown(body),
+            body_html=render_markdown(body, allow_images=True),
             images_json=json.dumps(uploaded_items) if uploaded_items else None,
             created_by_id=current_user.id if current_user.is_authenticated else None,
         )
@@ -271,11 +272,13 @@ def detail(slug):
         return redirect(url_for("news.detail", slug=post.slug))
 
     images = parse_media_json(post.images_json)
+    standalone_images = standalone_news_images(images, post.body)
     primary_image = images[0] if images else None
     return render_template(
         "news/detail.html",
         post=post,
-        images=images,
+        body_html=render_markdown(post.body, allow_images=True),
+        images=standalone_images,
         primary_image=primary_image,
         comments=_comment_tree(post.id),
         nick=_get_news_nick(),

@@ -6131,12 +6131,12 @@ textarea {
 
 .repressor-duel-art-frame {
   margin-top: 2px;
+  width: 100%;
+  aspect-ratio: 1 / 1;
   border-radius: 12px;
   border: 1px solid var(--border);
   background: #0a1116;
   overflow: hidden;
-  min-height: 220px;
-  height: clamp(220px, 36vh, 420px);
   display: grid;
   place-items: center;
 }
@@ -6150,6 +6150,14 @@ textarea {
   object-position: center;
   display: block;
   cursor: zoom-in;
+}
+
+.repressor-duel-art-frame > .repressor-duel-art {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: contain;
 }
 
 .repressor-duel-art-empty {
@@ -6447,8 +6455,7 @@ textarea {
   }
 
   .repressor-duel-art-frame {
-    min-height: 180px;
-    height: clamp(180px, 34vh, 300px);
+    min-height: 0;
   }
 
   .repressor-duel-grid {

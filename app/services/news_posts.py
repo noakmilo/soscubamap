@@ -61,3 +61,14 @@ def replace_news_image_tokens(body: str, uploaded_items) -> str:
             continue
         value = value.replace(f"news-image:{idx}", url)
     return value
+
+
+def standalone_news_images(images, body: str):
+    source = body or ""
+    standalone = []
+    for image in images or []:
+        url = image.get("url") if isinstance(image, dict) else ""
+        if not url or url in source:
+            continue
+        standalone.append(image)
+    return standalone

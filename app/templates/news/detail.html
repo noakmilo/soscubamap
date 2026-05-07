@@ -29,7 +29,7 @@
   {% endif %}
 
   <div class="discussion-body news-body">
-    {{ post.body_html|safe }}
+    {{ body_html|default(post.body_html)|safe }}
   </div>
 
   {% if images|length > 1 %}

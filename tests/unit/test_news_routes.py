@@ -104,6 +104,29 @@ def test_news_detail_accepts_comment(app, client):
         assert "<strong>útil</strong>" in comment.body_html
 
 
+def test_news_detail_renders_inline_images_without_duplicate_gallery(app, client):
+    image_url = "https://example.com/foto.jpg"
+    with app.app_context():
+        post = NewsPost(
+            title="Noticia con imagen inline",
+            slug="noticia-con-imagen-inline",
+            author_name="Equipo",
+            summary="Resumen",
+            body=f"Texto inicial\n\n![Foto en texto]({image_url})\n\nTexto final",
+            body_html="<p>Texto inicial</p><p>Foto en texto</p><p>Texto final</p>",
+            images_json=f'[{{"url": "{image_url}", "alt": "Foto en texto"}}]',
+        )
+        db.session.add(post)
+        db.session.commit()
+
+    response = client.get("/noticias/noticia-con-imagen-inline")
+    html = response.get_data(as_text=True)
+    assert response.status_code == 200
+    assert '<img alt="Foto en texto" src="https://example.com/foto.jpg">' in html
+    assert "news-hero-image" not in html
+    assert "news-gallery" not in html
+
+
 def test_admin_news_panel_lists_post(app, client):
     admin_id = _seed_admin(app)
     with app.app_context():
